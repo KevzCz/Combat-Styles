@@ -3,8 +3,9 @@
   "id": "combat_styles",
   "version": "${version}",
   "name": "Combat Styles",
-  "description": "Collect attack styles from BetterCombat weapons and compose custom attack sequences onto your weapon.",
+  "description": "Craft your Combat Style",
   "authors": [
+    "KevzCz",
     "Pixel Dream Studios"
   ],
   "contact": {},

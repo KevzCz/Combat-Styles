@@ -83,7 +83,7 @@ public record EquipmentDefinition(String id,
             ByteBufCodecs.map(LinkedHashMap::new, ByteBufCodecs.STRING_UTF8, STREAM_CODEC);
 
     public EquipmentDefinition {
-        effects = effects == null ? Map.of() : new LinkedHashMap<>(effects);
+        effects = effects == null ? Map.of() : withEventPayloads(effects, groups);
         attributes = attributes == null ? Map.of() : new LinkedHashMap<>(attributes);
         innateAffixes = innateAffixes == null ? List.of() : List.copyOf(innateAffixes);
         groups = groups == null ? Map.of() : withTriggerChances(groups, effects);
@@ -97,6 +97,24 @@ public record EquipmentDefinition(String id,
         excludedCategories = excludedCategories == null
                 ? List.of()
                 : List.copyOf(excludedCategories);
+    }
+
+    private static Map<String, TriggeredEffect> withEventPayloads(Map<String, TriggeredEffect> effects,
+                                                                  Map<String, EffectGroup> groups) {
+        Map<String, TriggeredEffect> migrated = new LinkedHashMap<>();
+        for (Map.Entry<String, TriggeredEffect> named : effects.entrySet()) {
+            EquipmentTrigger groupTrigger = null;
+            if (groups != null) {
+                for (EffectGroup group : groups.values()) {
+                    if (group.holds(named.getKey())) {
+                        groupTrigger = group.trigger();
+                        break;
+                    }
+                }
+            }
+            migrated.put(named.getKey(), EventPayloads.migrated(named.getValue(), groupTrigger));
+        }
+        return migrated;
     }
 
     private static Map<String, EffectGroup> withTriggerChances(Map<String, EffectGroup> groups,

@@ -7,12 +7,14 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 import net.pixeldreamstudios.combat_styles.affix.CastSpell;
 import net.pixeldreamstudios.combat_styles.equipment.SpellTuning;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Consumer;
 
 public final class SpellEngineCompat {
 
@@ -72,8 +74,13 @@ public final class SpellEngineCompat {
     public static final float INHERIT_DAMAGE = -1.0F;
 
     public static Object shootSpell(Player player, ResourceLocation spellId,
-                                    Entity target, float damage, SpellTuning tuning) {
-        return SpellEngineBridge.shootSpell(player, spellId, target, damage, tuning);
+                                    Entity target, float damage, SpellTuning tuning,
+                                    Consumer<Object> beforeLaunch) {
+        return SpellEngineBridge.shootSpell(player, spellId, target, damage, tuning, beforeLaunch);
+    }
+
+    public static void faceAlong(Entity shot, Vec3 direction) {
+        SpellEngineBridge.faceAlong(shot, direction);
     }
 
     public static Object shotTagOf(Entity projectile) {

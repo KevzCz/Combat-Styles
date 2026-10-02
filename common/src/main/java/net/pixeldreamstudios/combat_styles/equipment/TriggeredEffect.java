@@ -137,6 +137,11 @@ public record TriggeredEffect(EquipmentTrigger trigger,
                 && !trigger.arms(cooldown);
     }
 
+    public boolean selfEffectsInPasses() {
+        return effect.onHit().isPresent() || effect.onSwing().isPresent()
+                || effect.events().isEmpty();
+    }
+
     public boolean selfEffectsOnHit() {
         if (effect.onSwing().isPresent()) {
             return false;

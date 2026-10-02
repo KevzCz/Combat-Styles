@@ -609,13 +609,21 @@ public final class EquipmentRuntime {
                 continue;
             }
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
-                if (named.getValue().trigger().matches(context,
-                        named.getValue().cooldown())) {
-                    matched.add(new Match(definition, named.getValue(), named.getKey()));
+                TriggeredEffect entry = named.getValue();
+                if (entry.trigger().matches(context, entry.cooldown())
+                        || summonPayloadMatches(context, entry)) {
+                    matched.add(new Match(definition, entry, named.getKey()));
                 }
             }
         }
         return matched;
+    }
+
+    private static boolean summonPayloadMatches(EquipmentContext context, TriggeredEffect entry) {
+        return context != null && context.summonHit()
+                && entry.effect().events().has(EventKind.ON_SUMMON_HIT)
+                && !entry.trigger().onSummonHit().orElse(false)
+                && entry.trigger().matches(context.withoutSummonHit(), entry.cooldown());
     }
 
     public static List<Match> activeFor(Player player, EquipmentContext context) {
@@ -724,11 +732,12 @@ public final class EquipmentRuntime {
         List<Match> eligible = new ArrayList<>(matched.size());
         for (Match match : matched) {
             if (missPhase
-                    ? !match.hears(trigger -> trigger.onMiss().orElse(false))
+                    ? !(match.hears(trigger -> trigger.onMiss().orElse(false))
+                            || match.effect().events().has(EventKind.ON_MISS))
                     : match.trigger().onMiss().orElse(false)) {
                 continue;
             }
-            if (!actsOn(match, onHit)) {
+            if (!actsOn(match, context, onHit, missPhase)) {
                 continue;
             }
             if (!SubstitutionMatch.swung(player, match.effect())) {
@@ -909,7 +918,9 @@ public final class EquipmentRuntime {
             CombatDebug.skipped(player, first.id(), "group " + name + " picked nothing");
             return List.of();
         }
-        if (!GroupWindows.claim(player, first.id(), name, group, context, roll.passed())) {
+        if (!GroupWindows.claim(player, first.id(), name, group, context, roll.passed())
+                && !(arming && roll.passed() && firesOnEvent(context, contenders)
+                        && GroupWindows.claimUse(player, first.id(), name, group))) {
             return List.of();
         }
         List<Match> drawn = new ArrayList<>(contenders.size());
@@ -1001,6 +1012,19 @@ public final class EquipmentRuntime {
 
     private static boolean substitutedThisAttack(Player player, String itemId) {
         return SUBSTITUTED_SWING.getOrDefault(player.getUUID(), Set.of()).contains(itemId);
+    }
+
+    private static boolean firesOnEvent(EquipmentContext context, List<Match> contenders) {
+        EventKind activation = EventKind.activationOf(context);
+        List<EventKind> kinds = activation != null
+                ? List.of(activation)
+                : EventKind.meleeOf(context, context != null && context.hitPass(), false);
+        for (Match match : contenders) {
+            if (!match.effect().events().getAll(kinds).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean sharesDraw(EquipmentDefinition definition, EffectGroup group) {
@@ -1141,20 +1165,25 @@ public final class EquipmentRuntime {
         return AffixMechanics.selfConditionMet(condition, player);
     }
 
-    private static boolean actsOn(Match match, boolean onHit) {
+    private static boolean actsOn(Match match, EquipmentContext context, boolean onHit,
+                                  boolean missPhase) {
         EquipmentEffect effect = match.effect();
         TriggeredEffect entry = match.entry();
-        boolean selfHere = !entry.selfEffects().isEmpty() && entry.selfEffectsOnHit() == onHit;
+        boolean eventHere = !effect.events()
+                .getAll(EventKind.meleeOf(context, onHit, missPhase)).isEmpty();
+        boolean selfHere = !entry.selfEffects().isEmpty() && (entry.selfEffectsInPasses()
+                ? entry.selfEffectsOnHit() == onHit
+                : eventHere);
         boolean armingHere = armsWithoutPayload(match) && armsInHitPass(match) == onHit;
         if (onHit) {
             return effect.onHit().isPresent() || !effect.grantAffixes().isEmpty()
                     || effect.summonReplacement().isPresent() || effect.rewritesAttack()
                     || effect.summonDive().isPresent() || effect.echo().isPresent()
                     || effect.substitution().filter(StyleSubstitution::inserts).isPresent()
-                    || selfHere || armingHere;
+                    || selfHere || armingHere || eventHere;
         }
         return effect.onSwing().isPresent() || effect.resetCombo().orElse(0) > 0
-                || selfHere || armingHere;
+                || selfHere || armingHere || eventHere;
     }
 
     private static boolean armsWithoutPayload(Match match) {

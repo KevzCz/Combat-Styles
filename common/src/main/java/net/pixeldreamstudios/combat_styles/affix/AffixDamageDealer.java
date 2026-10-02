@@ -35,6 +35,7 @@ import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRuntime;
+import net.pixeldreamstudios.combat_styles.equipment.EventKind;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
 import net.pixeldreamstudios.combat_styles.network.SwingHastePayload;
@@ -1301,7 +1302,8 @@ public final class AffixDamageDealer {
             }
         }
         try {
-            if (!fireEquipment(player, match, context, onHit, target, base, resolved, gated)) {
+            if (!fireEquipment(player, match, context, onHit, target, base, resolved, gated,
+                    missPhase)) {
                 return false;
             }
             match.effect().substitution()
@@ -1337,20 +1339,32 @@ public final class AffixDamageDealer {
                                          EquipmentContext context, boolean onHit,
                                          LivingEntity target, float base,
                                          ResolvedAffixes resolved) {
-        return fireEquipment(player, match, context, onHit, target, base, resolved, true);
+        return fireEquipment(player, match, context, onHit, target, base, resolved, true, false);
     }
 
     private static boolean fireEquipment(Player player, EquipmentRuntime.Match match,
                                          EquipmentContext context, boolean onHit,
                                          LivingEntity target, float base,
-                                         ResolvedAffixes resolved, boolean gated) {
+                                         ResolvedAffixes resolved, boolean gated,
+                                         boolean missPhase) {
         TriggeredEffect entry = match.entry();
-        AffixEffects.OnHit effects = onHit
+        AffixEffects.OnHit melee = onHit
                 ? match.effect().onHit().orElse(null)
                 : match.effect().onSwing().orElse(null);
-        boolean selfHere = !entry.selfEffects().isEmpty() && entry.selfEffectsOnHit() == onHit;
+        boolean meleeHeard = !(missPhase
+                && !match.hears(trigger -> trigger.onMiss().orElse(false)))
+                && !(context.summonHit()
+                        && !match.hears(trigger -> trigger.onSummonHit().orElse(false)));
+        List<AffixEffects.OnHit> events = match.effect().events()
+                .getAll(EventKind.meleeOf(context, onHit, missPhase));
+        boolean armingNow = gated && entry.cooldown().windowed() && EffectWindows.arms(match)
+                && match.trigger().eventFiring(context);
+        AffixEffects.OnHit effects = meleeHeard && !armingNow ? melee : null;
+        boolean selfHere = !entry.selfEffects().isEmpty() && (entry.selfEffectsInPasses()
+                ? entry.selfEffectsOnHit() == onHit
+                : !events.isEmpty());
         if (gated && entry.cooldown().windowed()) {
-            if (EffectWindows.arms(match) && match.trigger().eventFiring(context)) {
+            if (armingNow) {
                 if (EffectWindows.arm(player, match)) {
                     if (CombatDebug.enabled(player)) {
                         CombatDebug.fired(player, match.id(), "armed on "
@@ -1358,7 +1372,9 @@ public final class AffixDamageDealer {
                     }
                     syncCooldowns(player, match);
                 }
-                return false;
+                if (events.isEmpty()) {
+                    return false;
+                }
             }
             boolean passed = entry.armsOnSwing()
                     ? (onHit ? EffectWindows.armed(player, match.id(), match.key())
@@ -1370,14 +1386,14 @@ public final class AffixDamageDealer {
             }
             syncCooldowns(player, match);
         }
-        if (effects == null && !selfHere) {
+        if (effects == null && events.isEmpty() && !selfHere) {
             return true;
         }
         StyleAffix source = EquipmentAffix.of(match);
         if (CombatDebug.enabled(player)) {
             CombatDebug.fired(player, match.id(), "procced on " + match.trigger().describe()
                     + " — " + (effects == null
-                            ? "self effects"
+                            ? (events.isEmpty() ? "self effects" : events.size() + " event payload(s)")
                             : payloadOf(match.effect(), effects)));
         }
         syncCooldowns(player, match);
@@ -1385,11 +1401,16 @@ public final class AffixDamageDealer {
             if (selfHere) {
                 AffixImpacts.applySelfEffects(player, entry.selfEffects());
             }
+            List<AffixEffects.OnHit> firing = new ArrayList<>(events.size() + 1);
             if (effects != null) {
-                apply(player, target, source, effects, base, resolved);
-                if (!effects.isEmpty()) {
-                    scheduleEcho(player, target, source, effects, base, resolved,
-                            effects.echo().orElse(null));
+                firing.add(effects);
+            }
+            firing.addAll(events);
+            for (AffixEffects.OnHit payload : firing) {
+                apply(player, target, source, payload, base, resolved);
+                if (!payload.isEmpty()) {
+                    scheduleEcho(player, target, source, payload, base, resolved,
+                            payload.echo().orElse(null));
                 }
             }
         };

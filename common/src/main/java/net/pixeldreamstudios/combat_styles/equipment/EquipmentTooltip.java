@@ -38,6 +38,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 public final class EquipmentTooltip {
@@ -417,6 +418,7 @@ public final class EquipmentTooltip {
         }
         appendSelfEffects(entry.selfEffects(), tooltip);
         appendOwnEffects(definition, effect, tooltip);
+        appendEventEffects(definition, effect, tooltip);
         if (TooltipContextAccess.expanded()) {
             appendAugment(effect.augment().orElse(null), tooltip);
             appendEcho(echoOf(effect), tooltip);
@@ -962,6 +964,25 @@ public final class EquipmentTooltip {
                 definition.id())), lines, false);
         for (Component line : lines) {
             tooltip.add(TooltipGem.EFFECT.bullet(line));
+        }
+    }
+
+    private static void appendEventEffects(EquipmentDefinition definition, EquipmentEffect effect,
+                                           List<Component> tooltip) {
+        for (EventKind kind : EventKind.values()) {
+            for (AffixEffects.OnHit payload : effect.events().get(kind)) {
+                tooltip.add(TooltipGem.EFFECT.bullet(Component.translatable(kind.labelKey())
+                        .withStyle(BODY)));
+                List<Component> lines = new ArrayList<>();
+                EquipmentEffect alone = EquipmentEffects.withOnHit(EquipmentEffect.EMPTY,
+                        Optional.of(payload));
+                AffixText.appendEffects(EquipmentAffix.of(new EquipmentRuntime.Match(definition,
+                        new TriggeredEffect(EquipmentTrigger.ALWAYS, alone, EffectCooldown.NONE,
+                                false), definition.id())), lines, false);
+                for (Component line : lines) {
+                    tooltip.add(TooltipGem.hang(line));
+                }
+            }
         }
     }
 

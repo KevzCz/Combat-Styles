@@ -117,6 +117,14 @@ public record EquipmentContext(Player player,
                 null, null, false, 0.0F, null, cast);
     }
 
+    public EquipmentContext withoutSummonHit() {
+        return summonHit
+                ? new EquipmentContext(player, entry, attack, slotIndex, sequenceSize,
+                        swingCount, killed, false, target, hurt, shot, blocked, used,
+                        hitPass, dealtDamage, projectileHit, cast)
+                : this;
+    }
+
     public EquipmentContext onHitPass(boolean hitPass, float dealt) {
         return new EquipmentContext(player, entry, attack, slotIndex, sequenceSize,
                 swingCount, killed, summonHit, target, hurt, shot, blocked, used,

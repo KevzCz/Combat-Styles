@@ -64,6 +64,11 @@ public record ProjectileSpawn(SpawnAnchor anchor, float forward, float up, float
                 && velocity.isEmpty();
     }
 
+    public boolean placesOrigin() {
+        return anchor != SpawnAnchor.EYES || forward != 0.0F || up != 0.0F || right != 0.0F
+                || (mode.offsetsOrigin() && arc != 0.0F);
+    }
+
     public Vec3 originFor(Player player, Entity target, int index, int count) {
         Vec3 base = anchorPoint(player, target);
         float bodyYaw = player.getYRot();

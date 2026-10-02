@@ -9,6 +9,7 @@ import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
 import net.pixeldreamstudios.combat_styles.equipment.EffectCooldown;
 import net.pixeldreamstudios.combat_styles.equipment.EffectGroup;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentTrigger;
+import net.pixeldreamstudios.combat_styles.equipment.EventKind;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentEffect;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
@@ -31,6 +32,10 @@ import java.util.List;
 import java.util.Map;
 
 public final class DataIntegrity {
+
+    private static final List<EventKind> TARGETED_EVENTS = List.of(EventKind.ON_HURT,
+            EventKind.ON_SHIELD_BLOCK, EventKind.ON_PROJECTILE_HIT, EventKind.ON_KILL,
+            EventKind.ON_SUMMON_HIT);
 
     private DataIntegrity() {
     }
@@ -287,6 +292,13 @@ public final class DataIntegrity {
         if (triggered.trigger().requiresTarget() && !namesHitTrigger(equipment)) {
             found.add(where + " needs a target but no effect on this item triggers on hit");
         }
+        for (EventKind kind : EventKind.values()) {
+            if (triggered.effect().events().has(kind) && triggered.trigger().requiresActivation()
+                    && !kind.heardBy(triggered.trigger())) {
+                found.add(where + " has a " + kind.serializedName() + " event effect, but its"
+                        + " trigger only fires on other events, so it never runs");
+            }
+        }
         if (triggered.needsArming()) {
             found.add(where + " has attributes, spells, summon profiles or a substitution under an"
                     + " event trigger with no uses/duration, so they never turn on");
@@ -328,6 +340,11 @@ public final class DataIntegrity {
         for (TriggeredEffect entry : equipment.triggered()) {
             if (entry.effect().onHit().isPresent()) {
                 return true;
+            }
+            for (EventKind kind : TARGETED_EVENTS) {
+                if (entry.effect().events().has(kind)) {
+                    return true;
+                }
             }
         }
         return false;

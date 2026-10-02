@@ -27,9 +27,13 @@ import net.pixeldreamstudios.combat_styles.style.SlashAnchor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Mixin(value = TargetFinder.class, remap = false)
 public class HitboxOffsetMixin {
+
+    @Unique
+    private static final String DISTANCE_FORMAT = "%.1f";
 
     @Unique
     private static void combat_styles$matchBoxes(Player player, OrientedBoundingBox base,
@@ -149,7 +153,7 @@ public class HitboxOffsetMixin {
             StringBuilder nearby = new StringBuilder();
             for (Entity candidate : candidates) {
                 nearby.append(' ').append(candidate.getName().getString())
-                        .append('@').append(String.format("%.1f",
+                        .append('@').append(String.format(Locale.ROOT, DISTANCE_FORMAT,
                                 candidate.position().distanceTo(moved.center)));
             }
             CombatStyles.LOGGER.info("[OFFSET] {} fwd={} up={} right={} range={} "

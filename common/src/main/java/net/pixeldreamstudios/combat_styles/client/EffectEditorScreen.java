@@ -21,6 +21,8 @@ import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentEffects;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLocks;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentTrigger;
+import net.pixeldreamstudios.combat_styles.equipment.EventKind;
+import net.pixeldreamstudios.combat_styles.equipment.EventPayloads;
 import net.pixeldreamstudios.combat_styles.equipment.StyleSubstitution;
 import net.pixeldreamstudios.combat_styles.equipment.SummonDive;
 import net.pixeldreamstudios.combat_styles.equipment.SummonProfile;
@@ -99,6 +101,7 @@ public class EffectEditorScreen extends PanelScreen {
             Codec.unboundedMap(Codec.STRING, AttributeBonus.EXPANDED);
     private static final String ROW_ON_SWING = "screen.combat_styles.effect_row_on_swing";
     private static final String ROW_ON_HIT = "screen.combat_styles.effect_row_on_hit";
+    private static final String ROW_EVENTS = "screen.combat_styles.effect_row_events";
     private static final String ROW_ECHO = "screen.combat_styles.effect_row_echo";
     private static final String ROW_SPELLS = "screen.combat_styles.effect_row_spells";
     private static final String ROW_RESET = "screen.combat_styles.effect_row_reset";
@@ -124,7 +127,7 @@ public class EffectEditorScreen extends PanelScreen {
         List<String> rows = new ArrayList<>(List.of(
                 ROW_TRIGGER, ROW_COOLDOWN, ROW_SUBSTITUTE, ROW_SUBSTITUTION, ROW_AUGMENT,
                 ROW_GRANTS, ROW_TUNES, ROW_ATTRS, ROW_DAMAGE_BONUS, ROW_ON_SWING, ROW_ON_HIT,
-                ROW_ECHO,
+                ROW_EVENTS, ROW_ECHO,
                 ROW_RESET, ROW_SUMMON_REPLACE, ROW_SUMMON_PROFILE, ROW_SUMMON_DIVE,
                 ROW_HIDE_TOOLTIP, ROW_TOOLTIP_TEXT, ROW_DELAY, ROW_SELF_EFFECTS));
         if (SpellEngineCompat.isLoaded()) {
@@ -275,6 +278,7 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_DAMAGE_BONUS -> count(payload.damageBonus().size());
             case ROW_ON_SWING -> flag(payload.onSwing().isPresent());
             case ROW_ON_HIT -> flag(payload.onHit().isPresent());
+            case ROW_EVENTS -> count(payload.events().payloads().size());
             case ROW_ECHO -> flag(payload.echo().isPresent());
             case ROW_SPELLS -> flag(!payload.spells().isEmpty());
             case ROW_RESET -> count(payload.resetCombo().orElse(0));
@@ -323,6 +327,14 @@ public class EffectEditorScreen extends PanelScreen {
                     .append(note.copy().withStyle(ChatFormatting.GOLD)));
         }
 
+        if (row.equals(ROW_EVENTS)) {
+            for (EventKind kind : EventKind.values()) {
+                if (payload.events().has(kind)) {
+                    lines.add(Component.translatable(kind.labelKey())
+                            .copy().withStyle(ChatFormatting.AQUA));
+                }
+            }
+        }
         switch (row) {
             case ROW_SUBSTITUTE -> payload.substituteStyle()
                     .ifPresent(style -> lines.addAll(RefTooltip.forStyle(style)));
@@ -428,6 +440,7 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_ON_HIT -> openTree(ROW_ON_HIT, AffixEffects.OnHit.CODEC,
                     payload.onHit().orElse(AffixEffects.OnHit.EMPTY),
                     applied -> setPayload(EquipmentEffects.withOnHit(payload(), applied)));
+            case ROW_EVENTS -> openEvents();
             case ROW_ECHO -> openTree(ROW_ECHO, AffixEffects.Echo.CODEC,
                     payload.echo().orElse(null),
                     applied -> setPayload(EquipmentEffects.withEcho(payload(), applied)));
@@ -448,6 +461,50 @@ public class EffectEditorScreen extends PanelScreen {
             default -> {
             }
         }
+    }
+
+    private void openEvents() {
+        List<String> kinds = new ArrayList<>();
+        for (EventKind kind : EventKind.values()) {
+            kinds.add(kind.serializedName());
+        }
+        minecraft.setScreen(new ChoicePickerScreen(this, Component.translatable(ROW_EVENTS),
+                kinds, "", picked -> {
+                    EventKind kind = eventNamed(picked);
+                    if (kind == null) {
+                        minecraft.setScreen(this);
+                        return;
+                    }
+                    openEvent(kind);
+                }).handingOffOnPick());
+    }
+
+    private static EventKind eventNamed(String name) {
+        for (EventKind kind : EventKind.values()) {
+            if (kind.serializedName().equals(name)) {
+                return kind;
+            }
+        }
+        return null;
+    }
+
+    private void openEvent(EventKind kind) {
+        List<AffixEffects.OnHit> current = payload().events().get(kind);
+        minecraft.setScreen(new EffectTreeScreen(this,
+                Component.translatable(kind.labelKey()),
+                AffixEffects.OnHit.CODEC,
+                current.isEmpty() ? AffixEffects.OnHit.EMPTY : current.getFirst(),
+                applied -> {
+                    List<AffixEffects.OnHit> next = new ArrayList<>(payload().events().get(kind));
+                    AffixEffects.OnHit value = applied.orElse(AffixEffects.OnHit.EMPTY);
+                    if (next.isEmpty()) {
+                        next.add(value);
+                    } else {
+                        next.set(0, value);
+                    }
+                    setPayload(EquipmentEffects.withEvents(payload(),
+                            payload().events().with(kind, next)));
+                }).withSchema(EffectSchema.ROOT_EFFECT));
     }
 
     private void openDamageBonus() {
@@ -590,6 +647,7 @@ public class EffectEditorScreen extends PanelScreen {
                     payload, Optional.empty()));
             case ROW_ON_HIT -> setPayload(EquipmentEffects.withOnHit(
                     payload, Optional.empty()));
+            case ROW_EVENTS -> setPayload(EquipmentEffects.withEvents(payload, EventPayloads.EMPTY));
             case ROW_ECHO -> setPayload(EquipmentEffects.withEcho(payload, Optional.empty()));
             case ROW_SPELLS -> setPayload(EquipmentEffects.withSpells(payload, SpellLocks.NONE));
             case ROW_SUMMON_REPLACE -> setPayload(EquipmentEffects.withSummonReplacement(
@@ -621,6 +679,7 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_AUGMENT -> payload.augment().isPresent();
             case ROW_ON_SWING -> payload.onSwing().isPresent();
             case ROW_ON_HIT -> payload.onHit().isPresent();
+            case ROW_EVENTS -> !payload.events().isEmpty();
             case ROW_ECHO -> payload.echo().isPresent();
             case ROW_SPELLS -> !payload.spells().isEmpty();
             case ROW_SUMMON_REPLACE -> payload.summonReplacement().isPresent();

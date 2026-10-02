@@ -44,8 +44,12 @@ final class AffixProjectiles {
         int count = Math.max(1, projectile.count());
         DamageSpec spec = projectile.damageSpec().orElse(null);
         SpellTuning tuning = projectile.spellProjectile().tuning();
+        ProjectileSpawn spawn = projectile.spawn();
         for (int shot = 0; shot < count; shot++) {
-            Object tag = SpellEngineCompat.shootSpell(player, spellId, target, damage, tuning);
+            int index = shot;
+            Object tag = SpellEngineCompat.shootSpell(player, spellId, target, damage, tuning,
+                    launched -> SpellShotPlacement.expect(launched, player, target, spawn, index,
+                            count));
             if (tag == null) {
                 if (CombatDebug.enabled(player)) {
                     CombatDebug.note(player, "spell " + spellId

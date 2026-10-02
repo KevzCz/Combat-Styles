@@ -53,31 +53,32 @@ public final class EquipmentHurt {
                 : living;
         List<EquipmentRuntime.Match> heard = new ArrayList<>();
         for (EquipmentRuntime.Match match : EquipmentRuntime.matching(player, context)) {
-            if (match.hears(EquipmentTrigger::reactsToHurt)) {
+            if (match.hears(EquipmentTrigger::reactsToHurt)
+                    || match.effect().events().has(EventKind.ON_HURT)) {
                 heard.add(match);
             }
         }
         for (EquipmentRuntime.Match match : EquipmentRuntime.pickGroups(player, context, heard)) {
-            AffixEffects.OnHit onHit = match.effect().onHit().orElse(null);
-            AffixEffects.OnHit onSwing = match.effect().onSwing().orElse(null);
+            List<AffixEffects.OnHit> payloads = match.effect().events().get(EventKind.ON_HURT);
             boolean arming = EffectWindows.arms(match) && match.trigger().eventFiring(context);
-            if (!arming && onHit == null && onSwing == null
+            if (!arming && payloads.isEmpty()
                     && match.entry().selfEffects().isEmpty()) {
                 continue;
             }
             try {
                 if (arming) {
-                    if (!EffectWindows.arm(player, match)) {
+                    if (EffectWindows.arm(player, match)) {
+                        if (CombatDebug.enabled(player)) {
+                            CombatDebug.fired(player, match.id(),
+                                    "armed on hurt — " + amount + " damage, running total " + total);
+                        }
+                        if (player instanceof ServerPlayer served) {
+                            NetworkManager.syncCooldowns(served, match.itemId());
+                        }
+                    }
+                    if (payloads.isEmpty()) {
                         continue;
                     }
-                    if (CombatDebug.enabled(player)) {
-                        CombatDebug.fired(player, match.id(),
-                                "armed on hurt — " + amount + " damage, running total " + total);
-                    }
-                    if (player instanceof ServerPlayer served) {
-                        NetworkManager.syncCooldowns(served, match.itemId());
-                    }
-                    continue;
                 }
                 if (!EffectWindows.claim(player, match)) {
                     continue;
@@ -92,13 +93,9 @@ public final class EquipmentHurt {
                 }
                 Runnable fire = () -> {
                     AffixImpacts.applySelfEffects(player, match.entry().selfEffects());
-                    if (onSwing != null) {
+                    for (AffixEffects.OnHit payload : payloads) {
                         AffixDamageDealer.applyHurtReaction(player, attacker, affix,
-                                onSwing, amount);
-                    }
-                    if (onHit != null) {
-                        AffixDamageDealer.applyHurtReaction(player, attacker, affix,
-                                onHit, amount);
+                                payload, amount);
                     }
                 };
                 if (!CombatScheduler.after(player, match.entry().delayTicks(),

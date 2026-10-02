@@ -97,18 +97,18 @@ public final class EquipmentActivation {
         }
         firing = true;
         try {
+            EventKind kind = EventKind.activationOf(context);
             List<EquipmentRuntime.Match> heard = new ArrayList<>();
             for (EquipmentRuntime.Match match : EquipmentRuntime.matching(player, context)) {
-                if (match.hears(wanted)) {
+                if (match.hears(wanted) || match.effect().events().has(kind)) {
                     heard.add(match);
                 }
             }
             for (EquipmentRuntime.Match match : EquipmentRuntime.pickGroups(player, context, heard)) {
-                AffixEffects.OnHit onHit = match.effect().onHit().orElse(null);
-                AffixEffects.OnHit onSwing = match.effect().onSwing().orElse(null);
+                List<AffixEffects.OnHit> payloads = match.effect().events().get(kind);
                 boolean arming = EffectWindows.arms(match)
                         && match.trigger().eventFiring(context);
-                if (!arming && onHit == null && onSwing == null
+                if (!arming && payloads.isEmpty()
                         && match.entry().selfEffects().isEmpty()) {
                     continue;
                 }
@@ -120,7 +120,9 @@ public final class EquipmentActivation {
                             }
                             sync(player, match);
                         }
-                        continue;
+                        if (payloads.isEmpty()) {
+                            continue;
+                        }
                     }
                     if (!EffectWindows.claim(player, match)) {
                         continue;
@@ -133,13 +135,9 @@ public final class EquipmentActivation {
                     LivingEntity target = context.target();
                     Runnable fire = () -> {
                         AffixImpacts.applySelfEffects(player, match.entry().selfEffects());
-                        if (onSwing != null) {
+                        for (AffixEffects.OnHit payload : payloads) {
                             AffixDamageDealer.applyHurtReaction(player, target, affix,
-                                    onSwing, 0.0F);
-                        }
-                        if (onHit != null) {
-                            AffixDamageDealer.applyHurtReaction(player, target, affix,
-                                    onHit, 0.0F);
+                                    payload, 0.0F);
                         }
                     };
                     if (!CombatScheduler.after(player, match.entry().delayTicks(),

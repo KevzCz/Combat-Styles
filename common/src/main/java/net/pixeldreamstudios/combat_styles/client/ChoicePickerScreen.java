@@ -39,6 +39,7 @@ public class ChoicePickerScreen extends PickerScreen<String> {
     private final Consumer<String> onPick;
     private boolean previewsEntities;
     private boolean previewsSpells;
+    private boolean handsOff;
     private String hovered;
     private Runnable onAny;
     private boolean anySelected;
@@ -58,6 +59,16 @@ public class ChoicePickerScreen extends PickerScreen<String> {
             options.addFirst(ANY_ROW);
         }
         return this;
+    }
+
+    public ChoicePickerScreen handingOffOnPick() {
+        this.handsOff = true;
+        return this;
+    }
+
+    @Override
+    protected boolean closeOnPick() {
+        return !handsOff;
     }
 
     public ChoicePickerScreen previewingEntities() {

@@ -5,6 +5,7 @@ import net.minecraft.network.chat.Component;
 
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentEffect;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentTrigger;
+import net.pixeldreamstudios.combat_styles.equipment.EventKind;
 import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
 import net.pixeldreamstudios.combat_styles.style.AttackOverride;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
@@ -91,6 +92,11 @@ public final class EffectSummary {
                 lines.add(Component.translatable(KEY_ON_SWING).withStyle(ChatFormatting.GRAY)));
         effect.onHit().ifPresent(value ->
                 lines.add(Component.translatable(KEY_ON_HIT).withStyle(ChatFormatting.GRAY)));
+        for (EventKind kind : EventKind.values()) {
+            if (effect.events().has(kind)) {
+                lines.add(Component.translatable(kind.labelKey()).withStyle(ChatFormatting.GRAY));
+            }
+        }
         effect.echo().ifPresent(value ->
                 lines.add(Component.translatable(KEY_ECHO).withStyle(ChatFormatting.GRAY)));
         effect.resetCombo().ifPresent(value -> {

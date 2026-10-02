@@ -53,6 +53,7 @@ import net.spell_engine.internals.container.SpellContainerSource;
 import net.spell_engine.internals.delivery.ProjectileLauncher;
 import net.spell_engine.internals.delivery.SpellDelivery;
 import net.spell_engine.internals.target.SpellTarget;
+import net.spell_engine.utils.VectorHelper;
 import net.spell_power.api.SpellPower;
 import net.spell_engine.internals.casting.SpellCaster;
 
@@ -65,6 +66,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.function.Consumer;
 
 final class SpellEngineBridge {
 
@@ -487,6 +489,18 @@ final class SpellEngineBridge {
         return null;
     }
 
+    public static void faceAlong(Entity shot, Vec3 direction) {
+        if (!isLoaded() || shot == null || direction == null) {
+            return;
+        }
+        float pitch = (float) VectorHelper.pitchFromNormalized(direction);
+        float yaw = (float) VectorHelper.yawFromNormalized(direction);
+        shot.setXRot(pitch);
+        shot.setYRot(yaw);
+        shot.xRotO = pitch;
+        shot.yRotO = yaw;
+    }
+
     public static Object shotTagOf(Entity projectile) {
         if (!isLoaded()) {
             return null;
@@ -501,7 +515,8 @@ final class SpellEngineBridge {
     }
 
     public static Object shootSpell(Player player, ResourceLocation spellId,
-                                    Entity target, float damage, SpellTuning tuning) {
+                                    Entity target, float damage, SpellTuning tuning,
+                                    Consumer<Object> beforeLaunch) {
         if (!isLoaded() || player == null || spellId == null
                 || player.level() == null || player.level().isClientSide()) {
             return null;
@@ -527,6 +542,9 @@ final class SpellEngineBridge {
                     : modifierFor(tuning);
             modifier.projectile_launch = launchFor(player, spell, launch, tuning);
             SpellExecution.ImpactContext context = contextFor(player, spell, modifier, damage);
+            if (beforeLaunch != null) {
+                beforeLaunch.accept(context.power());
+            }
             if (meteor) {
                 Vec3 at = target == null ? player.position() : target.position();
                 return ProjectileLauncher.fallProjectile(player.level(), player, target,
@@ -535,6 +553,7 @@ final class SpellEngineBridge {
             ProjectileLauncher.shootProjectile(player.level(), player, target, spell, context);
             return context.power();
         } catch (Throwable throwable) {
+            CombatStyles.LOGGER.warn("Shooting {} failed", spellId, throwable);
             return null;
         }
     }

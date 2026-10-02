@@ -29,7 +29,8 @@ public record EquipmentEffect(Optional<String> substituteStyle,
                          Optional<SummonProfile> summonProfile,
                          Optional<SummonDive> summonDive,
                          SpellLocks spells,
-                         List<DamageBonus> damageBonus) {
+                         List<DamageBonus> damageBonus,
+                         EventPayloads events) {
 
     private static final Codec<Integer> REPEAT_CODEC = Codec.either(Codec.INT, Codec.BOOL)
             .xmap(either -> either.map(count -> count, flag -> flag ? 1 : 0),
@@ -61,7 +62,9 @@ public record EquipmentEffect(Optional<String> substituteStyle,
             SpellLocks.CODEC.optionalFieldOf("spells", SpellLocks.NONE)
                     .forGetter(EquipmentEffect::spells),
             DamageBonus.LIST_CODEC.optionalFieldOf(DamageBonus.KEY, List.of())
-                    .forGetter(EquipmentEffect::damageBonus)
+                    .forGetter(EquipmentEffect::damageBonus),
+            EventPayloads.CODEC.optionalFieldOf(EventPayloads.KEY, EventPayloads.EMPTY)
+                    .forGetter(EquipmentEffect::events)
     ).apply(instance, EquipmentEffect::new));
 
     public EquipmentEffect {
@@ -70,12 +73,13 @@ public record EquipmentEffect(Optional<String> substituteStyle,
         attributes = attributes == null ? Map.of() : Map.copyOf(attributes);
         spells = spells == null ? SpellLocks.NONE : spells;
         damageBonus = damageBonus == null ? List.of() : List.copyOf(damageBonus);
+        events = events == null ? EventPayloads.EMPTY : events;
     }
 
     public static final EquipmentEffect EMPTY = new EquipmentEffect(Optional.empty(),
             Optional.empty(), List.of(), Optional.empty(), Optional.empty(), Optional.empty(),
             Map.of(), Optional.empty(), Map.of(), Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), SpellLocks.NONE, List.of());
+            Optional.empty(), Optional.empty(), SpellLocks.NONE, List.of(), EventPayloads.EMPTY);
 
     public EquipmentEffect mergedWith(EquipmentEffect other) {
         if (other == null || other.isEmpty()) {
@@ -106,7 +110,8 @@ public record EquipmentEffect(Optional<String> substituteStyle,
                 echo.or(other::echo), merged, substitution.or(other::substitution),
                 summonReplacement.or(other::summonReplacement),
                 summonProfile.or(other::summonProfile),
-                summonDive.or(other::summonDive), spells.mergedWith(other.spells()), bonuses);
+                summonDive.or(other::summonDive), spells.mergedWith(other.spells()), bonuses,
+                events.mergedWith(other.events()));
     }
 
     public boolean hasAlwaysOnParts() {
@@ -126,6 +131,6 @@ public record EquipmentEffect(Optional<String> substituteStyle,
                 && tuneAffixes.isEmpty() && echo.isEmpty() && attributes.isEmpty()
                 && substitution.isEmpty() && summonReplacement.isEmpty()
                 && summonProfile.isEmpty() && summonDive.isEmpty() && spells.isEmpty()
-                && damageBonus.isEmpty();
+                && damageBonus.isEmpty() && events.isEmpty();
     }
 }

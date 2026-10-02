@@ -52,6 +52,28 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
         return !hurt.isEmpty();
     }
 
+    public boolean requiresActivation() {
+        if (reactsToHurt() || activation.reactsToShoot() || activation.reactsToBlock()
+                || activation.usesItem() || activation.reactsToProjectileHit()
+                || activation.reactsToCast()) {
+            return true;
+        }
+        for (EquipmentTrigger required : allOf) {
+            if (required.requiresActivation()) {
+                return true;
+            }
+        }
+        if (anyOf.isEmpty()) {
+            return false;
+        }
+        for (EquipmentTrigger option : anyOf) {
+            if (!option.requiresActivation()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public boolean inTree(Predicate<EquipmentTrigger> test) {
         if (test.test(this)) {
             return true;

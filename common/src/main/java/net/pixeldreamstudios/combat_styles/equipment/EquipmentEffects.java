@@ -21,7 +21,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), effect.onSwing(), effect.onHit(),
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withSubstituteStyle(EquipmentEffect effect,
@@ -30,7 +30,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), effect.onSwing(), effect.onHit(),
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withGrantAffixes(EquipmentEffect effect,
@@ -40,7 +40,7 @@ public final class EquipmentEffects {
                 effect.onSwing(), effect.onHit(),
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withSubstitution(EquipmentEffect effect,
@@ -49,7 +49,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), effect.onSwing(), effect.onHit(),
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), value, effect.summonReplacement(),
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withTuneAffixes(EquipmentEffect effect,
@@ -58,7 +58,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), effect.onSwing(), effect.onHit(),
                 effect.resetCombo(), tuning == null ? Map.of() : Map.copyOf(tuning),
                 effect.echo(), effect.attributes(), effect.substitution(),
-                effect.summonReplacement(), effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonReplacement(), effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withAttributes(EquipmentEffect effect,
@@ -68,7 +68,7 @@ public final class EquipmentEffects {
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 attributes == null ? Map.of() : Map.copyOf(attributes),
                 effect.substitution(), effect.summonReplacement(),
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withOnSwing(EquipmentEffect effect,
@@ -77,7 +77,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), drop(value), effect.onHit(),
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withOnHit(EquipmentEffect effect,
@@ -86,7 +86,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), effect.onSwing(), drop(value),
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     private static Optional<AffixEffects.OnHit> drop(Optional<AffixEffects.OnHit> value) {
@@ -99,7 +99,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), effect.onSwing(), effect.onHit(),
                 effect.resetCombo(), effect.tuneAffixes(), value,
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withSummonReplacement(EquipmentEffect effect,
@@ -108,7 +108,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), effect.onSwing(), effect.onHit(),
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), value,
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withSummonProfile(EquipmentEffect effect,
@@ -117,7 +117,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), effect.onSwing(), effect.onHit(),
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
-                value, effect.summonDive(), effect.spells(), effect.damageBonus());
+                value, effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withSummonDive(EquipmentEffect effect,
@@ -126,7 +126,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), effect.onSwing(), effect.onHit(),
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
-                effect.summonProfile(), value, effect.spells(), effect.damageBonus());
+                effect.summonProfile(), value, effect.spells(), effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withSpells(EquipmentEffect effect, SpellLocks spells) {
@@ -134,7 +134,7 @@ public final class EquipmentEffects {
                 effect.grantAffixes(), effect.onSwing(), effect.onHit(),
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
-                effect.summonProfile(), effect.summonDive(), spells, effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), spells, effect.damageBonus(), effect.events());
     }
 
     public static EquipmentEffect withResetCombo(EquipmentEffect effect, int repeats) {
@@ -143,7 +143,16 @@ public final class EquipmentEffects {
                 repeats > 0 ? Optional.of(repeats) : Optional.empty(),
                 effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus());
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
+    }
+
+    public static EquipmentEffect withEvents(EquipmentEffect effect, EventPayloads events) {
+        return new EquipmentEffect(effect.substituteStyle(), effect.augment(),
+                effect.grantAffixes(), effect.onSwing(), effect.onHit(),
+                effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
+                effect.attributes(), effect.substitution(), effect.summonReplacement(),
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(),
+                events == null ? EventPayloads.EMPTY : events);
     }
 
     public static EquipmentEffect withDamageBonus(EquipmentEffect effect, List<DamageBonus> bonuses) {
@@ -152,6 +161,6 @@ public final class EquipmentEffects {
                 effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
                 effect.attributes(), effect.substitution(), effect.summonReplacement(),
                 effect.summonProfile(), effect.summonDive(), effect.spells(),
-                bonuses == null ? List.of() : List.copyOf(bonuses));
+                bonuses == null ? List.of() : List.copyOf(bonuses), effect.events());
     }
 }
