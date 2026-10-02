@@ -34,13 +34,6 @@ ordering = "AFTER"
 side = "BOTH"
 
 [[dependencies.combat_styles]]
-modId = "geckolib"
-type = "required"
-versionRange = "[4.9,)"
-ordering = "AFTER"
-side = "BOTH"
-
-[[dependencies.combat_styles]]
 modId = "bettercombat"
 type = "required"
 versionRange = "[1.8,)"
@@ -49,10 +42,10 @@ side = "BOTH"
 
 [[dependencies.combat_styles]]
 modId = "playeranimator"
-type = "optional"
+type = "required"
 versionRange = "[2.0,)"
 ordering = "AFTER"
-side = "CLIENT"
+side = "BOTH"
 
 [[mixins]]
 config = "combat_styles.mixins.json"

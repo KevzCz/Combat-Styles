@@ -32,10 +32,7 @@
     "java": ">=21",
     "architectury": ">=13.0.8",
     "fabric-api": "*",
-    "geckolib": ">=4.9.0",
-    "bettercombat": "*"
-  },
-  "recommends": {
-    "playeranimator": "*"
+    "bettercombat": "*",
+    "playeranimator": ">=2.0.0"
   }
 }

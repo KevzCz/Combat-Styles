@@ -40,7 +40,6 @@ dependencies {
     modImplementation "curse.maven:playeranimator-658587:$rootProject.player_animator_fabric"
     modCompileOnly "curse.maven:spell-engine-807653:$rootProject.spell_engine_fabric"
     modCompileOnly "curse.maven:spell-power-771265:$rootProject.spell_power_fabric"
-    modImplementation "curse.maven:geckolib-388172:$rootProject.geckolib_fabric"
 
     modCompileOnly "me.shedaniel.cloth:cloth-config-fabric:$rootProject.cloth_config_version"
     modCompileOnly "com.terraformersmc:modmenu:$rootProject.modmenu_version"
