@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "combat_styles",
+  "version": "${version}",
+  "name": "Combat Styles",
+  "description": "Collect attack styles from BetterCombat weapons and compose custom attack sequences onto your weapon.",
+  "authors": [
+    "Pixel Dream Studios"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/combat_styles/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.pixeldreamstudios.combat_styles.fabric.CombatStylesFabric"
+    ],
+    "client": [
+      "net.pixeldreamstudios.combat_styles.fabric.client.CombatStylesFabricClient"
+    ],
+    "modmenu": [
+      "net.pixeldreamstudios.combat_styles.fabric.client.CombatStylesModMenu"
+    ]
+  },
+  "mixins": [
+    "combat_styles.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "architectury": ">=13.0.8",
+    "fabric-api": "*",
+    "geckolib": ">=4.9.0",
+    "bettercombat": "*"
+  },
+  "recommends": {
+    "playeranimator": "*"
+  }
+}

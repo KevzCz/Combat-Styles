@@ -1,0 +1,57 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+[[mods]]
+modId = "combat_styles"
+version = "${version}"
+displayName = "Combat Styles"
+authors = "Pixel Dream Studios"
+description = '''
+Collect attack styles from BetterCombat weapons and compose custom attack sequences onto your weapon.
+'''
+
+[[dependencies.combat_styles]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.combat_styles]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.combat_styles]]
+modId = "architectury"
+type = "required"
+versionRange = "[13.0.8,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.combat_styles]]
+modId = "geckolib"
+type = "required"
+versionRange = "[4.9,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.combat_styles]]
+modId = "bettercombat"
+type = "required"
+versionRange = "[1.8,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.combat_styles]]
+modId = "playeranimator"
+type = "optional"
+versionRange = "[2.0,)"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[mixins]]
+config = "combat_styles.mixins.json"

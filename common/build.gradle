@@ -1,0 +1,36 @@
+architectury {
+    common rootProject.enabled_platforms.split(',')
+}
+
+loom {
+    mixin {
+        useLegacyMixinAp = true
+        defaultRefmapName = "combat_styles-common-refmap.json"
+    }
+}
+
+dependencies {
+    // We depend on Fabric Loader here to use the Fabric @Environment annotations,
+    // which get remapped to the correct annotations on each platform.
+    // Do NOT use other classes from Fabric Loader.
+    modImplementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
+
+    // Architectury API. This is optional, and you can comment it out if you don't need it.
+    modImplementation "dev.architectury:architectury:$rootProject.architectury_api_version"
+
+    modCompileOnly "curse.maven:better-combat-by-daedelus-639842:$rootProject.better_combat_fabric"
+    modCompileOnly "curse.maven:playeranimator-658587:$rootProject.player_animator_fabric"
+    modCompileOnly "curse.maven:spell-engine-807653:$rootProject.spell_engine_fabric"
+    modCompileOnly "curse.maven:spell-power-771265:$rootProject.spell_power_fabric"
+    modCompileOnly "curse.maven:geckolib-388172:$rootProject.geckolib_fabric"
+
+    testImplementation platform("org.junit:junit-bom:$rootProject.junit_version")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+

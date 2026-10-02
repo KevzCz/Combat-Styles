@@ -1,0 +1,83 @@
+package net.pixeldreamstudios.combat_styles.item;
+
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.ResourceLocation;
+
+import net.pixeldreamstudios.combat_styles.CombatStyles;
+import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
+import net.pixeldreamstudios.combat_styles.style.StyleRarity;
+
+public enum TooltipGem {
+    SAPPHIRE(0xE000),
+    AMBER(0xE001),
+    AMETHYST(0xE002),
+    EMERALD(0xE003),
+    AQUAMARINE(0xE004),
+    ROSE(0xE005),
+    SILVER(0xE006),
+    SLATE(0xE007),
+    HOLLOW(0xE008),
+    SHADOW(0xE009);
+
+    public static final TooltipGem STAT = EMERALD;
+    public static final TooltipGem MOVESET = AMBER;
+    public static final TooltipGem SPELL = AMETHYST;
+    public static final TooltipGem EFFECT = AQUAMARINE;
+    public static final TooltipGem DAMAGE = ROSE;
+    public static final TooltipGem SUMMON = SAPPHIRE;
+    public static final TooltipGem NOTE = SLATE;
+    public static final TooltipGem CUSTOM = SILVER;
+    public static final TooltipGem MORE = HOLLOW;
+
+    private static final ResourceLocation FONT =
+            ResourceLocation.fromNamespaceAndPath(CombatStyles.MOD_ID, "icons");
+    private static final int SPACER = 0xE010;
+    private static final String GAP = " ";
+    private static final String PLAIN_INDENT = "  ";
+    private static final String LEAD = " ";
+
+    private final int glyph;
+
+    TooltipGem(int glyph) {
+        this.glyph = glyph;
+    }
+
+    public MutableComponent icon() {
+        return Component.literal(Character.toString(glyph))
+                .withStyle(style -> style.withFont(FONT).withColor(ChatFormatting.WHITE));
+    }
+
+    public MutableComponent bullet(Component line) {
+        if (!CombatStylesConfig.get().tooltipGemBullets()) {
+            return Component.literal(PLAIN_INDENT).append(line);
+        }
+        return Component.literal(LEAD).append(icon()).append(GAP).append(line);
+    }
+
+    public static MutableComponent hang(Component line) {
+        if (!CombatStylesConfig.get().tooltipGemBullets()) {
+            return Component.literal(PLAIN_INDENT).append(line);
+        }
+        return Component.literal(LEAD).append(spacer()).append(GAP).append(line);
+    }
+
+    private static MutableComponent spacer() {
+        return Component.literal(Character.toString(SPACER)).withStyle(style -> style.withFont(FONT));
+    }
+
+    public static TooltipGem of(StyleRarity rarity) {
+        if (rarity == null) {
+            return SILVER;
+        }
+        return switch (rarity) {
+            case COMMON -> SILVER;
+            case UNCOMMON -> EMERALD;
+            case RARE -> AQUAMARINE;
+            case EPIC -> AMETHYST;
+            case LEGENDARY -> AMBER;
+            case MYTHIC -> ROSE;
+        };
+    }
+}
