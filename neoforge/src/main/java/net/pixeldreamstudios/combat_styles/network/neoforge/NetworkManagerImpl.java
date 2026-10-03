@@ -173,6 +173,10 @@ public final class NetworkManagerImpl {
         PacketDistributor.sendToPlayer(player, payload);
     }
 
+    public static void sendCooldownsToClient(ServerPlayer player, SyncCooldownsPayload payload) {
+        PacketDistributor.sendToPlayer(player, payload);
+    }
+
     public static void sendLootToClient(ServerPlayer player, SyncLootPayload payload) {
         PacketDistributor.sendToPlayer(player, payload);
     }

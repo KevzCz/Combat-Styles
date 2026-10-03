@@ -1,12 +1,10 @@
 package net.pixeldreamstudios.combat_styles.item;
 
-import dev.architectury.registry.CreativeTabOutput;
 import dev.architectury.registry.CreativeTabRegistry;
 import dev.architectury.registry.registries.DeferredRegister;
 import dev.architectury.registry.registries.RegistrySupplier;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -48,9 +46,10 @@ public final class ModItems {
     }
 
     public static final RegistrySupplier<CreativeModeTab> TAB = TABS.register("general", () ->
-            CreativeTabRegistry.create(
-                    Component.translatable("itemGroup.combat_styles.general"),
-                    () -> new ItemStack(STYLE_PAGE.get())));
+            CreativeTabRegistry.create(builder -> builder
+                    .title(Component.translatable("itemGroup.combat_styles.general"))
+                    .icon(() -> new ItemStack(STYLE_PAGE.get()))
+                    .displayItems(ModItems::fillTab)));
 
     private ModItems() {
     }
@@ -63,11 +62,10 @@ public final class ModItems {
     public static void register() {
         ITEMS.register();
         TABS.register();
-        CreativeTabRegistry.modify(TAB, ModItems::fillTab);
     }
 
-    private static void fillTab(FeatureFlagSet flags, CreativeTabOutput output,
-                                boolean canUseGameMasterBlocks) {
+    private static void fillTab(CreativeModeTab.ItemDisplayParameters parameters,
+                                CreativeModeTab.Output output) {
         output.accept(new ItemStack(STYLE_EXTRACTOR.get()));
         for (StyleRarity rarity : StyleRarity.values()) {
             output.accept(new ItemStack(bookFor(rarity)));
