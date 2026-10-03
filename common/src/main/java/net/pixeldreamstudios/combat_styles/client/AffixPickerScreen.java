@@ -60,7 +60,7 @@ public class AffixPickerScreen extends PanelScreen {
     private static final String KEY_NONE = "screen.combat_styles.affix_none";
     private static final String KEY_CANCEL = "gui.cancel";
     private static final String KEY_CONFIRM = "screen.combat_styles.confirm";
-    private static final String KEY_NEW_AFFIX = "screen.combat_styles.new_affix";
+    private static final String KEY_MANAGE_AFFIXES = "screen.combat_styles.manage_affixes";
     private static final String KEY_COMBINATIONS = "screen.combat_styles.affix_combinations";
     private static final String KEY_COST = "screen.combat_styles.affix_cost";
     private static final String KEY_NO_AFFIX = "screen.combat_styles.affix_none_option";
@@ -128,9 +128,9 @@ public class AffixPickerScreen extends PanelScreen {
 
         int buttonY = top + PANEL_HEIGHT - FOOTER + 4;
         if (state != null && state.creative()) {
-            addRenderableWidget(PanelButton.of(Component.translatable(KEY_NEW_AFFIX),
-                            button -> minecraft.setScreen(new AffixBuilderScreen(this,
-                                    created -> rebuild())))
+            addRenderableWidget(PanelButton.of(Component.translatable(KEY_MANAGE_AFFIXES),
+                            button -> minecraft.setScreen(new AffixManagerScreen(this,
+                                    state.creative(), this::rebuild)))
                     .bounds(left + PADDING, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT)
                     .build());
         }

@@ -5,6 +5,9 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.StringRepresentable;
+import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
+import net.pixeldreamstudios.combat_styles.loot.BookRoll;
+import net.pixeldreamstudios.combat_styles.loot.WeaponRoll;
 import net.pixeldreamstudios.combat_styles.affix.CastSpell;
 import net.pixeldreamstudios.combat_styles.affix.SpawnAnchor;
 import net.pixeldreamstudios.combat_styles.affix.SpreadMode;
@@ -155,6 +158,12 @@ public final class EffectChoices {
                         : List.of();
             }
             case "mode" -> {
+                if (scope.contains(EffectSchema.ROOT_STYLE_BOOK)) {
+                    yield BookRoll.Mode.NAMES;
+                }
+                if (scope.contains(EffectSchema.ROOT_WEAPON_ROLL)) {
+                    yield WeaponRoll.MODES;
+                }
                 if (scope.contains(KEY_SPAWN)) {
                     yield names(SpreadMode.values());
                 }
@@ -198,6 +207,15 @@ public final class EffectChoices {
             case "entities" -> entityIds();
             case "effect" -> effectIds();
             case "holding", "wearing", "equipped" -> itemIds();
+            case "items" -> scope.contains(EffectSchema.ROOT_WEAPON_ROLL) ? itemIds() : List.of();
+            case "tags" -> scope.contains(EffectSchema.ROOT_WEAPON_ROLL) ? itemTagIds() : List.of();
+            case "tables" -> scope.contains(EffectSchema.ROOT_WEAPON_ROLL)
+                    ? DropSuggestions.of(DropSuggestions.LOOT_TABLES)
+                    : List.of();
+            case "style" -> scope.contains(EffectSchema.ROOT_STYLE_BOOK)
+                    || scope.contains(EffectSchema.ROOT_WEAPON_ROLL)
+                    ? styleIds()
+                    : List.of();
             case "ability", "finale", "abilities" -> abilityIds();
             case "sound", "swing_sound" -> soundIds();
             case "id" -> scope.contains(KEY_SOUND) ? soundIds() : List.of();
@@ -306,7 +324,7 @@ public final class EffectChoices {
     }
 
     private static List<String> categoryIds() {
-        return StyleRegistry.categories();
+        return WeaponCategories.allNames();
     }
 
     private static List<String> animationIds() {

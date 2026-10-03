@@ -15,8 +15,7 @@ import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactori
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
-import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
-import net.pixeldreamstudios.combat_styles.client.ClientConfigSync;
+import net.pixeldreamstudios.combat_styles.client.ClientDisconnect;
 import net.pixeldreamstudios.combat_styles.client.ConfigScreen;
 import net.pixeldreamstudios.combat_styles.client.CooldownHud;
 import net.pixeldreamstudios.combat_styles.client.ClientTooltipBinding;
@@ -27,16 +26,8 @@ import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.client.SlashWaveRenderer;
 import net.pixeldreamstudios.combat_styles.client.tooltip.ArcTooltipComponent;
 import net.pixeldreamstudios.combat_styles.client.tooltip.ArcTooltipData;
-import net.pixeldreamstudios.combat_styles.client.ClientStyleData;
 import net.pixeldreamstudios.combat_styles.entity.ModEntities;
-import net.pixeldreamstudios.combat_styles.equipment.BurstSequence;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
-import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
-import net.pixeldreamstudios.combat_styles.equipment.SpellLockState;
-import net.pixeldreamstudios.combat_styles.style.AttackOverrides;
-import net.pixeldreamstudios.combat_styles.style.CustomAttacks;
-import net.pixeldreamstudios.combat_styles.style.CustomStyles;
-import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
 import net.pixeldreamstudios.combat_styles.style.ClientTooltipState;
 
 @Mod(value = CombatStyles.MOD_ID, dist = Dist.CLIENT)
@@ -51,16 +42,7 @@ public final class CombatStylesNeoForgeClient {
 
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
-        ClientConfigSync.restoreLocal();
-        SpellLockState.clearMirror();
-        ClientStyleData.clear();
-        DefaultStyles.clearSync();
-        CustomStyles.clearSync();
-        CustomAttacks.clearSync();
-        EquipmentRegistry.clearSync();
-        AffixRegistry.clearSync();
-        AttackOverrides.clearSync();
-        BurstSequence.clearClient();
+        ClientDisconnect.clearAll();
     }
 
     public CombatStylesNeoForgeClient(IEventBus modBus, ModContainer container) {

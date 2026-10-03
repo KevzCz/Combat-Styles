@@ -29,6 +29,7 @@ import net.pixeldreamstudios.combat_styles.equipment.EquipmentTrigger;
 import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
+import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -95,6 +96,8 @@ public class EquipmentDetailScreen extends PanelScreen {
     private static final String KEY_SOURCE_CONFIG = "screen.combat_styles.equipment_source_config";
     private static final String KEY_SOURCE_DATA = "screen.combat_styles.equipment_source_data";
     private static final String KEY_POSE = "screen.combat_styles.equipment_pose";
+    private static final String KEY_CATEGORY = "screen.combat_styles.equipment_weapon_category";
+    private static final String KEY_CATEGORY_PICKER = "screen.combat_styles.weapon_category_picker";
     private static final String KEY_USE = "screen.combat_styles.equipment_use";
     private static final String KEY_PASSIVES = "screen.combat_styles.equipment_passives";
     private static final String KEY_TARGETS = "screen.combat_styles.equipment_targets";
@@ -119,6 +122,7 @@ public class EquipmentDetailScreen extends PanelScreen {
     private Optional<String> offHandPose;
     private PoseTuning poseTuning;
     private UseSpec use = UseSpec.NONE;
+    private Optional<String> weaponCategory;
     private final List<String> matchItems = new ArrayList<>();
     private final List<String> matchTags = new ArrayList<>();
     private final List<String> matchCategories = new ArrayList<>();
@@ -149,6 +153,7 @@ public class EquipmentDetailScreen extends PanelScreen {
         this.offHandPose = definition.offHandPose();
         this.poseTuning = definition.poseTuning();
         this.use = definition.use();
+        this.weaponCategory = definition.weaponCategory();
         this.matchItems.addAll(definition.items());
         this.matchTags.addAll(definition.itemTags());
         this.matchCategories.addAll(definition.weaponCategories());
@@ -290,7 +295,7 @@ public class EquipmentDetailScreen extends PanelScreen {
 
         int buttonY = top + PANEL_HEIGHT - ScreenTheme.BUTTON_HEIGHT - ScreenTheme.PADDING;
         boolean resettable = EquipmentRegistry.isOverridden(definitionId);
-        int slots = resettable ? 9 : 8;
+        int slots = resettable ? 10 : 9;
         int span = PANEL_WIDTH - ScreenTheme.PADDING * 2;
         int slotWidth = (span - GAP * (slots - 1)) / slots;
         int slot = 0;
@@ -321,6 +326,10 @@ public class EquipmentDetailScreen extends PanelScreen {
                         slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
         addRenderableWidget(PanelButton.of(Component.translatable(KEY_POSE),
                         button -> openPoses())
+                .bounds(buttonX(slot++, slotWidth), buttonY,
+                        slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
+        addRenderableWidget(PanelButton.of(Component.translatable(KEY_CATEGORY),
+                        button -> openWeaponCategory())
                 .bounds(buttonX(slot++, slotWidth), buttonY,
                         slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
         addRenderableWidget(PanelButton.of(useLabel(),
@@ -505,13 +514,20 @@ public class EquipmentDetailScreen extends PanelScreen {
                 }));
     }
 
+    private void openWeaponCategory() {
+        minecraft.setScreen(new ChoicePickerScreen(this, Component.translatable(KEY_CATEGORY_PICKER),
+                WeaponCategories.allNames(), weaponCategory.orElse(null),
+                chosen -> weaponCategory = WeaponCategories.normalize(chosen))
+                .creatingNew(WeaponCategories::normalize));
+    }
+
     private EquipmentDefinition currentDefinition(String id) {
         return new EquipmentDefinition(id, Map.copyOf(effects),
                 Map.copyOf(passiveAttributes), rarity, List.copyOf(innate), Map.copyOf(groups),
                 pose, offHandPose, poseTuning, List.copyOf(matchItems),
                 List.copyOf(matchTags), List.copyOf(matchCategories),
                 List.copyOf(excludeItems), List.copyOf(excludeTags),
-                List.copyOf(excludeCategories), use);
+                List.copyOf(excludeCategories), use, weaponCategory);
     }
 
     private void export() {

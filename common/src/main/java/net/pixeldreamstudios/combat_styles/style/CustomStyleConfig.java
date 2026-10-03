@@ -25,7 +25,7 @@ public final class CustomStyleConfig {
     }
 
     public static Path directory() {
-        return ConfigPaths.of(ConfigPaths.STYLES);
+        return ConfigPaths.of(ConfigPaths.CUSTOM_STYLES);
     }
 
     public static Map<String, CustomStyle> loaded() {

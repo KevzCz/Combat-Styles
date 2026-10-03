@@ -479,6 +479,11 @@ public final class SequenceService {
 
     public static String categoryOf(ItemStack stack) {
         WeaponAttributes attributes = baseAttributes(stack);
-        return attributes == null ? null : attributes.category();
+        if (attributes != null) {
+            return attributes.category();
+        }
+        return stack == null || stack.isEmpty()
+                ? null
+                : WeaponCategories.assigned(stack).orElse(null);
     }
 }

@@ -55,6 +55,8 @@ import net.pixeldreamstudios.combat_styles.equipment.SpellTune;
 import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
 import net.pixeldreamstudios.combat_styles.equipment.SpellTuning;
 import net.pixeldreamstudios.combat_styles.equipment.StateGate;
+import net.pixeldreamstudios.combat_styles.loot.BookRoll;
+import net.pixeldreamstudios.combat_styles.loot.WeaponRoll;
 import net.pixeldreamstudios.combat_styles.equipment.EffectCooldown;
 import net.pixeldreamstudios.combat_styles.equipment.SlotBand;
 import net.pixeldreamstudios.combat_styles.equipment.SlotSelection;
@@ -147,6 +149,8 @@ public final class EffectSchema {
     public static final String ROOT_TOOLTIP = "@tooltip";
     public static final String ROOT_SELF_EFFECTS = "@self_effects";
     public static final String ROOT_DAMAGE_BONUS = "@damage_bonus";
+    public static final String ROOT_STYLE_BOOK = "@style_book";
+    public static final String ROOT_WEAPON_ROLL = "@weapon_roll";
 
     private static final String DEFAULT_TRAIL_COLOR = "#FFFFFF";
     private static final int DEFAULT_NTH_SWING = 3;
@@ -199,6 +203,7 @@ public final class EffectSchema {
 
     public static final String KEY_TUNING = "tuning";
     private static final String KEY_ABILITY = "ability";
+    private static final String KEY_MODE = "mode";
     static final List<String> DAMAGE_MODES =
             List.of("additive", "amplify", "convert");
 
@@ -828,6 +833,10 @@ public final class EffectSchema {
     }
 
     private static void deriveAll() {
+        register(ROOT_STYLE_BOOK, KEY_MODE, BookRoll.Mode.CODEC, BookRoll.Mode.VARIANT);
+        deriveMissing(ROOT_STYLE_BOOK, BookRoll.CODEC, BookRoll.SAMPLE);
+        register(ROOT_WEAPON_ROLL, KEY_MODE, Codec.STRING, WeaponRoll.MODE_APPEND);
+        deriveMissing(ROOT_WEAPON_ROLL, WeaponRoll.CODEC, WeaponRoll.SAMPLE);
         deriveMissing(ROOT_SUMMON_DIVE, SummonDive.CODEC, SummonDive.SAMPLE);
         deriveMissing(ROOT_ECHO, AffixEffects.Echo.CODEC, AffixEffects.Echo.SAMPLE);
         deriveMissing(ROOT_COOLDOWN, EffectCooldown.EXPANDED, EffectCooldown.SAMPLE);

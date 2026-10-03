@@ -5,8 +5,10 @@ import net.minecraft.util.RandomSource;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class AffixRegistry {
@@ -15,6 +17,8 @@ public final class AffixRegistry {
     private static final Map<String, StyleAffix> DATAPACK = new ConcurrentHashMap<>();
     private static final Map<String, StyleAffix> CUSTOM = new ConcurrentHashMap<>();
     private static final Map<String, StyleAffix> SYNCED = new ConcurrentHashMap<>();
+    private static final Set<String> SYNCED_CONFIG = ConcurrentHashMap.newKeySet();
+    private static final Set<String> SYNCED_DATA = ConcurrentHashMap.newKeySet();
     private static volatile List<StyleAffix> ordered = List.of();
 
     private AffixRegistry() {
@@ -32,10 +36,48 @@ public final class AffixRegistry {
         rebuild();
     }
 
-    public static void acceptSync(Map<String, StyleAffix> synced) {
+    public static void acceptSync(Map<String, StyleAffix> synced, Set<String> fromConfig,
+                                  Set<String> fromData) {
         SYNCED.clear();
         SYNCED.putAll(synced);
+        SYNCED_CONFIG.clear();
+        SYNCED_CONFIG.addAll(fromConfig);
+        SYNCED_DATA.clear();
+        SYNCED_DATA.addAll(fromData);
         rebuild();
+    }
+
+    public static void removeLocal(String affixId) {
+        if (affixId != null && !hasDatapackVersion(affixId)) {
+            SYNCED.remove(affixId);
+            rebuild();
+        }
+    }
+
+    public static Map<String, StyleAffix> authoritative() {
+        Map<String, StyleAffix> merged = new LinkedHashMap<>(DATAPACK);
+        merged.putAll(CUSTOM);
+        return merged;
+    }
+
+    public static Set<String> customIds() {
+        return Set.copyOf(CUSTOM.keySet());
+    }
+
+    public static Set<String> datapackIds() {
+        return Set.copyOf(DATAPACK.keySet());
+    }
+
+    public static boolean isConfigOwned(String affixId) {
+        return affixId != null && (CUSTOM.containsKey(affixId) || SYNCED_CONFIG.contains(affixId));
+    }
+
+    public static boolean hasDatapackVersion(String affixId) {
+        return affixId != null && (DATAPACK.containsKey(affixId) || SYNCED_DATA.contains(affixId));
+    }
+
+    public static boolean isOverridden(String affixId) {
+        return isConfigOwned(affixId) && hasDatapackVersion(affixId);
     }
 
     public static void acceptLocal(StyleAffix affix) {
@@ -47,6 +89,8 @@ public final class AffixRegistry {
 
     public static void clearSync() {
         SYNCED.clear();
+        SYNCED_CONFIG.clear();
+        SYNCED_DATA.clear();
         rebuild();
     }
 

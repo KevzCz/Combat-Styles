@@ -7,6 +7,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 
@@ -17,6 +18,7 @@ import net.pixeldreamstudios.combat_styles.client.tooltip.ArcTooltipComponent;
 import net.pixeldreamstudios.combat_styles.client.tooltip.TooltipPanel;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.network.ApplySequencePayload;
+import net.pixeldreamstudios.combat_styles.network.ApplyWeaponCategoryPayload;
 import net.pixeldreamstudios.combat_styles.network.EditConfigPayload;
 import net.pixeldreamstudios.combat_styles.network.ExtractStylePayload;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
@@ -26,16 +28,20 @@ import net.pixeldreamstudios.combat_styles.style.CategoryAffinity;
 import net.pixeldreamstudios.combat_styles.style.CustomAttack;
 import net.pixeldreamstudios.combat_styles.style.CustomAttacks;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
+import net.pixeldreamstudios.combat_styles.style.DefaultStyleConfig;
+import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
 import net.pixeldreamstudios.combat_styles.style.SequenceLimits;
 import net.pixeldreamstudios.combat_styles.style.SequenceService;
 import net.pixeldreamstudios.combat_styles.style.StyleCost;
 import net.pixeldreamstudios.combat_styles.style.InnateAffixes;
+import net.pixeldreamstudios.combat_styles.style.SequenceComposer;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
 import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 import net.pixeldreamstudios.combat_styles.style.StyleSequence;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
 import net.pixeldreamstudios.combat_styles.style.StyleTooltip;
+import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
 import java.util.ArrayList;
@@ -101,8 +107,20 @@ public class CustomizerScreen extends PanelScreen {
     private static final String KEY_NO_MATCH = "screen.combat_styles.no_match";
     private static final String KEY_APPLY = "screen.combat_styles.apply";
     private static final String KEY_CLEAR = "screen.combat_styles.clear";
-    private static final String KEY_NEW_ATTACK = "screen.combat_styles.new_attack";
+    private static final String KEY_CLEAR_MENU = "screen.combat_styles.clear_menu";
+    private static final String KEY_EXPORT_DEFAULT = "screen.combat_styles.export_default";
+    private static final String KEY_REMOVE_DEFAULT = "screen.combat_styles.remove_default";
+    private static final String KEY_SAVE_CUSTOM_STYLE = "screen.combat_styles.save_custom_style";
+    private static final String KEY_CUSTOM_STYLES = "screen.combat_styles.open_custom_styles";
+    private static final String KEY_DEFAULT_EXPORTED = "screen.combat_styles.default_exported";
+    private static final String KEY_DEFAULT_REMOVED = "screen.combat_styles.default_removed";
+    private static final String KEY_PICK_SLOT = "screen.combat_styles.pick_slot";
+    private static final String SLOT_LABEL_SEPARATOR = " · ";
+    private static final String KEY_AUTHORING_MENU = "screen.combat_styles.authoring_menu";
+    private static final String KEY_CUSTOM_ATTACKS = "screen.combat_styles.open_custom_attacks";
     private static final String KEY_POSE = "screen.combat_styles.equipment_pose";
+    private static final String KEY_CATEGORY_BUTTON = "screen.combat_styles.equipment_weapon_category";
+    private static final String KEY_CATEGORY_PICKER = "screen.combat_styles.weapon_category_picker";
     private static final String KEY_BUILDER_FAILED = "screen.combat_styles.builder_failed";
     private static final String KEY_MAINHAND = "screen.combat_styles.main_hand";
     private static final String KEY_OFFHAND = "screen.combat_styles.off_hand";
@@ -165,6 +183,8 @@ public class CustomizerScreen extends PanelScreen {
     private final Set<String> expanded = new HashSet<>();
     private final Set<String> openGroups = new HashSet<>();
     private final List<Button> panelButtons = new ArrayList<>();
+    private DropdownMenu clearMenu;
+    private DropdownMenu authoringMenu;
 
     private static boolean categoriesOpen;
 
@@ -241,22 +261,40 @@ public class CustomizerScreen extends PanelScreen {
         }).bounds(left + PADDING, buttonY, 64, BUTTON_HEIGHT).build()));
 
         if (state.creative()) {
-            panelButtons.add(addRenderableWidget(PanelButton.of(
-                    Component.translatable(KEY_NEW_ATTACK), button -> openAttackBuilder())
-                    .bounds(left + PADDING + 68, buttonY, 74, BUTTON_HEIGHT).build()));
+            Button authoringButton = addRenderableWidget(PanelButton.of(
+                    Component.translatable(KEY_AUTHORING_MENU), button -> openAttackBuilder())
+                    .bounds(left + PADDING + 68, buttonY, 74, BUTTON_HEIGHT).build());
+            panelButtons.add(authoringButton);
+            authoringMenu = new DropdownMenu(authoringButton, List.of(
+                    DropdownMenu.Option.always(Component.translatable(KEY_CUSTOM_ATTACKS),
+                            this::openAttackBuilder),
+                    DropdownMenu.Option.always(Component.translatable(KEY_CUSTOM_STYLES),
+                            this::openCustomStyles)));
             panelButtons.add(addRenderableWidget(PanelButton.of(
                     Component.translatable(KEY_POSE),
                     button -> minecraft.setScreen(
                             PoseEditorScreen.forHeldItem(this, state.slot())))
                     .bounds(left + PADDING + 146, buttonY, 48, BUTTON_HEIGHT).build()));
+            panelButtons.add(addRenderableWidget(PanelButton.of(
+                    Component.translatable(KEY_CATEGORY_BUTTON),
+                    button -> openWeaponCategory())
+                    .bounds(left + PADDING + 198, buttonY, 72, BUTTON_HEIGHT).build()));
         }
 
-        panelButtons.add(addRenderableWidget(PanelButton.of(Component.translatable(KEY_CLEAR), button -> {
-            state.clear();
-            selected = null;
-            selectedVariant = null;
-            preview.select(null);
-        }).bounds(right - 112, buttonY, 52, BUTTON_HEIGHT).build()));
+        Button clearButton = addRenderableWidget(PanelButton.of(
+                Component.translatable(KEY_CLEAR_MENU), button -> clearSequence())
+                .bounds(right - 112, buttonY, 52, BUTTON_HEIGHT).build());
+        panelButtons.add(clearButton);
+        clearMenu = new DropdownMenu(clearButton, List.of(
+                DropdownMenu.Option.always(Component.translatable(KEY_CLEAR), this::clearSequence),
+                new DropdownMenu.Option(Component.translatable(KEY_EXPORT_DEFAULT),
+                        state::creative, this::exportDefault),
+                new DropdownMenu.Option(Component.translatable(KEY_REMOVE_DEFAULT),
+                        () -> state.creative() && DefaultStyles.hasConfigDefault(state.weapon()),
+                        this::removeDefault),
+                new DropdownMenu.Option(Component.translatable(KEY_SAVE_CUSTOM_STYLE),
+                        () -> state.creative() && !state.sequence().isEmpty(),
+                        this::saveSlotAsCustomStyle)));
 
         panelButtons.add(addRenderableWidget(PanelButton.of(Component.translatable(KEY_APPLY), button -> apply())
                 .bounds(right - 56, buttonY, 56, BUTTON_HEIGHT).build()));
@@ -660,6 +698,8 @@ public class CustomizerScreen extends PanelScreen {
         }
         AttackOverride current = effectiveOverride(page, index);
         StylePage edited = state.isNative(page.styleId())
+                || SequenceComposer.ignoresAffinity(entry, state.attackOverrideFor(index),
+                        page.styleId())
                 ? page
                 : CategoryAffinity.scaled(page, state.weaponCategory());
         minecraft.setScreen(new AttackEditorScreen(this, edited, current, override -> {
@@ -751,20 +791,121 @@ public class CustomizerScreen extends PanelScreen {
     }
 
     private void apply() {
+        if (sendApply()) {
+            onClose();
+        }
+    }
+
+    private boolean sendApply() {
         if (SequenceService.isLocked(state.weapon())) {
             showToast(Component.translatable(KEY_ITEM_LOCKED).withStyle(ChatFormatting.RED));
-            return;
+            return false;
         }
         int minimum = SequenceLimits.minimumFor(state.weapon());
         if (!state.sequence().isEmpty() && state.sequence().size() < minimum) {
             showToast(Component.translatable(KEY_BELOW_MINIMUM,
                     minimum, state.sequence().size()).withStyle(ChatFormatting.RED));
-            return;
+            return false;
         }
         StyleSequence outgoing = state.matchesDefault() ? StyleSequence.EMPTY : state.sequence();
         NetworkManager.sendApplySequence(new ApplySequencePayload(state.slot(), outgoing,
                 state.attackOverrides(), improvised, state.budgetOverride()));
-        onClose();
+        return true;
+    }
+
+    private List<DropdownMenu> menus() {
+        List<DropdownMenu> menus = new ArrayList<>(2);
+        if (clearMenu != null) {
+            menus.add(clearMenu);
+        }
+        if (authoringMenu != null && state.creative()) {
+            menus.add(authoringMenu);
+        }
+        return menus;
+    }
+
+    private void clearSequence() {
+        state.clear();
+        selected = null;
+        selectedVariant = null;
+        preview.select(null);
+    }
+
+    private boolean requireOperator() {
+        if (ConfigEdits.permitted()) {
+            return true;
+        }
+        showToast(ConfigEdits.operatorOnly().copy().withStyle(ChatFormatting.RED));
+        return false;
+    }
+
+    private void exportDefault() {
+        if (!requireOperator() || !sendApply()) {
+            return;
+        }
+        if (ConfigEdits.send(new EditConfigPayload(EditConfigPayload.Kind.DEFAULT_STYLE,
+                state.slot().getName(), EditConfigPayload.NONE))) {
+            showToast(Component.translatable(KEY_DEFAULT_EXPORTED).withStyle(ChatFormatting.GREEN));
+        }
+    }
+
+    private void removeDefault() {
+        ResourceLocation itemId = DefaultStyleConfig.itemIdOf(state.weapon());
+        if (itemId == null || !requireOperator()) {
+            return;
+        }
+        if (ConfigEdits.remove(EditConfigPayload.Kind.DEFAULT_STYLE_CLEAR, itemId.toString())) {
+            showToast(Component.translatable(KEY_DEFAULT_REMOVED).withStyle(ChatFormatting.GREEN));
+        }
+    }
+
+    private void saveSlotAsCustomStyle() {
+        List<StyleEntry> entries = state.sequence().entries();
+        List<String> choices = new ArrayList<>(entries.size());
+        for (int i = 0; i < entries.size(); i++) {
+            StyleEntry entry = entries.get(i);
+            StylePage page = StyleRegistry.get(CustomStyles.resolve(entry).styleId());
+            String label = page == null
+                    ? entry.styleId()
+                    : StyleText.affixedName(entry, page).getString();
+            choices.add((i + 1) + SLOT_LABEL_SEPARATOR + label);
+        }
+        minecraft.setScreen(new ChoicePickerScreen(this,
+                Component.translatable(KEY_PICK_SLOT), choices, null, picked -> {
+                    int index = choices.indexOf(picked);
+                    if (index < 0) {
+                        minecraft.setScreen(this);
+                        return;
+                    }
+                    StyleEntry seed = CustomStyles.resolve(entries.get(index));
+                    AttackOverride fromSlot = state.attackOverrideFor(index);
+                    if (fromSlot != null) {
+                        seed = seed.withAttackOverride(seed.attackOverride()
+                                .map(current -> current.overriddenBy(fromSlot))
+                                .orElse(fromSlot));
+                    }
+                    minecraft.setScreen(new CustomStyleEditorScreen(this, null, seed,
+                            saved -> refreshStyles()));
+                }).handingOffOnPick());
+    }
+
+    private void openCustomStyles() {
+        minecraft.setScreen(new CustomStyleManagerScreen(this, state.creative(), this::refreshStyles));
+    }
+
+    private void openWeaponCategory() {
+        EquipmentSlot slot = state.slot();
+        minecraft.setScreen(new ChoicePickerScreen(this, Component.translatable(KEY_CATEGORY_PICKER),
+                WeaponCategories.allNames(),
+                WeaponCategories.stackCategoryOf(state.weapon()).orElse(null),
+                chosen -> {
+                    String category = WeaponCategories.normalize(chosen).orElse("");
+                    NetworkManager.sendApplyWeaponCategory(new ApplyWeaponCategoryPayload(slot, category));
+                    WeaponCategories.store(state.weapon(), category);
+                    state.refreshWeaponCategory();
+                    rebuildLibrary();
+                })
+                .creatingNew(WeaponCategories::normalize));
     }
 
     @Override
@@ -819,7 +960,14 @@ public class CustomizerScreen extends PanelScreen {
 
         renderShortcuts(graphics);
         renderToast(graphics);
-        renderTooltips(graphics, mouseX, mouseY);
+        boolean menuOpen = false;
+        for (DropdownMenu menu : menus()) {
+            menu.render(graphics, font, mouseX, mouseY);
+            menuOpen |= menu.isOpen();
+        }
+        if (!menuOpen) {
+            renderTooltips(graphics, mouseX, mouseY);
+        }
     }
 
     private void renderHeader(GuiGraphics graphics) {
@@ -1322,6 +1470,8 @@ public class CustomizerScreen extends PanelScreen {
                     return false;
                 }
                 CategoryAffinity.Tier tier = state.isNative(page.styleId())
+                        || SequenceComposer.ignoresAffinity(entry, state.attackOverrideFor(index),
+                                page.styleId())
                         ? CategoryAffinity.Tier.NATIVE
                         : CategoryAffinity.tierOf(CustomStyles.categoryOf(entry, page),
                                 state.weaponCategory());
@@ -1541,6 +1691,11 @@ public class CustomizerScreen extends PanelScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        for (DropdownMenu menu : menus()) {
+            if (menu.mouseClicked(font, mouseX, mouseY)) {
+                return true;
+            }
+        }
         if (searchBox.mouseClicked(mouseX, mouseY, button)) {
             setFocused(searchBox);
             return true;

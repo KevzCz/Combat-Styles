@@ -1,6 +1,9 @@
 package net.pixeldreamstudios.combat_styles.style;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.netty.buffer.ByteBuf;
@@ -11,6 +14,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.List;
@@ -54,6 +58,8 @@ public record AttackOverride(Optional<Double> damageMultiplier,
 
     public static final double NEUTRAL_COOLDOWN = 1.0D;
     public static final String SILENT_SOUND = CombatStyles.MOD_ID + ":none";
+    private static final String DIFF_ARROW = " → ";
+    private static final String DIFF_NONE = "-";
 
     public static boolean isSilent(String soundId) {
         return SILENT_SOUND.equals(soundId);
@@ -537,5 +543,50 @@ public record AttackOverride(Optional<Double> damageMultiplier,
 
     public boolean isDisabled() {
         return disabled.orElse(Boolean.FALSE);
+    }
+
+    public AttackOverride withoutMatching(AttackOverride reference) {
+        JsonObject mine = encoded(this);
+        JsonObject theirs = encoded(reference);
+        if (mine == null || theirs == null) {
+            return this;
+        }
+        for (String key : List.copyOf(mine.keySet())) {
+            if (mine.get(key).equals(theirs.get(key))) {
+                mine.remove(key);
+            }
+        }
+        return CODEC.parse(JsonOps.INSTANCE, mine).result().orElse(this);
+    }
+
+    public List<String> differencesFrom(AttackOverride reference) {
+        JsonObject mine = encoded(this);
+        JsonObject theirs = encoded(reference);
+        List<String> lines = new ArrayList<>();
+        if (mine == null) {
+            return lines;
+        }
+        for (String key : mine.keySet()) {
+            JsonElement other = theirs == null ? null : theirs.get(key);
+            if (!mine.get(key).equals(other)) {
+                lines.add(key + " " + mine.get(key) + DIFF_ARROW
+                        + (other == null ? DIFF_NONE : other.toString()));
+            }
+        }
+        return lines;
+    }
+
+    public boolean isBlank() {
+        JsonObject json = encoded(this);
+        return json == null || json.size() == 0;
+    }
+
+    private static JsonObject encoded(AttackOverride override) {
+        return override == null
+                ? null
+                : CODEC.encodeStart(JsonOps.INSTANCE, override).result()
+                        .filter(JsonElement::isJsonObject)
+                        .map(JsonElement::getAsJsonObject)
+                        .orElse(null);
     }
 }

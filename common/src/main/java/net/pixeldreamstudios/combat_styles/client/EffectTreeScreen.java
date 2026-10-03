@@ -93,7 +93,12 @@ public class EffectTreeScreen extends PanelScreen {
 
     public <T> EffectTreeScreen(Screen parent, Component subtitle, Codec<T> codec, T current,
                                 Consumer<Optional<T>> onApply) {
-        super(Component.translatable(KEY_TITLE), parent);
+        this(parent, Component.translatable(KEY_TITLE), subtitle, codec, current, onApply);
+    }
+
+    public <T> EffectTreeScreen(Screen parent, Component title, Component subtitle, Codec<T> codec,
+                                T current, Consumer<Optional<T>> onApply) {
+        super(title, parent, new Scrollbar(ScreenTheme.TRACK, COLOR_ACCENT));
         this.subtitle = subtitle;
         this.binding = new Binding<>(codec, current, onApply);
         this.root = encode(codec, current);
@@ -296,8 +301,7 @@ public class EffectTreeScreen extends PanelScreen {
         graphics.fill(0, 0, width, height, COLOR_SHADE);
         ScreenDraw.panel(graphics, left, top, PANEL_WIDTH, PANEL_HEIGHT);
 
-        graphics.drawString(font, Component.translatable(KEY_TITLE),
-                left + PADDING, top + 9, COLOR_HEADING, false);
+        graphics.drawString(font, title, left + PADDING, top + 9, COLOR_HEADING, false);
         graphics.drawString(font, subtitle, left + PADDING, top + 21, COLOR_TEXT, false);
         graphics.drawString(font, Component.translatable(KEY_HINT),
                 left + PADDING, top + 32, COLOR_MUTED, false);
@@ -315,10 +319,12 @@ public class EffectTreeScreen extends PanelScreen {
         int y = listTop();
         int last = Math.min(rows.size(), scroll + visibleRows());
         List<Component> hoverTip = null;
+        boolean overBar = scrollbar.isOverTrack(mouseX, mouseY);
+        int rowMouseX = overBar ? Integer.MIN_VALUE : mouseX;
         for (int i = scroll; i < last; i++) {
             JsonTreeModel.Node node = rows.get(i);
-            renderRow(graphics, node, i, x, y, listWidth, mouseX, mouseY);
-            if (ScreenDraw.isWithin(mouseX, mouseY, x, y, listWidth, ROW_HEIGHT)) {
+            renderRow(graphics, node, i, x, y, listWidth, rowMouseX, mouseY);
+            if (!overBar && ScreenDraw.isWithin(mouseX, mouseY, x, y, listWidth, ROW_HEIGHT)) {
                 hoverTip = tooltipFor(node);
             }
             y += ROW_HEIGHT;
@@ -326,8 +332,8 @@ public class EffectTreeScreen extends PanelScreen {
         graphics.disableScissor();
         pendingTooltip = hoverTip;
 
-        ScreenDraw.scrollbar(graphics, x + listWidth - SCROLLBAR_WIDTH - 1, listTop(),
-                listBottom() - listTop(), visibleRows(), rows.size(), scroll);
+        scrollbar.render(graphics, x + listWidth - SCROLLBAR_WIDTH - 1, listTop(), listBottom(),
+                scroll, maxScroll(), rows.size(), visibleRows());
 
         if (error != null) {
             graphics.drawString(font, trim(Component.translatable(KEY_INVALID).getString()
@@ -689,6 +695,10 @@ public class EffectTreeScreen extends PanelScreen {
         }
         if (mouseY < listTop() || mouseY > listBottom()) {
             return super.mouseClicked(mouseX, mouseY, button);
+        }
+        if (scrollbar.isOverTrack(mouseX, mouseY)) {
+            scroll = scrollbar.beginDrag(mouseX, mouseY, scroll);
+            return true;
         }
 
         int x = left + PADDING;

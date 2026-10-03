@@ -469,6 +469,10 @@ public class CustomizerState {
         return weaponCategory;
     }
 
+    public void refreshWeaponCategory() {
+        weaponCategory = SequenceService.categoryOf(weapon());
+    }
+
     public String activeCategory() {
         return activeCategory;
     }

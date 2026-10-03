@@ -10,6 +10,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 
 import net.pixeldreamstudios.combat_styles.network.ApplyPosePayload;
+import net.pixeldreamstudios.combat_styles.network.ApplyWeaponCategoryPayload;
 import net.pixeldreamstudios.combat_styles.network.ApplySequencePayload;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
 import net.pixeldreamstudios.combat_styles.network.ExtractStylePayload;
@@ -25,6 +26,7 @@ import net.pixeldreamstudios.combat_styles.network.ApplyStackEquipmentPayload;
 import net.pixeldreamstudios.combat_styles.network.HoldComboPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncDefaultStylesPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncAffixesPayload;
+import net.pixeldreamstudios.combat_styles.network.SyncLootPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncAttackOverridesPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncEquipmentPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncLearnedPayload;
@@ -37,6 +39,7 @@ public final class NetworkManagerImpl {
     public static void register() {
         PayloadTypeRegistry.playC2S().register(ApplySequencePayload.TYPE, ApplySequencePayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(ApplyPosePayload.TYPE, ApplyPosePayload.STREAM_CODEC);
+        PayloadTypeRegistry.playC2S().register(ApplyWeaponCategoryPayload.TYPE, ApplyWeaponCategoryPayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(ExtractStylePayload.TYPE, ExtractStylePayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(SwungAttackPayload.TYPE, SwungAttackPayload.STREAM_CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SwungAttackPayload.TYPE, (payload, context) ->
@@ -57,6 +60,8 @@ public final class NetworkManagerImpl {
                 SyncEquipmentPayload.STREAM_CODEC);
         PayloadTypeRegistry.playS2C().register(SyncAffixesPayload.TYPE,
                 SyncAffixesPayload.STREAM_CODEC);
+        PayloadTypeRegistry.playS2C().register(SyncLootPayload.TYPE,
+                SyncLootPayload.STREAM_CODEC);
         PayloadTypeRegistry.playS2C().register(SyncAttackOverridesPayload.TYPE,
                 SyncAttackOverridesPayload.STREAM_CODEC);
         PayloadTypeRegistry.playS2C().register(SyncCooldownsPayload.TYPE,
@@ -76,6 +81,8 @@ public final class NetworkManagerImpl {
                 context.server().execute(() -> NetworkManager.handleApplySequence(context.player(), payload)));
         ServerPlayNetworking.registerGlobalReceiver(ApplyPosePayload.TYPE, (payload, context) ->
                 context.server().execute(() -> NetworkManager.handleApplyPose(context.player(), payload)));
+        ServerPlayNetworking.registerGlobalReceiver(ApplyWeaponCategoryPayload.TYPE, (payload, context) ->
+                context.server().execute(() -> NetworkManager.handleApplyWeaponCategory(context.player(), payload)));
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
                 server.execute(() -> {
                     NetworkManager.syncLearned(handler.getPlayer());
@@ -111,6 +118,10 @@ public final class NetworkManagerImpl {
         ServerPlayNetworking.send(player, payload);
     }
 
+    public static void sendLootToClient(ServerPlayer player, SyncLootPayload payload) {
+        ServerPlayNetworking.send(player, payload);
+    }
+
     public static void sendAttackOverridesToClient(ServerPlayer player,
                                                    SyncAttackOverridesPayload payload) {
         ServerPlayNetworking.send(player, payload);
@@ -139,6 +150,10 @@ public final class NetworkManagerImpl {
 
     @Environment(EnvType.CLIENT)
     public static void sendApplyPose(ApplyPosePayload payload) {
+        ClientPlayNetworking.send(payload);
+    }
+
+    public static void sendApplyWeaponCategory(ApplyWeaponCategoryPayload payload) {
         ClientPlayNetworking.send(payload);
     }
 

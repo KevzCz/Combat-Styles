@@ -15,84 +15,95 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 public final class DefaultStyleConfig {
 
     private static final String EXTENSION = ".json";
+    private static final char NAMESPACE_SEPARATOR = ':';
+    private static final char FILE_SEPARATOR = '_';
 
     private DefaultStyleConfig() {
     }
 
     public static Path directory() {
-        return ConfigPaths.of(ConfigPaths.STYLES);
+        return ConfigPaths.of(ConfigPaths.DEFAULT_STYLES);
     }
 
     public static int reload() {
-        Map<ResourceLocation, StyleSequence> loaded = new LinkedHashMap<>();
-        Map<ResourceLocation, Integer> slotLimits = new LinkedHashMap<>();
-        Set<ResourceLocation> appending = new HashSet<>();
-
+        List<DefaultStyleLoader.Definition> definitions = new ArrayList<>();
         Path directory = directory();
-        if (!Files.isDirectory(directory)) {
-            DefaultStyles.acceptConfig(loaded, slotLimits, appending);
-            return 0;
+        if (Files.isDirectory(directory)) {
+            try (Stream<Path> files = Files.list(directory)) {
+                files.filter(path -> path.toString().endsWith(EXTENSION))
+                        .forEach(path -> read(path).ifPresent(definitions::add));
+            } catch (IOException exception) {
+                CombatStyles.LOGGER.error("Unable to list {}", directory, exception);
+            }
         }
-
-        try (Stream<Path> files = Files.list(directory)) {
-            files.filter(path -> path.toString().endsWith(EXTENSION))
-                    .forEach(path -> load(path, loaded, slotLimits, appending));
-        } catch (IOException exception) {
-            CombatStyles.LOGGER.error("Unable to list {}", directory, exception);
-        }
-
-        DefaultStyles.acceptConfig(loaded, slotLimits, appending);
-        return loaded.size();
+        DefaultStyleSet compiled = DefaultStyleSet.compile(definitions);
+        DefaultStyles.acceptConfig(compiled);
+        return compiled.targets().size();
     }
 
-    private static void load(Path path,
-                             Map<ResourceLocation, StyleSequence> loaded,
-                             Map<ResourceLocation, Integer> slotLimits,
-                             Set<ResourceLocation> appending) {
+    private static Optional<DefaultStyleLoader.Definition> read(Path path) {
         try {
             JsonElement json = JsonParser.parseString(Files.readString(path));
-            DefaultStyleLoader.Definition definition = DefaultStyleLoader.Definition.CODEC
+            return DefaultStyleLoader.Definition.CODEC
                     .parse(JsonOps.INSTANCE, json)
                     .resultOrPartial(error ->
-                            CombatStyles.LOGGER.error("Invalid default style {}: {}", path, error))
-                    .orElse(null);
-            if (definition == null) {
-                return;
-            }
-
-            StyleSequence sequence = definition.entries().isEmpty()
-                    ? null
-                    : new StyleSequence(definition.name(), definition.entries());
-
-            for (ResourceLocation itemId : DefaultStyleLoader.targetsOf(definition)) {
-                if (sequence != null) {
-                    loaded.put(itemId, sequence);
-                    if (definition.appends()) {
-                        appending.add(itemId);
-                    }
-                }
-                if (definition.slots() > 0) {
-                    slotLimits.put(itemId, definition.slots());
-                }
-            }
+                            CombatStyles.LOGGER.error("Invalid default style {}: {}", path, error));
         } catch (IOException | RuntimeException exception) {
             CombatStyles.LOGGER.error("Unable to read {}", path, exception);
+            return Optional.empty();
         }
     }
 
-    public static Path export(ResourceLocation itemId, StyleSequence sequence, int slots) {
-        return export(itemId, sequence, slots, List.of(), false, false);
+    public static Path fileFor(ResourceLocation itemId) {
+        return directory().resolve(itemId.toString().replace(NAMESPACE_SEPARATOR, FILE_SEPARATOR)
+                + EXTENSION);
+    }
+
+    public static Path exportFrom(ItemStack stack, UUID holder) {
+        ResourceLocation itemId = itemIdOf(stack);
+        if (itemId == null || !SequenceService.isSupported(stack)) {
+            return null;
+        }
+        StyleSequence sequence = SequenceService.sequenceOf(stack, holder);
+        if (sequence.isEmpty()) {
+            return null;
+        }
+
+        Map<String, AttackOverride> overrides = SequenceService.attackOverridesOf(stack);
+        List<StyleEntry> entries = new ArrayList<>(sequence.entries());
+        for (int i = 0; i < entries.size(); i++) {
+            StyleEntry entry = entries.get(i);
+            StylePage page = StyleRegistry.get(CustomStyles.resolve(entry).styleId());
+            AttackOverride effective = page == null
+                    ? null
+                    : AttackOverrides.get(page.styleId());
+            AttackOverride declared = entry.attackOverride().orElse(null);
+            if (declared != null) {
+                effective = effective == null ? declared : effective.overriddenBy(declared);
+            }
+            AttackOverride fromSlot = overrides.get(String.valueOf(i));
+            if (fromSlot != null) {
+                effective = effective == null ? fromSlot : effective.overriddenBy(fromSlot);
+            }
+            if (effective != null) {
+                entries.set(i, entry.withAttackOverride(effective));
+            }
+        }
+
+        return export(itemId, new StyleSequence(sequence.name(), entries),
+                DefaultStyles.slotLimitFor(stack),
+                DefaultStyles.slotTuningsFor(stack),
+                SequenceService.isLocked(stack),
+                DefaultStyles.keepsThroughRolls(stack));
     }
 
     public static Path export(ResourceLocation itemId, StyleSequence sequence, int slots,
@@ -115,7 +126,7 @@ public final class DefaultStyleConfig {
                 applies, composed, tune == null ? List.of() : tune, 0, locked,
                 keepThroughRolls, Optional.empty());
 
-        Path file = directory.resolve(itemId.getPath() + EXTENSION);
+        Path file = fileFor(itemId);
         return DefaultStyleLoader.Definition.CODEC.encodeStart(JsonOps.INSTANCE, definition)
                 .resultOrPartial(error -> CombatStyles.LOGGER.error("Encode failed: {}", error))
                 .map(json -> {
@@ -129,6 +140,18 @@ public final class DefaultStyleConfig {
                     }
                 })
                 .orElse(null);
+    }
+
+    public static boolean remove(ResourceLocation itemId) {
+        if (itemId == null) {
+            return false;
+        }
+        try {
+            return Files.deleteIfExists(fileFor(itemId));
+        } catch (IOException exception) {
+            CombatStyles.LOGGER.error("Unable to remove the default style for {}", itemId, exception);
+            return false;
+        }
     }
 
     public static ResourceLocation itemIdOf(ItemStack stack) {

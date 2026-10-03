@@ -8,6 +8,8 @@ import net.pixeldreamstudios.combat_styles.style.StyleText;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Consumer;
 
 public class ChoicePickerScreen extends PickerScreen<String> {
@@ -27,6 +29,9 @@ public class ChoicePickerScreen extends PickerScreen<String> {
     private static final String KEY_ANY = "screen.combat_styles.choice_any";
     private static final String KEY_ANY_HINT = "screen.combat_styles.choice_any_hint";
     private static final String ANY_ROW = "*";
+    private static final String KEY_NEW = "screen.combat_styles.content_new";
+    private static final String KEY_NEW_TITLE = "screen.combat_styles.choice_new";
+    private static final String KEY_BAD_NAME = "screen.combat_styles.choice_bad_name";
 
     private static final int PREVIEW_SIZE = 76;
     private static final int PREVIEW_GAP = 6;
@@ -43,6 +48,7 @@ public class ChoicePickerScreen extends PickerScreen<String> {
     private String hovered;
     private Runnable onAny;
     private boolean anySelected;
+    private Function<String, Optional<String>> creator;
 
     public ChoicePickerScreen(Screen parent, Component subtitle, List<String> choices,
                               String current, Consumer<String> onPick) {
@@ -59,6 +65,21 @@ public class ChoicePickerScreen extends PickerScreen<String> {
             options.addFirst(ANY_ROW);
         }
         return this;
+    }
+
+    public ChoicePickerScreen creatingNew(Function<String, Optional<String>> normalize) {
+        this.creator = normalize;
+        return this;
+    }
+
+    private Optional<Component> create(String typed) {
+        Optional<String> created = creator.apply(typed);
+        if (created.isEmpty()) {
+            return Optional.of(Component.translatable(KEY_BAD_NAME));
+        }
+        onPick.accept(created.get());
+        minecraft.setScreen(parent);
+        return Optional.empty();
     }
 
     public ChoicePickerScreen handingOffOnPick() {
@@ -153,6 +174,13 @@ public class ChoicePickerScreen extends PickerScreen<String> {
             onPick.accept("");
             minecraft.setScreen(parent);
         }).bounds(contentLeft(), buttonY, BUTTON_WIDTH, ScreenTheme.BUTTON_HEIGHT).build());
+        if (creator != null) {
+            addRenderableWidget(PanelButton.of(Component.translatable(KEY_NEW),
+                            button -> minecraft.setScreen(new NamePromptScreen(this,
+                                    Component.translatable(KEY_NEW_TITLE, title), this::create)))
+                    .bounds(contentLeft() + BUTTON_WIDTH + ScreenTheme.PADDING, buttonY,
+                            BUTTON_WIDTH, ScreenTheme.BUTTON_HEIGHT).build());
+        }
         addRenderableWidget(PanelButton.of(Component.translatable(KEY_CANCEL),
                         button -> minecraft.setScreen(parent))
                 .bounds(contentRight() - BUTTON_WIDTH, buttonY,

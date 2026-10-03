@@ -9,7 +9,6 @@ import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.platform.WeaponRegistryAccess;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -17,20 +16,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 public final class DefaultStyles {
 
     private static final Map<ResourceLocation, StyleSequence> REGISTERED = new ConcurrentHashMap<>();
-    private static final Map<ResourceLocation, StyleSequence> DATAPACK = new ConcurrentHashMap<>();
-    private static final Map<ResourceLocation, StyleSequence> CONFIG = new ConcurrentHashMap<>();
-    private static final Map<ResourceLocation, Integer> SLOT_LIMITS = new ConcurrentHashMap<>();
-    private static final Map<ResourceLocation, Integer> CONFIG_SLOT_LIMITS = new ConcurrentHashMap<>();
-    private static final Set<ResourceLocation> APPENDING = ConcurrentHashMap.newKeySet();
+    private static final Map<ResourceLocation, Integer> REGISTERED_SLOT_LIMITS = new ConcurrentHashMap<>();
+
+    private static volatile DefaultStyleSet datapack = DefaultStyleSet.EMPTY;
+    private static volatile DefaultStyleSet config = DefaultStyleSet.EMPTY;
+
     private static final Map<ResourceLocation, StyleSequence> SYNCED = new ConcurrentHashMap<>();
     private static final Map<ResourceLocation, Integer> SYNCED_SLOT_LIMITS = new ConcurrentHashMap<>();
     private static final Set<ResourceLocation> SYNCED_APPENDING = ConcurrentHashMap.newKeySet();
-    private static final Set<ResourceLocation> LOCKED_ITEMS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> SYNCED_TUNING = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> SYNCED_STICKY = ConcurrentHashMap.newKeySet();
     private static final Set<ResourceLocation> SYNCED_LOCKED = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> SYNCED_CONFIG_ITEMS = ConcurrentHashMap.newKeySet();
+    private static final Map<ResourceLocation, List<SlotTuning>> SYNCED_SLOT_TUNINGS =
+            new ConcurrentHashMap<>();
 
     private DefaultStyles() {
     }
@@ -42,90 +46,91 @@ public final class DefaultStyles {
         REGISTERED.put(itemId, sequence);
     }
 
-    public static void acceptDatapack(Map<ResourceLocation, StyleSequence> loaded,
-                                      Map<ResourceLocation, Integer> slotLimits,
-                                      Set<ResourceLocation> appending) {
-        DATAPACK.clear();
-        DATAPACK.putAll(loaded);
-        SLOT_LIMITS.clear();
-        SLOT_LIMITS.putAll(slotLimits);
-        APPENDING.removeIf(id -> !CONFIG.containsKey(id));
-        APPENDING.addAll(appending);
+    public static void registerSlotLimit(ResourceLocation itemId, int slots) {
+        if (itemId != null && slots > 0) {
+            REGISTERED_SLOT_LIMITS.put(itemId, slots);
+        }
     }
 
-    public static void acceptConfig(Map<ResourceLocation, StyleSequence> loaded,
-                                    Map<ResourceLocation, Integer> slotLimits,
-                                    Set<ResourceLocation> appending) {
-        CONFIG.clear();
-        CONFIG.putAll(loaded);
-        CONFIG_SLOT_LIMITS.clear();
-        CONFIG_SLOT_LIMITS.putAll(slotLimits);
-        APPENDING.addAll(appending);
+    public static void acceptDatapack(DefaultStyleSet loaded) {
+        datapack = loaded == null ? DefaultStyleSet.EMPTY : loaded;
+    }
+
+    public static void acceptConfig(DefaultStyleSet loaded) {
+        config = loaded == null ? DefaultStyleSet.EMPTY : loaded;
+    }
+
+    public static void clear() {
+        datapack = DefaultStyleSet.EMPTY;
+        config = DefaultStyleSet.EMPTY;
+    }
+
+    private static DefaultStyleSet layerFor(ResourceLocation itemId) {
+        return config.owns(itemId) ? config : datapack;
+    }
+
+    private static boolean flagged(ResourceLocation itemId,
+                                   Function<DefaultStyleSet, Set<ResourceLocation>> flags,
+                                   Set<ResourceLocation> synced) {
+        return itemId != null
+                && (flags.apply(layerFor(itemId)).contains(itemId) || synced.contains(itemId));
+    }
+
+    private static Set<ResourceLocation> effective(
+            Function<DefaultStyleSet, Set<ResourceLocation>> flags) {
+        Set<ResourceLocation> merged = new HashSet<>();
+        for (ResourceLocation itemId : flags.apply(datapack)) {
+            if (!config.owns(itemId)) {
+                merged.add(itemId);
+            }
+        }
+        merged.addAll(flags.apply(config));
+        return merged;
     }
 
     public static Map<ResourceLocation, StyleSequence> snapshotSequences() {
         Map<ResourceLocation, StyleSequence> merged = new LinkedHashMap<>(REGISTERED);
-        merged.putAll(DATAPACK);
-        merged.putAll(CONFIG);
+        merged.putAll(datapack.sequences());
+        merged.putAll(config.sequences());
         return merged;
     }
 
     public static Map<ResourceLocation, Integer> snapshotSlotLimits() {
-        Map<ResourceLocation, Integer> merged = new LinkedHashMap<>(SLOT_LIMITS);
-        merged.putAll(CONFIG_SLOT_LIMITS);
+        Map<ResourceLocation, Integer> merged = new LinkedHashMap<>(REGISTERED_SLOT_LIMITS);
+        merged.putAll(datapack.slotLimits());
+        merged.putAll(config.slotLimits());
         return merged;
     }
 
-    private static final Set<ResourceLocation> STICKY = new HashSet<>();
-    private static final Set<ResourceLocation> SYNCED_STICKY = ConcurrentHashMap.newKeySet();
-
-    public static void acceptSticky(Set<ResourceLocation> sticky) {
-        STICKY.clear();
-        STICKY.addAll(sticky);
-    }
-
-    public static void acceptSyncSticky(Set<ResourceLocation> sticky) {
-        SYNCED_STICKY.clear();
-        SYNCED_STICKY.addAll(sticky);
-    }
-
-    public static Set<ResourceLocation> snapshotSticky() {
-        return Set.copyOf(STICKY);
-    }
-
-    public static boolean keepsThroughRolls(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return false;
-        }
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        return itemId != null && (STICKY.contains(itemId) || SYNCED_STICKY.contains(itemId));
-    }
-
-    private static final Map<ResourceLocation, List<SlotTuning>> SLOT_TUNINGS = new HashMap<>();
-
-    public static void acceptSlotTunings(Map<ResourceLocation, List<SlotTuning>> tunings) {
-        SLOT_TUNINGS.clear();
-        SLOT_TUNINGS.putAll(tunings);
-    }
-
-    public static List<SlotTuning> slotTuningsFor(ItemStack stack) {
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        return itemId == null ? List.of() : SLOT_TUNINGS.getOrDefault(itemId, List.of());
+    public static Set<ResourceLocation> snapshotAppending() {
+        return Set.copyOf(effective(DefaultStyleSet::appending));
     }
 
     public static Set<ResourceLocation> snapshotTuning() {
-        return Set.copyOf(TUNING);
+        return Set.copyOf(effective(DefaultStyleSet::tuning));
     }
 
-    public static Set<ResourceLocation> snapshotAppending() {
-        return Set.copyOf(APPENDING);
+    public static Set<ResourceLocation> snapshotSticky() {
+        return Set.copyOf(effective(DefaultStyleSet::sticky));
     }
 
-    private static final Set<ResourceLocation> SYNCED_TUNING = ConcurrentHashMap.newKeySet();
+    public static Set<ResourceLocation> snapshotLocked() {
+        return Set.copyOf(effective(DefaultStyleSet::locked));
+    }
 
-    public static void acceptSyncTuning(Set<ResourceLocation> tuning) {
-        SYNCED_TUNING.clear();
-        SYNCED_TUNING.addAll(tuning);
+    public static Map<ResourceLocation, List<SlotTuning>> snapshotSlotTunings() {
+        Map<ResourceLocation, List<SlotTuning>> merged = new LinkedHashMap<>();
+        datapack.slotTunings().forEach((itemId, tunings) -> {
+            if (!config.owns(itemId)) {
+                merged.put(itemId, tunings);
+            }
+        });
+        merged.putAll(config.slotTunings());
+        return merged;
+    }
+
+    public static Set<ResourceLocation> snapshotConfigItems() {
+        return Set.copyOf(config.targets());
     }
 
     public static void acceptSync(Map<ResourceLocation, StyleSequence> sequences,
@@ -139,17 +144,14 @@ public final class DefaultStyles {
         SYNCED_APPENDING.addAll(appending);
     }
 
-    public static void clearSync() {
-        SYNCED.clear();
-        SYNCED_SLOT_LIMITS.clear();
-        SYNCED_APPENDING.clear();
-        SYNCED_STICKY.clear();
+    public static void acceptSyncTuning(Set<ResourceLocation> tuning) {
         SYNCED_TUNING.clear();
-        SYNCED_LOCKED.clear();
+        SYNCED_TUNING.addAll(tuning);
     }
 
-    public static Set<ResourceLocation> snapshotLocked() {
-        return Set.copyOf(LOCKED_ITEMS);
+    public static void acceptSyncSticky(Set<ResourceLocation> sticky) {
+        SYNCED_STICKY.clear();
+        SYNCED_STICKY.addAll(sticky);
     }
 
     public static void acceptSyncLocked(Set<ResourceLocation> locked) {
@@ -157,25 +159,56 @@ public final class DefaultStyles {
         SYNCED_LOCKED.addAll(locked);
     }
 
-    public static void acceptLocked(Set<ResourceLocation> locked) {
-        LOCKED_ITEMS.clear();
-        if (locked != null) {
-            LOCKED_ITEMS.addAll(locked);
-        }
+    public static void acceptSyncSlotTunings(Map<ResourceLocation, List<SlotTuning>> tunings) {
+        SYNCED_SLOT_TUNINGS.clear();
+        SYNCED_SLOT_TUNINGS.putAll(tunings);
+    }
+
+    public static void acceptSyncConfigItems(Set<ResourceLocation> items) {
+        SYNCED_CONFIG_ITEMS.clear();
+        SYNCED_CONFIG_ITEMS.addAll(items);
+    }
+
+    public static void clearSync() {
+        SYNCED.clear();
+        SYNCED_SLOT_LIMITS.clear();
+        SYNCED_APPENDING.clear();
+        SYNCED_STICKY.clear();
+        SYNCED_TUNING.clear();
+        SYNCED_LOCKED.clear();
+        SYNCED_SLOT_TUNINGS.clear();
+        SYNCED_CONFIG_ITEMS.clear();
+    }
+
+    private static ResourceLocation itemIdOf(ItemStack stack) {
+        return stack == null || stack.isEmpty()
+                ? null
+                : BuiltInRegistries.ITEM.getKey(stack.getItem());
+    }
+
+    public static boolean hasConfigDefault(ItemStack stack) {
+        ResourceLocation itemId = itemIdOf(stack);
+        return itemId != null && (config.owns(itemId) || SYNCED_CONFIG_ITEMS.contains(itemId));
+    }
+
+    public static boolean keepsThroughRolls(ItemStack stack) {
+        return flagged(itemIdOf(stack), DefaultStyleSet::sticky, SYNCED_STICKY);
     }
 
     public static boolean isLockedByDefault(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return false;
-        }
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        return itemId != null && (LOCKED_ITEMS.contains(itemId) || SYNCED_LOCKED.contains(itemId));
+        return flagged(itemIdOf(stack), DefaultStyleSet::locked, SYNCED_LOCKED);
     }
 
-    public static void registerSlotLimit(ResourceLocation itemId, int slots) {
-        if (itemId != null && slots > 0) {
-            SLOT_LIMITS.put(itemId, slots);
+    public static List<SlotTuning> slotTuningsFor(ItemStack stack) {
+        ResourceLocation itemId = itemIdOf(stack);
+        if (itemId == null) {
+            return List.of();
         }
+        List<SlotTuning> local = layerFor(itemId).slotTunings().get(itemId);
+        if (local != null) {
+            return local;
+        }
+        return SYNCED_SLOT_TUNINGS.getOrDefault(itemId, List.of());
     }
 
     public static int slotLimitFor(ItemStack stack) {
@@ -188,17 +221,21 @@ public final class DefaultStyles {
             return override;
         }
 
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        ResourceLocation itemId = itemIdOf(stack);
         if (itemId == null) {
             return configured;
         }
-        Integer fromConfig = CONFIG_SLOT_LIMITS.get(itemId);
+        Integer fromConfig = config.slotLimits().get(itemId);
         if (fromConfig != null) {
             return fromConfig;
         }
-        Integer fromData = SLOT_LIMITS.get(itemId);
+        Integer fromData = datapack.slotLimits().get(itemId);
         if (fromData != null) {
             return fromData;
+        }
+        Integer fromCode = REGISTERED_SLOT_LIMITS.get(itemId);
+        if (fromCode != null) {
+            return fromCode;
         }
         Integer fromSync = SYNCED_SLOT_LIMITS.get(itemId);
         return fromSync == null ? configured : fromSync;
@@ -215,18 +252,18 @@ public final class DefaultStyles {
         if (rolled != null && !rolled.isEmpty()) {
             return true;
         }
-        return !forItem(BuiltInRegistries.ITEM.getKey(stack.getItem())).isEmpty();
+        return !forItem(itemIdOf(stack)).isEmpty();
     }
 
     public static StyleSequence forItem(ResourceLocation itemId) {
         if (itemId == null) {
             return StyleSequence.EMPTY;
         }
-        StyleSequence fromConfig = CONFIG.get(itemId);
+        StyleSequence fromConfig = config.sequences().get(itemId);
         if (fromConfig != null) {
             return fromConfig;
         }
-        StyleSequence fromPack = DATAPACK.get(itemId);
+        StyleSequence fromPack = datapack.sequences().get(itemId);
         if (fromPack != null) {
             return fromPack;
         }
@@ -238,28 +275,16 @@ public final class DefaultStyles {
         return fromSync == null ? StyleSequence.EMPTY : fromSync;
     }
 
-    private static final Set<ResourceLocation> TUNING = new HashSet<>();
-
-    public static void acceptTuning(Set<ResourceLocation> tuning) {
-        TUNING.clear();
-        TUNING.addAll(tuning);
-    }
-
-    private static boolean tunes(ResourceLocation itemId) {
-        return itemId != null && (TUNING.contains(itemId) || SYNCED_TUNING.contains(itemId));
-    }
-
     public static StyleSequence forStack(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return StyleSequence.EMPTY;
         }
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        ResourceLocation itemId = itemIdOf(stack);
         StyleSequence defined = forItem(itemId);
-        if (tunes(itemId)) {
+        if (flagged(itemId, DefaultStyleSet::tuning, SYNCED_TUNING)) {
             return tuned(stack, defined);
         }
-        boolean appends = itemId != null
-                && (APPENDING.contains(itemId) || SYNCED_APPENDING.contains(itemId));
+        boolean appends = flagged(itemId, DefaultStyleSet::appending, SYNCED_APPENDING);
         if (!defined.isEmpty() && !appends) {
             return defined;
         }
@@ -334,9 +359,6 @@ public final class DefaultStyles {
     }
 
     public static Map<ResourceLocation, StyleSequence> all() {
-        Map<ResourceLocation, StyleSequence> merged = new LinkedHashMap<>(REGISTERED);
-        merged.putAll(DATAPACK);
-        merged.putAll(CONFIG);
-        return Map.copyOf(merged);
+        return Map.copyOf(snapshotSequences());
     }
 }

@@ -9,8 +9,7 @@ import net.minecraft.util.profiling.ProfilerFiller;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class WeaponRollLoader extends SimpleJsonResourceReloadListener {
@@ -25,7 +24,7 @@ public class WeaponRollLoader extends SimpleJsonResourceReloadListener {
     protected void apply(Map<ResourceLocation, JsonElement> object,
                          ResourceManager resourceManager,
                          ProfilerFiller profiler) {
-        List<WeaponRoll> loaded = new ArrayList<>();
+        Map<String, WeaponRoll> loaded = new LinkedHashMap<>();
         int rejected = 0;
         for (Map.Entry<ResourceLocation, JsonElement> file : object.entrySet()) {
             WeaponRoll roll = WeaponRoll.CODEC
@@ -41,7 +40,8 @@ public class WeaponRollLoader extends SimpleJsonResourceReloadListener {
                 CombatStyles.LOGGER.warn("Weapon roll {} has chance <= 0 and will never fire",
                         file.getKey());
             }
-            if (roll.items().isEmpty() && roll.categories().isEmpty() && roll.tables().isEmpty()) {
+            if (roll.items().isEmpty() && roll.categories().isEmpty() && roll.tables().isEmpty()
+                    && roll.tags().isEmpty()) {
                 CombatStyles.LOGGER.warn("Weapon roll {} has no filters and matches every weapon",
                         file.getKey());
             }
@@ -49,9 +49,9 @@ public class WeaponRollLoader extends SimpleJsonResourceReloadListener {
                 CombatStyles.LOGGER.info("Weapon roll {} targets a random slot ({} mode)",
                         file.getKey(), roll.mode());
             }
-            loaded.add(roll);
+            loaded.put(file.getKey().toString(), roll);
         }
-        WeaponRolls.accept(loaded);
+        WeaponRolls.DEFINITIONS.acceptData(loaded);
         CombatStyles.LOGGER.info("Loaded {} weapon roll definitions ({} rejected)",
                 loaded.size(), rejected);
     }

@@ -3,6 +3,7 @@ package net.pixeldreamstudios.combat_styles.loot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
+import net.pixeldreamstudios.combat_styles.item.StyleBooks;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 import net.pixeldreamstudios.combat_styles.style.StyleSequence;
@@ -22,17 +23,13 @@ public final class BookProvider {
         StyleSequence contentsOf(ItemStack book);
     }
 
-    private static Books books;
+    private static Books books = new StyleBooks();
 
     private BookProvider() {
     }
 
     public static void set(Books provider) {
         books = provider;
-    }
-
-    public static boolean available() {
-        return books != null;
     }
 
     public static Item bookFor(StyleRarity rarity) {

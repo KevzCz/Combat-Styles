@@ -8,7 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
+import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
 
 import java.util.ArrayList;
@@ -119,7 +119,7 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
                 .sorted()
                 .forEach(id -> tagRows.add(new Row(id, ItemStack.EMPTY,
                         Component.literal(TAG_MARKER + shortName(id)))));
-        for (String category : StyleRegistry.categories()) {
+        for (String category : WeaponCategories.allNames()) {
             categoryRows.add(new Row(category, ItemStack.EMPTY,
                     Component.literal(StyleText.prettify(shortName(category)))));
         }

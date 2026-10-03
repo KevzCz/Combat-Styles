@@ -42,6 +42,7 @@ import net.pixeldreamstudios.combat_styles.style.CustomStyleConfig;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
 import net.pixeldreamstudios.combat_styles.style.SequenceLimits;
+import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.pixeldreamstudios.combat_styles.style.SequenceService;
 import net.pixeldreamstudios.combat_styles.style.StyleCost;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
@@ -94,6 +95,11 @@ public final class NetworkManager {
 
     @ExpectPlatform
     public static void sendApplyPose(ApplyPosePayload payload) {
+        throw new AssertionError();
+    }
+
+    @ExpectPlatform
+    public static void sendApplyWeaponCategory(ApplyWeaponCategoryPayload payload) {
         throw new AssertionError();
     }
 
@@ -243,12 +249,17 @@ public final class NetworkManager {
                 DefaultStyles.snapshotTuning(),
                 DefaultStyles.snapshotSticky(),
                 DefaultStyles.snapshotLocked(),
-                CustomStyles.snapshot(),
-                CustomAttacks.snapshot(),
+                DefaultStyles.snapshotSlotTunings(),
+                DefaultStyles.snapshotConfigItems(),
+                CustomStyles.authoritative(),
+                CustomAttacks.authoritative(),
                 CustomStyleConfig.loaded().keySet(),
-                CustomAttackConfig.loaded().keySet()));
+                CustomAttackConfig.loaded().keySet(),
+                CustomStyles.datapackIds(),
+                CustomAttacks.datapackIds()));
         syncEquipment(player);
         syncAffixes(player);
+        syncLoot(player);
         syncAttackOverrides(player);
         syncConfig(player);
     }
@@ -268,8 +279,18 @@ public final class NetworkManager {
         throw new AssertionError();
     }
 
+    @ExpectPlatform
+    public static void sendLootToClient(ServerPlayer player, SyncLootPayload payload) {
+        throw new AssertionError();
+    }
+
+    public static void syncLoot(ServerPlayer player) {
+        sendLootToClient(player, SyncLootPayload.capture());
+    }
+
     public static void syncAffixes(ServerPlayer player) {
-        sendAffixesToClient(player, new SyncAffixesPayload(AffixRegistry.snapshot()));
+        sendAffixesToClient(player, new SyncAffixesPayload(AffixRegistry.authoritative(),
+                AffixRegistry.customIds(), AffixRegistry.datapackIds()));
     }
 
     @ExpectPlatform
@@ -409,6 +430,24 @@ public final class NetworkManager {
         } else {
             EquipmentPoses.store(stack, pose);
         }
+    }
+
+    public static void handleApplyWeaponCategory(ServerPlayer player, ApplyWeaponCategoryPayload payload) {
+        if (player == null || payload == null) {
+            return;
+        }
+        EquipmentSlot slot = payload.slot();
+        if (slot != EquipmentSlot.MAINHAND && slot != EquipmentSlot.OFFHAND) {
+            return;
+        }
+        if (!player.getAbilities().instabuild) {
+            return;
+        }
+        ItemStack stack = player.getItemBySlot(slot);
+        if (stack.isEmpty()) {
+            return;
+        }
+        WeaponCategories.store(stack, payload.category());
     }
 
     public static void handleApplySequence(ServerPlayer player, ApplySequencePayload payload) {

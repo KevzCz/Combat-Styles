@@ -7,6 +7,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.style.CustomAttack;
 import net.pixeldreamstudios.combat_styles.style.DeclaredAttack;
@@ -15,7 +16,6 @@ import net.pixeldreamstudios.combat_styles.style.SlashMode;
 import net.pixeldreamstudios.combat_styles.style.SlashPlacement;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
-import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
 
 import java.util.ArrayList;
@@ -95,7 +95,7 @@ public class AttackBuilderScreen extends PanelScreen {
         this.onCreated = onCreated;
         this.editing = existing;
 
-        categories = StyleRegistry.categories();
+        categories = new ArrayList<>(WeaponCategories.allNames());
         category = defaultCategory == null
                 ? 0
                 : Math.max(0, categories.indexOf(defaultCategory));
@@ -207,6 +207,20 @@ public class AttackBuilderScreen extends PanelScreen {
         return swingSound == null || swingSound.isBlank()
                 ? Optional.empty()
                 : Optional.of(swingSound);
+    }
+
+    private void openCategoryPicker() {
+        minecraft.setScreen(new ChoicePickerScreen(this, Component.translatable(KEY_CATEGORY),
+                categories, categories.isEmpty() ? null : categories.get(category), picked -> {
+                    Optional<String> chosen = WeaponCategories.normalize(picked);
+                    if (chosen.isEmpty()) {
+                        return;
+                    }
+                    if (!categories.contains(chosen.get())) {
+                        categories.add(chosen.get());
+                    }
+                    category = categories.indexOf(chosen.get());
+                }).creatingNew(WeaponCategories::normalize));
     }
 
     private String soundLabel() {
@@ -379,9 +393,8 @@ public class AttackBuilderScreen extends PanelScreen {
             return true;
         }
         y += ROW_HEIGHT;
-        if (ScreenDraw.isWithin(mouseX, mouseY, x, y, listWidth, ROW_HEIGHT)
-                && !categories.isEmpty()) {
-            category = (category + 1) % categories.size();
+        if (ScreenDraw.isWithin(mouseX, mouseY, x, y, listWidth, ROW_HEIGHT)) {
+            openCategoryPicker();
             return true;
         }
         y += ROW_HEIGHT;

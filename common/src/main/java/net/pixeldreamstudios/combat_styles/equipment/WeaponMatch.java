@@ -7,6 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.ItemStack;
 
+import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.pixeldreamstudios.combat_styles.platform.WeaponRegistryAccess;
 
 import java.util.List;
@@ -60,7 +61,8 @@ public final class WeaponMatch {
             return false;
         }
         WeaponAttributes attributes = WeaponRegistryAccess.rawAttributesFor(stack);
-        String category = attributes == null ? null : attributes.category();
+        String category = WeaponCategories.categoryFor(stack,
+                attributes == null ? null : attributes.category());
         if (category == null) {
             return false;
         }

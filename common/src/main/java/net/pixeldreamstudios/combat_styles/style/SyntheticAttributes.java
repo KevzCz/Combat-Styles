@@ -58,6 +58,7 @@ public final class SyntheticAttributes {
             return existing;
         }
         return new WeaponAttributes(ATTACK_RANGE, RANGE_BONUS, null, null, Boolean.FALSE,
-                CATEGORY, attacks.toArray(new WeaponAttributes.Attack[0]), null);
+                WeaponCategories.categoryFor(stack, CATEGORY),
+                attacks.toArray(new WeaponAttributes.Attack[0]), null);
     }
 }

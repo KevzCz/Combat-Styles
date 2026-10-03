@@ -14,7 +14,6 @@ import net.minecraft.world.level.storage.loot.predicates.LootItemRandomChanceCon
 import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 
 import net.pixeldreamstudios.combat_styles.damage.DamageBonuses;
-import net.pixeldreamstudios.combat_styles.config.EquipmentDropConfig;
 import net.pixeldreamstudios.combat_styles.network.ConfigEditHandler;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
@@ -22,7 +21,6 @@ import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
 import net.pixeldreamstudios.combat_styles.affix.AffixLoader;
 import net.pixeldreamstudios.combat_styles.affix.AffixMechanics;
 import net.pixeldreamstudios.combat_styles.affix.ProjectileUpkeep;
-import net.pixeldreamstudios.combat_styles.affix.TrailPlacements;
 import net.pixeldreamstudios.combat_styles.attribute.AttackAttributes;
 import net.pixeldreamstudios.combat_styles.command.CombatStylesCommand;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
@@ -58,13 +56,9 @@ import net.pixeldreamstudios.combat_styles.loot.EquipmentTagLoader;
 import net.pixeldreamstudios.combat_styles.loot.RandomStyleFunction;
 import net.pixeldreamstudios.combat_styles.loot.StyleLoot;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRollLoader;
-import net.pixeldreamstudios.combat_styles.style.AttackOverrides;
 import net.pixeldreamstudios.combat_styles.style.DeclaredClaims;
-import net.pixeldreamstudios.combat_styles.style.CustomAttackConfig;
 import net.pixeldreamstudios.combat_styles.style.CustomAttackLoader;
-import net.pixeldreamstudios.combat_styles.style.CustomStyleConfig;
 import net.pixeldreamstudios.combat_styles.style.CustomStyleLoader;
-import net.pixeldreamstudios.combat_styles.style.DefaultStyleConfig;
 import net.pixeldreamstudios.combat_styles.style.DefaultStyleLoader;
 import net.pixeldreamstudios.combat_styles.style.MovesetProjection;
 import net.pixeldreamstudios.combat_styles.style.SwingWindow;
@@ -73,7 +67,7 @@ import net.pixeldreamstudios.combat_styles.equipment.Cooldowns;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
 import net.pixeldreamstudios.combat_styles.equipment.PendingExtraHit;
 import net.pixeldreamstudios.combat_styles.style.StyleIndexReloader;
-import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
+import net.pixeldreamstudios.combat_styles.style.StyleConfigs;
 
 public final class ModEvents {
 
@@ -108,13 +102,7 @@ public final class ModEvents {
         LifecycleEvent.SERVER_STOPPED.register(server -> ServerDataReset.clear());
 
         LifecycleEvent.SERVER_STARTED.register(server -> {
-            AttackOverrides.reload();
-            TrailPlacements.reload();
-            CustomAttackConfig.reload();
-            CustomStyleConfig.reload();
-            EquipmentDropConfig.load();
-            StyleRegistry.rebuild();
-            DefaultStyleConfig.reload();
+            StyleConfigs.reloadAll();
             DataIntegrity.verify();
         });
 

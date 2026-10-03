@@ -11,6 +11,8 @@ import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.component.ModComponents;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
+import net.pixeldreamstudios.combat_styles.config.ConfigPaths;
+import net.pixeldreamstudios.combat_styles.config.DefinitionLayer;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
 import net.pixeldreamstudios.combat_styles.style.SequenceService;
@@ -29,15 +31,17 @@ public final class WeaponRolls {
 
     private static final List<WeaponRoll> ROLLS = new CopyOnWriteArrayList<>();
     private static final String WILDCARD = "*";
+    private static final String LABEL = "weapon roll";
+
+    public static final DefinitionLayer<WeaponRoll> DEFINITIONS = new DefinitionLayer<>(LABEL,
+            ConfigPaths.WEAPON_ROLLS, WeaponRoll.CODEC, WeaponRolls::rebuild);
 
     private WeaponRolls() {
     }
 
-    public static void accept(List<WeaponRoll> loaded) {
+    private static void rebuild() {
         ROLLS.clear();
-        if (loaded != null) {
-            ROLLS.addAll(loaded);
-        }
+        ROLLS.addAll(DEFINITIONS.authoritative().values());
     }
 
     public static boolean isEmpty() {

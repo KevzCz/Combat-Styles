@@ -24,7 +24,16 @@ public record EditConfigPayload(Kind kind, String id, String json)
         AFFIX_DELETE,
         ATTACK,
         ATTACK_DELETE,
-        ATTACK_OVERRIDE;
+        ATTACK_OVERRIDE,
+        ATTACK_OVERRIDE_CLEAR,
+        CUSTOM_STYLE,
+        CUSTOM_STYLE_DELETE,
+        DEFAULT_STYLE,
+        DEFAULT_STYLE_CLEAR,
+        STYLE_BOOK,
+        STYLE_BOOK_CLEAR,
+        WEAPON_ROLL,
+        WEAPON_ROLL_CLEAR;
 
         private static final IntFunction<Kind> BY_ID =
                 ByIdMap.continuous(Kind::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

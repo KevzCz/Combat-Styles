@@ -5,6 +5,7 @@ import net.minecraft.client.gui.GuiGraphics;
 public final class Scrollbar {
 
     public static final int WIDTH = 4;
+    public static final int GRAB_MARGIN = 4;
     private static final int MIN_THUMB = 14;
 
     private final int sunkColor;
@@ -46,7 +47,8 @@ public final class Scrollbar {
     }
 
     public boolean isOverTrack(double mouseX, double mouseY) {
-        return visible && mouseX >= x && mouseX < x + WIDTH && mouseY >= top && mouseY < bottom;
+        return visible && mouseX >= x - GRAB_MARGIN && mouseX < x + WIDTH + GRAB_MARGIN
+                && mouseY >= top && mouseY < bottom;
     }
 
     public int beginDrag(double mouseX, double mouseY, int scroll) {

@@ -25,7 +25,7 @@ public final class CustomAttackConfig {
     }
 
     public static Path directory() {
-        return ConfigPaths.of(ConfigPaths.ATTACKS);
+        return ConfigPaths.of(ConfigPaths.CUSTOM_ATTACKS);
     }
 
     public static Map<String, CustomAttack> loaded() {

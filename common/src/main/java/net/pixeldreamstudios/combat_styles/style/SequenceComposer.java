@@ -136,7 +136,7 @@ public final class SequenceComposer {
                     .orElse(null);
             boolean exempt = affinityExempt.contains(entry.styleId())
                     || affinityExempt.contains(page.styleId())
-                    || ignoresAffinity(entry, override);
+                    || ignoresAffinity(entry, override, page.styleId());
             WeaponAttributes.Attack copied = copyOf(page.attack(), sound);
             composedList.add(exempt
                     ? copied
@@ -158,13 +158,17 @@ public final class SequenceComposer {
                 base.trailAppearance());
     }
 
-    private static boolean ignoresAffinity(StyleEntry entry, AttackOverride override) {
+    public static boolean ignoresAffinity(StyleEntry entry, AttackOverride override, String styleId) {
         if (override != null && override.ignoreAffinity().orElse(false)) {
             return true;
         }
-        return entry.attackOverride()
+        if (entry != null && entry.attackOverride()
                 .flatMap(AttackOverride::ignoreAffinity)
-                .orElse(false);
+                .orElse(false)) {
+            return true;
+        }
+        AttackOverride fromStyle = styleId == null ? null : AttackOverrides.get(styleId);
+        return fromStyle != null && fromStyle.ignoreAffinity().orElse(false);
     }
 
     private static WeaponAttributes.Attack withAffinity(WeaponAttributes.Attack attack,

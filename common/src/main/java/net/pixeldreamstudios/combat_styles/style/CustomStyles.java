@@ -12,15 +12,27 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class CustomStyles {
 
     private static final Map<String, CustomStyle> DEFINITIONS = new ConcurrentHashMap<>();
+    private static final Map<String, CustomStyle> LOCAL = new ConcurrentHashMap<>();
     private static final Map<String, CustomStyle> SYNCED = new ConcurrentHashMap<>();
     private static final Set<String> SYNCED_CONFIG = ConcurrentHashMap.newKeySet();
+    private static final Set<String> SYNCED_DATA = ConcurrentHashMap.newKeySet();
 
     private CustomStyles() {
     }
 
     public static void acceptLocal(CustomStyle style) {
         if (style != null && !style.id().isBlank()) {
-            DEFINITIONS.put(style.id(), style);
+            LOCAL.put(style.id(), style);
+        }
+    }
+
+    public static void removeLocal(String id) {
+        if (id == null) {
+            return;
+        }
+        LOCAL.remove(id);
+        if (!hasDatapackVersion(id)) {
+            SYNCED.remove(id);
         }
     }
 
@@ -31,7 +43,8 @@ public final class CustomStyles {
         }
     }
 
-    public static void acceptSync(Map<String, CustomStyle> synced, Set<String> fromConfig) {
+    public static void acceptSync(Map<String, CustomStyle> synced, Set<String> fromConfig,
+                                  Set<String> fromData) {
         SYNCED.clear();
         if (synced != null) {
             SYNCED.putAll(synced);
@@ -40,17 +53,34 @@ public final class CustomStyles {
         if (fromConfig != null) {
             SYNCED_CONFIG.addAll(fromConfig);
         }
+        SYNCED_DATA.clear();
+        if (fromData != null) {
+            SYNCED_DATA.addAll(fromData);
+        }
+        LOCAL.clear();
     }
 
     public static void clearSync() {
         SYNCED.clear();
         SYNCED_CONFIG.clear();
+        SYNCED_DATA.clear();
+        LOCAL.clear();
+    }
+
+    public static Map<String, CustomStyle> authoritative() {
+        Map<String, CustomStyle> merged = new LinkedHashMap<>(DEFINITIONS);
+        merged.putAll(CustomStyleConfig.loaded());
+        return merged;
+    }
+
+    public static Set<String> datapackIds() {
+        return Set.copyOf(DEFINITIONS.keySet());
     }
 
     public static Map<String, CustomStyle> snapshot() {
-        Map<String, CustomStyle> merged = new LinkedHashMap<>(CustomStyleConfig.loaded());
-        merged.putAll(SYNCED);
-        merged.putAll(DEFINITIONS);
+        Map<String, CustomStyle> merged = new LinkedHashMap<>(SYNCED);
+        merged.putAll(authoritative());
+        merged.putAll(LOCAL);
         return merged;
     }
 
@@ -58,21 +88,29 @@ public final class CustomStyles {
         if (id == null || id.isBlank()) {
             return null;
         }
-        CustomStyle defined = DEFINITIONS.get(id);
-        if (defined != null) {
-            return defined;
+        CustomStyle local = LOCAL.get(id);
+        if (local != null) {
+            return local;
         }
-        CustomStyle synced = SYNCED.get(id);
-        return synced != null ? synced : CustomStyleConfig.loaded().get(id);
+        CustomStyle fromConfig = CustomStyleConfig.loaded().get(id);
+        if (fromConfig != null) {
+            return fromConfig;
+        }
+        CustomStyle defined = DEFINITIONS.get(id);
+        return defined != null ? defined : SYNCED.get(id);
     }
 
     public static boolean isConfigOwned(String id) {
-        return id != null && (CustomStyleConfig.isFromConfig(id) || SYNCED_CONFIG.contains(id));
+        return id != null && (CustomStyleConfig.isFromConfig(id) || SYNCED_CONFIG.contains(id)
+                || LOCAL.containsKey(id));
     }
 
-    public static boolean isDatapackOwned(String id) {
-        return id != null && (DEFINITIONS.containsKey(id) || SYNCED.containsKey(id))
-                && !isConfigOwned(id);
+    public static boolean hasDatapackVersion(String id) {
+        return id != null && (DEFINITIONS.containsKey(id) || SYNCED_DATA.contains(id));
+    }
+
+    public static boolean isOverridden(String id) {
+        return isConfigOwned(id) && hasDatapackVersion(id);
     }
 
     public static boolean contains(String id) {

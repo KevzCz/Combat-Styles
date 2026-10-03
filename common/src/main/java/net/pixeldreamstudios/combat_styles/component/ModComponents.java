@@ -101,6 +101,11 @@ public final class ModComponents {
                     .persistent(StackPose.CODEC)
                     .build());
 
+    public static final RegistrySupplier<DataComponentType<String>> STACK_WEAPON_CATEGORY =
+            COMPONENTS.register("stack_weapon_category", () -> DataComponentType.<String>builder()
+                    .persistent(Codec.STRING)
+                    .build());
+
     public static final RegistrySupplier<DataComponentType<EquipmentDefinition>> STACK_EQUIPMENT =
             COMPONENTS.register("stack_equipment", () ->
                     DataComponentType.<EquipmentDefinition>builder()

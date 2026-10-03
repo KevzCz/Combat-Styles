@@ -21,12 +21,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 
-import net.pixeldreamstudios.combat_styles.affix.CustomAffixConfig;
 import net.pixeldreamstudios.combat_styles.DataIntegrity;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.api.CombatStylesAPI;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
-import net.pixeldreamstudios.combat_styles.affix.TrailPlacements;
 import net.pixeldreamstudios.combat_styles.component.ModComponents;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.item.StylePageItem;
@@ -40,9 +38,7 @@ import net.pixeldreamstudios.combat_styles.progression.StyleProgression;
 import net.pixeldreamstudios.combat_styles.style.AttackOverride;
 import net.pixeldreamstudios.combat_styles.style.AttackOverrides;
 import net.pixeldreamstudios.combat_styles.style.BudgetSources;
-import net.pixeldreamstudios.combat_styles.style.CustomAttackConfig;
 import net.pixeldreamstudios.combat_styles.style.CustomStyle;
-import net.pixeldreamstudios.combat_styles.style.CustomStyleConfig;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.style.DefaultStyleConfig;
 import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
@@ -53,6 +49,7 @@ import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
+import net.pixeldreamstudios.combat_styles.style.StyleConfigs;
 import net.pixeldreamstudios.combat_styles.style.StyleSequence;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
 import net.pixeldreamstudios.combat_styles.style.SyntheticAttributes;
@@ -63,6 +60,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public final class CombatStylesCommand {
 
@@ -80,6 +78,8 @@ public final class CombatStylesCommand {
     private static final String ARG_VALUE = "value";
     private static final String ARG_RARITY = "rarity";
     private static final String ARG_EQUIPMENT = "equipment";
+    private static final String ARG_NAMESPACE = "namespace";
+    private static final String ALL_NAMESPACES = "all";
 
     private static final String FIELD_DAMAGE = "damage_multiplier";
     private static final String FIELD_ANGLE = "angle";
@@ -103,6 +103,10 @@ public final class CombatStylesCommand {
     private static final SuggestionProvider<CommandSourceStack> RARITY_SUGGESTIONS = (context, builder) ->
             SharedSuggestionProvider.suggest(
                     Arrays.stream(StyleRarity.values()).map(StyleRarity::key), builder);
+
+    private static final SuggestionProvider<CommandSourceStack> NAMESPACE_SUGGESTIONS = (context, builder) ->
+            SharedSuggestionProvider.suggest(Stream.concat(Stream.of(ALL_NAMESPACES),
+                    AttackOverrides.namespaces().stream()), builder);
 
     private static final SuggestionProvider<CommandSourceStack> EQUIPMENT_SUGGESTIONS = (context, builder) ->
             SharedSuggestionProvider.suggest(EquipmentReport.ids(), builder);
@@ -220,8 +224,11 @@ public final class CombatStylesCommand {
         root.then(Commands.literal("reload").executes(CombatStylesCommand::reload));
         root.then(Commands.literal("defaults_reload").executes(CombatStylesCommand::reloadDefaults));
         root.then(Commands.literal("attacks_reload").executes(CombatStylesCommand::reloadAttacks));
-        root.then(Commands.literal("attacks_regenerate")
-                .executes(CombatStylesCommand::regenerateAttacks));
+        root.then(Commands.literal("attacks_refresh")
+                .then(Commands.argument(ARG_NAMESPACE, StringArgumentType.word())
+                        .suggests(NAMESPACE_SUGGESTIONS)
+                        .executes(context -> refreshAttacks(context,
+                                StringArgumentType.getString(context, ARG_NAMESPACE)))));
         root.then(Commands.literal("export_default").executes(CombatStylesCommand::exportDefault));
     }
 
@@ -308,14 +315,9 @@ public final class CombatStylesCommand {
     }
 
     private static int reload(CommandContext<CommandSourceStack> context) {
-        AttackOverrides.reload();
-        TrailPlacements.reload();
-        CustomAttackConfig.reload();
-        CustomStyleConfig.reload();
-        CustomAffixConfig.reload();
-        StyleRegistry.rebuild();
-        DefaultStyleConfig.reload();
+        StyleConfigs.reloadAll();
         DataIntegrity.verify();
+        NetworkManager.broadcastDefaultStyles(context.getSource().getServer());
         context.getSource().sendSuccess(() -> Component.translatable("command.combat_styles.reloaded",
                 StyleRegistry.size()), true);
         return StyleRegistry.size();
@@ -452,40 +454,13 @@ public final class CombatStylesCommand {
         }
 
         ResourceLocation itemId = DefaultStyleConfig.itemIdOf(stack);
-        StyleSequence sequence = SequenceService.sequenceOf(stack, player.getUUID());
-        if (itemId == null || sequence.isEmpty()) {
+        if (itemId == null || SequenceService.sequenceOf(stack, player.getUUID()).isEmpty()) {
             context.getSource().sendFailure(
                     Component.translatable("command.combat_styles.nothing_to_export"));
             return 0;
         }
 
-        Map<String, AttackOverride> overrides = SequenceService.attackOverridesOf(stack);
-        List<StyleEntry> entries = new ArrayList<>(sequence.entries());
-        for (int i = 0; i < entries.size(); i++) {
-            StyleEntry entry = entries.get(i);
-            StylePage page = StyleRegistry.get(CustomStyles.resolve(entry).styleId());
-            AttackOverride effective = page == null
-                    ? null
-                    : AttackOverrides.get(page.styleId());
-            AttackOverride declared = entry.attackOverride().orElse(null);
-            if (declared != null) {
-                effective = effective == null ? declared : effective.overriddenBy(declared);
-            }
-            AttackOverride fromSlot = overrides.get(String.valueOf(i));
-            if (fromSlot != null) {
-                effective = effective == null ? fromSlot : effective.overriddenBy(fromSlot);
-            }
-            if (effective != null) {
-                entries.set(i, entry.withAttackOverride(effective));
-            }
-        }
-
-        StyleSequence exported = new StyleSequence(sequence.name(), entries);
-        Path file = DefaultStyleConfig.export(itemId, exported,
-                DefaultStyles.slotLimitFor(stack),
-                DefaultStyles.slotTuningsFor(stack),
-                SequenceService.isLocked(stack),
-                DefaultStyles.keepsThroughRolls(stack));
+        Path file = DefaultStyleConfig.exportFrom(stack, player.getUUID());
         if (file == null) {
             context.getSource().sendFailure(
                     Component.translatable("command.combat_styles.export_failed"));
@@ -496,7 +471,7 @@ public final class CombatStylesCommand {
         NetworkManager.broadcastDefaultStyles(context.getSource().getServer());
         context.getSource().sendSuccess(() -> Component.translatable(
                 "command.combat_styles.exported", itemId.toString(), file.toString()), true);
-        return entries.size();
+        return 1;
     }
 
     private static int rollHeld(CommandContext<CommandSourceStack> context)
@@ -683,25 +658,28 @@ public final class CombatStylesCommand {
     }
 
     private static int reloadAttacks(CommandContext<CommandSourceStack> context) {
-        int loaded = AttackOverrides.reload();
-        TrailPlacements.reload();
-        CustomAttackConfig.reload();
-        CustomStyleConfig.reload();
-        CustomAffixConfig.reload();
-        StyleRegistry.rebuild();
+        int loaded = StyleConfigs.reloadAll();
+        NetworkManager.broadcastDefaultStyles(context.getSource().getServer());
         context.getSource().sendSuccess(() -> Component.translatable(
                 "command.combat_styles.attacks_reloaded", loaded, StyleRegistry.size()), true);
         return loaded;
     }
 
-    private static int regenerateAttacks(CommandContext<CommandSourceStack> context) {
-        AttackOverrides.regenerateAll(StyleRegistry.all());
-        AttackOverrides.reload();
-        StyleRegistry.rebuild();
+    private static int refreshAttacks(CommandContext<CommandSourceStack> context, String namespace) {
+        AttackOverrides.Refresh refresh = AttackOverrides.refresh(namespace);
+        NetworkManager.broadcastDefaultStyles(context.getSource().getServer());
+        if (refresh.moved() == 0) {
+            context.getSource().sendFailure(Component.translatable(
+                    "command.combat_styles.attacks_refresh_none", namespace));
+            return 0;
+        }
+        for (String line : refresh.lines()) {
+            context.getSource().sendSuccess(() -> Component.literal(line), false);
+        }
         context.getSource().sendSuccess(() -> Component.translatable(
-                "command.combat_styles.attacks_regenerated", StyleRegistry.size(),
-                AttackOverrides.directory().toString()), true);
-        return StyleRegistry.size();
+                "command.combat_styles.attacks_refreshed", refresh.moved(), namespace,
+                refresh.backup().toString()), true);
+        return refresh.moved();
     }
 
     private static int inspect(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {

@@ -2,8 +2,10 @@ package net.pixeldreamstudios.combat_styles.equipment;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -35,9 +37,12 @@ public record EquipmentDefinition(String id,
                                   List<String> excludedItems,
                                   List<String> excludedTags,
                                   List<String> excludedCategories,
-                                  UseSpec use) {
+                                  UseSpec use,
+                                  Optional<String> weaponCategory) {
 
-    public static final Codec<EquipmentDefinition> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    private static final String WEAPON_CATEGORY = "weapon_category";
+
+    private static final MapCodec<EquipmentDefinition> CORE = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Codec.STRING.fieldOf("id").forGetter(EquipmentDefinition::id),
             Codec.unboundedMap(Codec.STRING, TriggeredEffect.CODEC)
                     .optionalFieldOf("effects", Map.of())
@@ -72,6 +77,12 @@ public record EquipmentDefinition(String id,
                     .forGetter(EquipmentDefinition::use)
     ).apply(instance, EquipmentDefinition::new));
 
+    public static final Codec<EquipmentDefinition> CODEC = Codec.mapPair(CORE,
+                    Codec.STRING.optionalFieldOf(WEAPON_CATEGORY))
+            .xmap(pair -> pair.getFirst().withWeaponCategory(pair.getSecond()),
+                    definition -> Pair.of(definition, definition.weaponCategory()))
+            .codec();
+
     public static final StreamCodec<ByteBuf, EquipmentDefinition> STREAM_CODEC =
             ByteBufCodecs.STRING_UTF8.map(
                     raw -> CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(raw))
@@ -94,9 +105,31 @@ public record EquipmentDefinition(String id,
         excludedItems = excludedItems == null ? List.of() : List.copyOf(excludedItems);
         excludedTags = excludedTags == null ? List.of() : List.copyOf(excludedTags);
         use = use == null ? UseSpec.NONE : use;
+        weaponCategory = weaponCategory == null
+                ? Optional.empty()
+                : weaponCategory.map(String::trim).filter(category -> !category.isEmpty());
         excludedCategories = excludedCategories == null
                 ? List.of()
                 : List.copyOf(excludedCategories);
+    }
+
+    public EquipmentDefinition(String id, Map<String, TriggeredEffect> effects,
+                               Map<String, AttributeBonus> attributes, Optional<StyleRarity> rarity,
+                               List<InnateAffixes.Slot> innateAffixes, Map<String, EffectGroup> groups,
+                               Optional<String> pose, Optional<String> offHandPose,
+                               PoseTuning poseTuning, List<String> items, List<String> itemTags,
+                               List<String> weaponCategories, List<String> excludedItems,
+                               List<String> excludedTags, List<String> excludedCategories,
+                               UseSpec use) {
+        this(id, effects, attributes, rarity, innateAffixes, groups, pose, offHandPose, poseTuning,
+                items, itemTags, weaponCategories, excludedItems, excludedTags, excludedCategories,
+                use, Optional.empty());
+    }
+
+    public EquipmentDefinition withWeaponCategory(Optional<String> category) {
+        return new EquipmentDefinition(id, effects, attributes, rarity, innateAffixes, groups, pose,
+                offHandPose, poseTuning, items, itemTags, weaponCategories, excludedItems,
+                excludedTags, excludedCategories, use, category);
     }
 
     private static Map<String, TriggeredEffect> withEventPayloads(Map<String, TriggeredEffect> effects,

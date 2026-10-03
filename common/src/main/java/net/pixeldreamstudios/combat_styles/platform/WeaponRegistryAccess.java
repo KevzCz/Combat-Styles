@@ -7,6 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
+import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.pixeldreamstudios.combat_styles.mixin.WeaponRegistryAccessor;
 
 import java.util.LinkedHashMap;
@@ -41,6 +42,7 @@ public final class WeaponRegistryAccess {
                 indexable.putIfAbsent(entry.getKey(), attributes);
             }
         }
+        indexable.replaceAll(WeaponCategories::applyTo);
         CombatStyles.LOGGER.info("Indexable sources: {} registrations + {} containers = {} entries",
                 registrations().size(), containers().size(), indexable.size());
         return indexable;
@@ -80,7 +82,7 @@ public final class WeaponRegistryAccess {
         }
         pushBypass();
         try {
-            return WeaponRegistry.getAttributes(stack);
+            return WeaponCategories.applyTo(stack, WeaponRegistry.getAttributes(stack));
         } finally {
             popBypass();
         }

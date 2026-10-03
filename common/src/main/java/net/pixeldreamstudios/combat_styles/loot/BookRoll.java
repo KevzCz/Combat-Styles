@@ -33,7 +33,16 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
                         ? INJECT
                         : VARIANT,
                 mode -> mode.name().toLowerCase(Locale.ROOT));
+
+        public static final List<String> NAMES = List.of(VARIANT.name().toLowerCase(Locale.ROOT),
+                INJECT.name().toLowerCase(Locale.ROOT));
     }
+
+    private static final String SAMPLE_STYLE = "bettercombat:one_handed_stab";
+    private static final String SAMPLE_CATEGORY = "sword";
+    private static final String SAMPLE_ATTRIBUTE = "minecraft:generic.attack_damage";
+    private static final String SAMPLE_OPERATION = "add_multiplied_base";
+    private static final String SAMPLE_SLOT = "primary";
 
     private static final int DEFAULT_MIN = 1;
     private static final int DEFAULT_MAX = 3;
@@ -339,4 +348,22 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
         }
         return found;
     }
+
+    private static final Range SAMPLE_RANGE = new Range(0.9D, 1.15D);
+
+    public static final Rolled SAMPLE_ROLL = new Rolled(Optional.of(SAMPLE_RANGE),
+            Optional.of(new Range(120.0D, 160.0D)), Optional.of(new Range(0.4D, 0.6D)),
+            Optional.of(new Range(1.0D, 1.2D)), Optional.of(new Range(0.8D, 1.0D)),
+            Optional.of(new Range(0.85D, 1.0D)), Optional.of(new Range(0.9D, 1.0D)),
+            Optional.of(new RolledDrag(Optional.of(new Range(4.0D, 8.0D)),
+                    Optional.of(new Range(1.0D, 3.0D)), Optional.of(Boolean.TRUE))),
+            Map.of(SAMPLE_ATTRIBUTE, new RolledAttribute(new Range(0.05D, 0.15D),
+                    SAMPLE_OPERATION, false)));
+
+    public static final BookRoll SAMPLE = new BookRoll(StyleRarity.RARE, 2, 4,
+            List.of(new Weighted(5, StyleEntry.of(SAMPLE_STYLE), SAMPLE_ROLL)),
+            List.of(SAMPLE_CATEGORY), 0.5F, 2, true, 30, SAMPLE_ROLL, Mode.INJECT, 5,
+            List.of(new WeightedAffix(3, List.of(""))),
+            List.of(new AffixSlot(Optional.of(SAMPLE_SLOT), 0.5F, 1, 2,
+                    List.of(new WeightedAffix(3, List.of(""))))));
 }

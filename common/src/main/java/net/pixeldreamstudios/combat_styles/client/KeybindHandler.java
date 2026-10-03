@@ -22,7 +22,7 @@ public final class KeybindHandler {
                 || !client.player.getAbilities().instabuild) {
             return;
         }
-        client.setScreen(new EquipmentEditorScreen(null));
+        client.setScreen(new LootMenuScreen(null, true));
     }
 
     public static void openCustomizer(Minecraft client) {

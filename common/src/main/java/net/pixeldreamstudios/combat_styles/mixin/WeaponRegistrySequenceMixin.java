@@ -13,6 +13,7 @@ import net.pixeldreamstudios.combat_styles.style.SequenceComposer;
 import net.pixeldreamstudios.combat_styles.style.SequenceService;
 import net.pixeldreamstudios.combat_styles.style.StyleSequence;
 import net.pixeldreamstudios.combat_styles.style.SyntheticAttributes;
+import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.minecraft.world.item.ItemStack;
 
 @Mixin(WeaponRegistry.class)
@@ -30,6 +31,8 @@ public class WeaponRegistrySequenceMixin {
         WeaponAttributes base = callback.getReturnValue();
         if (base == null) {
             base = SyntheticAttributes.forStack(stack, null);
+        } else {
+            base = WeaponCategories.applyTo(stack, base);
         }
         if (base == null) {
             return;

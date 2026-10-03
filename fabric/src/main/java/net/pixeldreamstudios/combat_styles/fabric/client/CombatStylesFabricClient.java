@@ -16,6 +16,7 @@ import net.pixeldreamstudios.combat_styles.network.AlignComboPayload;
 import net.pixeldreamstudios.combat_styles.network.HoldComboPayload;
 import net.pixeldreamstudios.combat_styles.network.SwingHastePayload;
 import net.pixeldreamstudios.combat_styles.equipment.ComboHold;
+import net.pixeldreamstudios.combat_styles.client.ClientDisconnect;
 import net.pixeldreamstudios.combat_styles.client.ClientConfigSync;
 import net.pixeldreamstudios.combat_styles.client.ClientStyleData;
 import net.pixeldreamstudios.combat_styles.client.KeybindHandler;
@@ -29,8 +30,8 @@ import net.pixeldreamstudios.combat_styles.entity.ModEntities;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.network.SyncDefaultStylesPayload;
-import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.network.SyncAffixesPayload;
+import net.pixeldreamstudios.combat_styles.network.SyncLootPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncAttackOverridesPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncEquipmentPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
@@ -38,22 +39,13 @@ import net.pixeldreamstudios.combat_styles.network.SyncConfigPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncSpellLocksPayload;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLockState;
 import net.pixeldreamstudios.combat_styles.network.SyncLearnedPayload;
-import net.pixeldreamstudios.combat_styles.equipment.BurstSequence;
 import net.pixeldreamstudios.combat_styles.style.AttackOverrides;
 import net.pixeldreamstudios.combat_styles.style.ClientTooltipState;
-import net.pixeldreamstudios.combat_styles.style.CustomAttacks;
-import net.pixeldreamstudios.combat_styles.style.CustomStyles;
-import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
 
 public class CombatStylesFabricClient implements ClientModInitializer {
 
     private static void acceptDefaults(SyncDefaultStylesPayload payload) {
-        DefaultStyles.acceptSync(payload.sequences(), payload.slotLimits(), payload.appending());
-        DefaultStyles.acceptSyncTuning(payload.tuning());
-        DefaultStyles.acceptSyncSticky(payload.sticky());
-        DefaultStyles.acceptSyncLocked(payload.locked());
-        CustomStyles.acceptSync(payload.customStyles(), payload.configStyles());
-        CustomAttacks.acceptSync(payload.customAttacks(), payload.configAttacks());
+        payload.applyToClient();
     }
 
     @Override
@@ -87,7 +79,10 @@ public class CombatStylesFabricClient implements ClientModInitializer {
                         payload.fromData(), payload.overridden())));
 
         ClientPlayNetworking.registerGlobalReceiver(SyncAffixesPayload.TYPE, (payload, context) ->
-                context.client().execute(() -> AffixRegistry.acceptSync(payload.affixes())));
+                context.client().execute(() -> payload.applyToClient()));
+
+        ClientPlayNetworking.registerGlobalReceiver(SyncLootPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> payload.applyToClient()));
 
         ClientPlayNetworking.registerGlobalReceiver(SyncAttackOverridesPayload.TYPE,
                 (payload, context) -> context.client().execute(() ->
@@ -100,16 +95,7 @@ public class CombatStylesFabricClient implements ClientModInitializer {
                 context.client().execute(() -> ClientConfigSync.accept(payload.json())));
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            ClientConfigSync.restoreLocal();
-            SpellLockState.clearMirror();
-            ClientStyleData.clear();
-            DefaultStyles.clearSync();
-            CustomStyles.clearSync();
-            CustomAttacks.clearSync();
-            EquipmentRegistry.clearSync();
-            AffixRegistry.clearSync();
-            AttackOverrides.clearSync();
-            BurstSequence.clearClient();
+            ClientDisconnect.clearAll();
         });
 
         ClientPlayNetworking.registerGlobalReceiver(SyncCooldownsPayload.TYPE,

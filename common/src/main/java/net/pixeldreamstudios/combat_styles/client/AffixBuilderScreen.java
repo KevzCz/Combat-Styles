@@ -9,6 +9,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
+import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
@@ -19,7 +20,6 @@ import net.pixeldreamstudios.combat_styles.network.EditConfigPayload;
 import net.pixeldreamstudios.combat_styles.style.AttackBehaviour;
 import net.pixeldreamstudios.combat_styles.style.SlashPlacement;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
-import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
 
 import java.util.ArrayList;
@@ -86,6 +86,7 @@ public class AffixBuilderScreen extends PanelScreen {
     private static final String PREVIEW_ID = "preview";
 
     private final Consumer<StyleAffix> onSaved;
+    private final StyleAffix existing;
 
     private EditBox idBox;
     private EditBox weightBox;
@@ -113,8 +114,23 @@ public class AffixBuilderScreen extends PanelScreen {
     private String error;
 
     public AffixBuilderScreen(Screen parent, Consumer<StyleAffix> onSaved) {
+        this(parent, null, onSaved);
+    }
+
+    public AffixBuilderScreen(Screen parent, StyleAffix existing, Consumer<StyleAffix> onSaved) {
         super(Component.translatable(KEY_TITLE), parent);
         this.onSaved = onSaved;
+        this.existing = existing;
+        if (existing != null) {
+            rarity = existing.rarity();
+            onHit = existing.onHit();
+            onSwing = existing.onSwing();
+            behaviour = existing.behaviour();
+            damageBonus = existing.damageBonus();
+            categories = existing.appliesTo().categories();
+            hitboxes = existing.appliesTo().hitboxes();
+            animations = existing.appliesTo().animations();
+        }
     }
 
     @Override
@@ -134,19 +150,24 @@ public class AffixBuilderScreen extends PanelScreen {
         int fieldWidth = FORM_WIDTH - LABEL_WIDTH;
         int y = top + FORM_TOP;
 
-        idBox = field(fieldX, y, fieldWidth, idBox == null ? "" : idBox.getValue(),
+        idBox = field(fieldX, y, fieldWidth, idBox == null ? initialId() : idBox.getValue(),
                 MAX_ID_LENGTH, KEY_ID);
         y += ROW_HEIGHT;
         weightBox = field(fieldX, y, fieldWidth,
-                weightBox == null ? String.valueOf(DEFAULT_WEIGHT) : weightBox.getValue(),
+                weightBox == null ? String.valueOf(existing == null ? DEFAULT_WEIGHT : existing.weight())
+                        : weightBox.getValue(),
                 MAX_ID_LENGTH, KEY_WEIGHT);
         y += ROW_HEIGHT;
         costBox = field(fieldX, y, fieldWidth,
-                costBox == null ? format(DEFAULT_MULTIPLIER) : costBox.getValue(),
+                costBox == null
+                        ? format(existing == null ? DEFAULT_MULTIPLIER : existing.costModifier())
+                        : costBox.getValue(),
                 MAX_ID_LENGTH, KEY_COST);
         y += ROW_HEIGHT;
         damageBox = field(fieldX, y, fieldWidth,
-                damageBox == null ? format(DEFAULT_MULTIPLIER) : damageBox.getValue(),
+                damageBox == null
+                        ? format(existing == null ? DEFAULT_MULTIPLIER : existing.damageMultiplier())
+                        : damageBox.getValue(),
                 MAX_ID_LENGTH, KEY_DAMAGE);
         y += ROW_HEIGHT;
 
@@ -157,7 +178,7 @@ public class AffixBuilderScreen extends PanelScreen {
         y += ROW_HEIGHT;
 
         categoryButton = addRenderableWidget(tipped(PanelButton.of(listLabel(categories),
-                        button -> openFilter(KEY_CATEGORIES, StyleRegistry.categories(),
+                        button -> openFilter(KEY_CATEGORIES, WeaponCategories.allNames(),
                                 categories, picked -> categories = picked)), KEY_CATEGORIES)
                 .bounds(fieldX, y, fieldWidth, ScreenTheme.BUTTON_HEIGHT).build());
         y += ROW_HEIGHT;
@@ -175,7 +196,7 @@ public class AffixBuilderScreen extends PanelScreen {
         y += ROW_HEIGHT;
 
         trailBox = field(fieldX, y, fieldWidth - SWATCH_SIZE - SWATCH_GAP,
-                trailBox == null ? "" : trailBox.getValue(), MAX_ID_LENGTH, KEY_TRAIL);
+                trailBox == null ? initialTrail() : trailBox.getValue(), MAX_ID_LENGTH, KEY_TRAIL);
         y += ROW_HEIGHT + GAP;
 
         int effectWidth = (FORM_WIDTH - GAP) / 2;
@@ -238,6 +259,14 @@ public class AffixBuilderScreen extends PanelScreen {
         }
         addRenderableWidget(box);
         return box;
+    }
+
+    private String initialId() {
+        return existing == null ? "" : existing.serializedId();
+    }
+
+    private String initialTrail() {
+        return existing == null ? "" : existing.trail().map(StyleAffix.TrailColor::color).orElse("");
     }
 
     private static PanelButton.Builder tipped(PanelButton.Builder builder, String labelKey) {
@@ -414,7 +443,9 @@ public class AffixBuilderScreen extends PanelScreen {
             return;
         }
         StyleAffix affix = build(id);
-        if (CustomAffixConfig.loaded().containsKey(affix.serializedId())) {
+        boolean editingSame = existing != null
+                && existing.serializedId().equals(affix.serializedId());
+        if (!editingSame && CustomAffixConfig.loaded().containsKey(affix.serializedId())) {
             error = Component.translatable(KEY_EXISTS).getString();
             return;
         }

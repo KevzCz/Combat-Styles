@@ -8,7 +8,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
@@ -20,14 +19,10 @@ import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.platform.WeaponRegistryAccess;
 
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 public class DefaultStyleLoader extends SimpleJsonResourceReloadListener {
 
@@ -171,19 +166,8 @@ public class DefaultStyleLoader extends SimpleJsonResourceReloadListener {
     }
 
     private static void applyTo(Map<ResourceLocation, JsonElement> object) {
-        Map<ResourceLocation, StyleSequence> loaded = new LinkedHashMap<>();
-        Map<ResourceLocation, Integer> slotLimits = new LinkedHashMap<>();
-        Set<ResourceLocation> appending = new HashSet<>();
-        Set<ResourceLocation> tuning = new HashSet<>();
-        Set<ResourceLocation> sticky = new HashSet<>();
-        Map<ResourceLocation, List<SlotTuning>> slotTunings = new HashMap<>();
-
-        Map<ResourceLocation, Integer> priorities = new HashMap<>();
-        Set<ResourceLocation> locked = new HashSet<>();
         int rejected = 0;
-        int unresolved = 0;
-
-        List<Map.Entry<ResourceLocation, Definition>> parsed = new ArrayList<>();
+        List<Definition> parsed = new ArrayList<>();
         for (Map.Entry<ResourceLocation, JsonElement> file : object.entrySet()) {
             Definition definition = Definition.CODEC
                     .parse(JsonOps.INSTANCE, file.getValue())
@@ -199,81 +183,16 @@ public class DefaultStyleLoader extends SimpleJsonResourceReloadListener {
                         file.getKey());
                 continue;
             }
-            parsed.add(Map.entry(file.getKey(), definition));
+            parsed.add(definition);
         }
 
-        parsed.sort(Comparator.comparingInt(
-                (Map.Entry<ResourceLocation, Definition> entry) -> entry.getValue().priority())
-                .reversed());
-
-        for (Map.Entry<ResourceLocation, Definition> file : parsed) {
-            Definition definition = file.getValue();
-
-            List<StyleEntry> resolvedEntries = new ArrayList<>(definition.entries().size());
-            for (StyleEntry entry : definition.entries()) {
-                if (entry.customStyleId().isEmpty()
-                        && StyleRegistry.get(entry.styleId()) == null) {
-                    unresolved++;
-                    continue;
-                }
-                resolvedEntries.add(entry);
-            }
-
-            String name = definition.nameKey()
-                    .map(key -> Component.translatable(key).getString())
-                    .orElse(definition.name());
-
-            StyleSequence sequence = resolvedEntries.isEmpty()
-                    ? null
-                    : new StyleSequence(name, resolvedEntries);
-
-            for (ResourceLocation itemId : targets(definition)) {
-                int priority = definition.priority();
-                Integer existing = priorities.get(itemId);
-                if (existing != null && existing > priority) {
-                    continue;
-                }
-                priorities.put(itemId, priority);
-
-                if (sequence != null) {
-                    loaded.put(itemId, sequence);
-                    if (definition.appends()) {
-                        appending.add(itemId);
-                    } else {
-                        appending.remove(itemId);
-                    }
-                    if (definition.tunes()) {
-                        tuning.add(itemId);
-                    } else {
-                        tuning.remove(itemId);
-                    }
-                    if (!definition.tunings().isEmpty()) {
-                        slotTunings.put(itemId, definition.tunings());
-                    }
-                    if (definition.keepThroughRolls()) {
-                        sticky.add(itemId);
-                    } else {
-                        sticky.remove(itemId);
-                    }
-                }
-                if (definition.slots() > 0) {
-                    slotLimits.put(itemId, definition.slots());
-                }
-                if (definition.locked()) {
-                    locked.add(itemId);
-                }
-            }
-        }
-
-        DefaultStyles.acceptDatapack(loaded, slotLimits, appending);
-        DefaultStyles.acceptTuning(tuning);
-        DefaultStyles.acceptSticky(sticky);
-        DefaultStyles.acceptSlotTunings(slotTunings);
-        DefaultStyles.acceptLocked(locked);
+        DefaultStyleSet compiled = DefaultStyleSet.compile(parsed);
+        DefaultStyles.acceptDatapack(compiled);
         CombatStyles.LOGGER.info(
                 "Loaded {} default combat style definitions ({} slot overrides, {} rejected, "
                         + "{} unresolved entries)",
-                loaded.size(), slotLimits.size(), rejected, unresolved);
+                compiled.sequences().size(), compiled.slotLimits().size(), rejected,
+                compiled.unresolved());
     }
 
     public static List<ResourceLocation> targetsOf(Definition definition) {
@@ -308,10 +227,12 @@ public class DefaultStyleLoader extends SimpleJsonResourceReloadListener {
             for (Map.Entry<ResourceLocation, WeaponAttributes> entry
                     : WeaponRegistryAccess.registrations().entrySet()) {
                 WeaponAttributes attributes = entry.getValue();
-                if (attributes != null && category.equalsIgnoreCase(attributes.category())) {
+                if (attributes != null && category.equalsIgnoreCase(
+                        WeaponCategories.categoryFor(entry.getKey(), attributes.category()))) {
                     targets.add(entry.getKey());
                 }
             }
+            targets.addAll(WeaponCategories.itemsIn(category));
         }
         return targets;
     }

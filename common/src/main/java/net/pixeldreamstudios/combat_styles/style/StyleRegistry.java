@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class StyleRegistry {
 
     private static final Map<String, StylePage> PAGES = new ConcurrentHashMap<>();
+    private static final Map<String, StylePage> RAW_PAGES = new ConcurrentHashMap<>();
     private static final Map<String, List<StylePage>> BY_CATEGORY = new ConcurrentHashMap<>();
     private static volatile List<String> categories = List.of();
     private static volatile List<WeaponAttributes.Sound> swingSounds = List.of();
@@ -41,6 +42,7 @@ public final class StyleRegistry {
         if (source == null || source.isEmpty()) {
             CombatStyles.LOGGER.warn("BetterCombat weapon registry is empty; no combat styles indexed");
             PAGES.clear();
+            RAW_PAGES.clear();
             BY_CATEGORY.clear();
             categories = List.of();
             swingSounds = List.of();
@@ -48,6 +50,7 @@ public final class StyleRegistry {
         }
 
         Map<String, StylePage> pages = new LinkedHashMap<>();
+        Map<String, StylePage> raw = new LinkedHashMap<>();
         Map<String, List<StylePage>> byCategory = new TreeMap<>();
         Map<String, Set<String>> seenSignatures = new HashMap<>();
         Map<String, Integer> nextIndex = new HashMap<>();
@@ -97,6 +100,7 @@ public final class StyleRegistry {
                     disabled++;
                     continue;
                 }
+                raw.put(styleId, page);
                 page = AttackOverrides.apply(page);
                 pages.put(styleId, page);
                 byCategory.computeIfAbsent(category, key -> new ArrayList<>()).add(page);
@@ -150,11 +154,13 @@ public final class StyleRegistry {
 
         PAGES.clear();
         PAGES.putAll(pages);
+        RAW_PAGES.clear();
+        RAW_PAGES.putAll(pages);
+        RAW_PAGES.putAll(raw);
         BY_CATEGORY.clear();
         BY_CATEGORY.putAll(byCategory);
         categories = List.copyOf(byCategory.keySet());
         swingSounds = List.copyOf(sounds.values());
-        AttackOverrides.generateMissing(pages.values());
 
         if (debug) {
             CombatStyles.LOGGER.info("Indexed {} combat styles across {} weapon categories "
@@ -297,6 +303,10 @@ public final class StyleRegistry {
             }
         }
         return List.copyOf(nodes);
+    }
+
+    public static StylePage raw(String styleId) {
+        return styleId == null ? null : RAW_PAGES.get(styleId);
     }
 
     public static StylePage get(String styleId) {

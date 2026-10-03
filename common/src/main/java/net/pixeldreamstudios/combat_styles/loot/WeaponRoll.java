@@ -26,7 +26,7 @@ public record WeaponRoll(List<String> items, List<String> categories, List<Strin
     public static final String MODE_SLOT = "slot";
     public static final String MODE_AFFIX = "affix";
 
-    private static final List<String> MODES =
+    public static final List<String> MODES =
             List.of(MODE_APPEND, MODE_REPLACE, MODE_SLOT, MODE_AFFIX);
 
     private static final Codec<String> MODE_CODEC = Codec.STRING.validate(mode ->
@@ -120,4 +120,17 @@ public record WeaponRoll(List<String> items, List<String> categories, List<Strin
             targeting.minSlots(), targeting.maxSlots(), targeting.affixChance(),
             targeting.maxAffixes(), content.styles(), content.names(), content.slotLimit(),
             content.mode(), content.slots(), content.affixes(), content.name())));
+
+    private static final String SAMPLE_ITEM = "minecraft:iron_sword";
+    private static final String SAMPLE_CATEGORY = "sword";
+    private static final String SAMPLE_TABLE = "minecraft:chests/simple_dungeon";
+    private static final String SAMPLE_TAG = "minecraft:swords";
+    private static final String SAMPLE_STYLE = "bettercombat:one_handed_stab";
+    private static final String SAMPLE_NAME = "Rolled Thrust";
+
+    public static final WeaponRoll SAMPLE = new WeaponRoll(List.of(SAMPLE_ITEM),
+            List.of(SAMPLE_CATEGORY), List.of(SAMPLE_TABLE), List.of(SAMPLE_TAG),
+            0.1F, 2, 4, 0.5F, 2, List.of(StyleEntry.of(SAMPLE_STYLE)),
+            Map.of(SAMPLE_STYLE, SAMPLE_NAME), Optional.of(4), MODE_REPLACE, List.of(0, 1),
+            List.of(""), Optional.of(SAMPLE_NAME));
 }

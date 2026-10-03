@@ -8,10 +8,11 @@ import net.pixeldreamstudios.combat_styles.style.CustomAttackConfig;
 import net.pixeldreamstudios.combat_styles.style.CustomAttacks;
 import net.pixeldreamstudios.combat_styles.style.CustomStyleConfig;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
+import net.pixeldreamstudios.combat_styles.loot.BookRolls;
+import net.pixeldreamstudios.combat_styles.loot.WeaponRolls;
 import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
 
 import java.util.Map;
-import java.util.Set;
 
 public final class ServerDataReset {
 
@@ -19,12 +20,9 @@ public final class ServerDataReset {
     }
 
     public static void clear() {
-        DefaultStyles.acceptDatapack(Map.of(), Map.of(), Set.of());
-        DefaultStyles.acceptConfig(Map.of(), Map.of(), Set.of());
-        DefaultStyles.acceptSticky(Set.of());
-        DefaultStyles.acceptSlotTunings(Map.of());
-        DefaultStyles.acceptTuning(Set.of());
-        DefaultStyles.acceptLocked(Set.of());
+        DefaultStyles.clear();
+        BookRolls.DEFINITIONS.forget();
+        WeaponRolls.DEFINITIONS.forget();
         CustomStyles.accept(Map.of());
         CustomStyleConfig.forgetAll();
         CustomAttacks.accept(Map.of());

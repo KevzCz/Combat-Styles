@@ -6,6 +6,8 @@ import net.minecraft.world.item.ItemStack;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
+import net.pixeldreamstudios.combat_styles.config.ConfigPaths;
+import net.pixeldreamstudios.combat_styles.config.DefinitionLayer;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
@@ -23,11 +25,19 @@ public final class BookRolls {
 
     private static final Map<StyleRarity, List<BookRoll>> ROLLS =
             new EnumMap<>(StyleRarity.class);
+    private static final String LABEL = "style book";
+
+    public static final DefinitionLayer<BookRoll> DEFINITIONS = new DefinitionLayer<>(LABEL,
+            ConfigPaths.STYLE_BOOKS, BookRoll.CODEC, BookRolls::rebuild);
 
     private BookRolls() {
     }
 
-    public static void accept(List<BookRoll> loaded) {
+    private static void rebuild() {
+        rebuild(List.copyOf(DEFINITIONS.authoritative().values()));
+    }
+
+    private static synchronized void rebuild(List<BookRoll> loaded) {
         ROLLS.clear();
         if (loaded == null) {
             return;

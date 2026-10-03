@@ -164,7 +164,7 @@ public class EquipmentEditorScreen extends PanelScreen {
                 source.rarity(), source.innateAffixes(), source.groups(), source.pose(),
                 source.offHandPose(), source.poseTuning(), source.items(), source.itemTags(),
                 source.weaponCategories(), source.excludedItems(), source.excludedTags(),
-                source.excludedCategories(), source.use());
+                source.excludedCategories(), source.use(), source.weaponCategory());
     }
 
     private EquipmentDefinition blankForStack(ItemStack stack) {

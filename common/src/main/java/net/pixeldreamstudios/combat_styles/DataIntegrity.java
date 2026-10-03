@@ -175,30 +175,33 @@ public final class DataIntegrity {
             }
         }
 
-        for (WeaponRoll roll : WeaponRolls.all()) {
+        for (Map.Entry<String, WeaponRoll> named : WeaponRolls.DEFINITIONS.authoritative().entrySet()) {
+            WeaponRoll roll = named.getValue();
             for (String affixId : roll.affixes()) {
                 if (AffixRegistry.get(affixId) == null) {
-                    problems.add("weapon roll grants unknown affix " + affixId);
+                    problems.add("weapon roll " + named.getKey() + " grants unknown affix " + affixId);
                 }
             }
             for (StyleEntry entry : roll.styles()) {
                 if (!knownEntry(entry)) {
-                    problems.add("weapon roll references unknown style " + entry.styleId());
+                    problems.add("weapon roll " + named.getKey() + " references unknown style "
+                            + entry.styleId());
                 }
             }
         }
 
-        for (BookRoll roll : BookRolls.all()) {
+        for (Map.Entry<String, BookRoll> named : BookRolls.DEFINITIONS.authoritative().entrySet()) {
+            BookRoll roll = named.getValue();
             for (BookRoll.Weighted weighted : roll.pool()) {
                 StyleEntry entry = weighted.entry();
                 for (String affixId : entry.affixIds()) {
                     if (AffixRegistry.get(affixId) == null) {
-                        problems.add("style book " + roll.rarity()
+                        problems.add("style book " + named.getKey()
                                 + " references unknown affix " + affixId);
                     }
                 }
                 if (entry.customStyleId().isPresent() && !knownEntry(entry)) {
-                    problems.add("style book " + roll.rarity()
+                    problems.add("style book " + named.getKey()
                             + " references unknown style " + entry.styleId());
                 }
             }

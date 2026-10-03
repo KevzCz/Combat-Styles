@@ -14,21 +14,40 @@ import net.pixeldreamstudios.combat_styles.config.ConfigPaths;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 public final class AttackOverrides {
     private static final String EXTENSION = ".json";
     private static final String UNSOURCED = "unsourced";
+    private static final String DATAPACK_FOLDER = "datapack";
+    private static final String CONFIG_FOLDER = "config";
+    private static final String ALL_NAMESPACES = "all";
+    private static final String NAMESPACE_SEPARATOR = ":";
+    private static final String UNSAFE_CHARACTERS = "[^A-Za-z0-9._-]";
+    private static final String SAFE_REPLACEMENT = "_";
+    private static final int OWNED_DEPTH = 3;
+    private static final DateTimeFormatter BACKUP_STAMP =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
     private static final Map<String, AttackOverride> OVERRIDES = new HashMap<>();
+    private static final Map<String, Path> FILES = new HashMap<>();
     private static final Map<String, AttackOverride> SYNCED = new ConcurrentHashMap<>();
-    private static final Set<String> GENERATED = ConcurrentHashMap.newKeySet();
     private static volatile boolean remote;
+
+    public record Refresh(int moved, List<String> lines, Path backup) {
+    }
 
     private AttackOverrides() {
     }
@@ -37,36 +56,87 @@ public final class AttackOverrides {
         return ConfigPaths.of(ConfigPaths.ATTACKS);
     }
 
-    public static void generateMissing(Iterable<StylePage> pages) {
+    public static int reload() {
+        OVERRIDES.clear();
+        FILES.clear();
         Path directory = directory();
-        try {
-            Files.createDirectories(directory);
+        if (!Files.isDirectory(directory)) {
+            return 0;
+        }
+        adoptUnsourced(directory);
+
+        List<Path> found = new ArrayList<>();
+        try (Stream<Path> files = Files.walk(directory)) {
+            files.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(EXTENSION))
+                    .forEach(found::add);
         } catch (IOException exception) {
-            CombatStyles.LOGGER.error("Unable to create {}", directory, exception);
+            CombatStyles.LOGGER.error("Unable to list {}", directory, exception);
+        }
+        found.sort(Comparator.comparing((Path path) -> isOwnerFolder(directory.relativize(path)))
+                .thenComparing(Path::toString));
+        for (Path path : found) {
+            load(path, idFor(directory.relativize(path)));
+        }
+        return OVERRIDES.size();
+    }
+
+    private static boolean isOwnerFolder(Path relative) {
+        if (relative.getNameCount() != OWNED_DEPTH) {
+            return false;
+        }
+        String first = relative.getName(0).toString();
+        return DATAPACK_FOLDER.equals(first) || CONFIG_FOLDER.equals(first);
+    }
+
+    private static String idFor(Path relative) {
+        String fileName = relative.getFileName().toString();
+        String stem = fileName.substring(0, fileName.length() - EXTENSION.length());
+        if (isOwnerFolder(relative)) {
+            return relative.getName(1) + NAMESPACE_SEPARATOR + stem;
+        }
+        return styleIdForFile(stem);
+    }
+
+    private static void adoptUnsourced(Path directory) {
+        Path unsourced = directory.resolve(UNSOURCED);
+        if (!Files.isDirectory(unsourced)) {
             return;
         }
-
-        int written = 0;
-        for (StylePage page : pages) {
-            if (!GENERATED.add(page.styleId())) {
+        Map<String, String> customByStem = new LinkedHashMap<>();
+        for (CustomAttack attack : CustomAttacks.all()) {
+            customByStem.put(sanitize(attack.id()), attack.id());
+        }
+        for (CustomStyle style : CustomStyles.all()) {
+            customByStem.put(sanitize(style.id()), style.id());
+        }
+        List<Path> candidates;
+        try (Stream<Path> files = Files.list(unsourced)) {
+            candidates = files.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(EXTENSION))
+                    .toList();
+        } catch (IOException exception) {
+            CombatStyles.LOGGER.error("Unable to list {}", unsourced, exception);
+            return;
+        }
+        for (Path file : candidates) {
+            String fileName = file.getFileName().toString();
+            String styleId = customByStem.get(fileName.substring(0,
+                    fileName.length() - EXTENSION.length()));
+            if (styleId == null) {
                 continue;
             }
-            Path file = fileFor(directory, page);
-            if (Files.exists(file)) {
+            Path target = ownerFile(styleId);
+            if (target == null || Files.exists(target)) {
                 continue;
             }
             try {
-                Files.createDirectories(file.getParent());
+                Files.createDirectories(target.getParent());
+                Files.move(file, target);
+                CombatStyles.LOGGER.info("Moved {} to {}", file, target);
             } catch (IOException exception) {
-                CombatStyles.LOGGER.error("Unable to create {}", file.getParent(), exception);
-                continue;
+                CombatStyles.LOGGER.error("Unable to move {} to {}", file, target, exception);
             }
-            if (write(file, AttackOverride.from(page))) {
-                written++;
-            }
-        }
-        if (written > 0) {
-            CombatStyles.LOGGER.info("Generated {} attack override files in {}", written, directory);
         }
     }
 
@@ -77,15 +147,11 @@ public final class AttackOverrides {
             if (encoded.equals(stem)) {
                 return id;
             }
-            if (stem.equals(namespaceOf(page) + "_" + encoded)) {
+            if (stem.equals(namespaceOf(page) + SAFE_REPLACEMENT + encoded)) {
                 return id;
             }
         }
         return stem;
-    }
-
-    private static String fileNameOf(String styleId) {
-        return styleId.replaceAll("[^A-Za-z0-9._-]", "_") + EXTENSION;
     }
 
     private static String namespaceOf(StylePage page) {
@@ -97,31 +163,45 @@ public final class AttackOverrides {
     }
 
     private static String sanitize(String raw) {
-        return raw.replaceAll("[^A-Za-z0-9._-]", "_");
+        return raw.replaceAll(UNSAFE_CHARACTERS, SAFE_REPLACEMENT);
     }
 
-    private static Path fileFor(Path directory, StylePage page) {
-        return directory.resolve(namespaceOf(page)).resolve(fileNameOf(page.styleId()));
+    private static boolean isCustom(String styleId) {
+        return CustomAttacks.contains(styleId) || CustomStyles.contains(styleId);
     }
 
-    public static void regenerateAll(Iterable<StylePage> pages) {
+    private static boolean hasDatapackSource(String styleId) {
+        return CustomAttacks.hasDatapackVersion(styleId) || CustomStyles.hasDatapackVersion(styleId);
+    }
+
+    private static Path ownerFile(String styleId) {
+        if (styleId == null || styleId.isBlank()) {
+            return null;
+        }
         Path directory = directory();
-        try {
-            Files.createDirectories(directory);
-        } catch (IOException exception) {
-            CombatStyles.LOGGER.error("Unable to create {}", directory, exception);
-            return;
+        int split = styleId.indexOf(NAMESPACE_SEPARATOR);
+        if (isCustom(styleId) && split > 0) {
+            String folder = hasDatapackSource(styleId) ? DATAPACK_FOLDER : CONFIG_FOLDER;
+            return directory.resolve(folder)
+                    .resolve(sanitize(styleId.substring(0, split)))
+                    .resolve(sanitize(styleId.substring(split + 1)) + EXTENSION);
         }
-        for (StylePage page : pages) {
-            Path file = fileFor(directory, page);
-            try {
-                Files.createDirectories(file.getParent());
-            } catch (IOException exception) {
-                CombatStyles.LOGGER.error("Unable to create {}", file.getParent(), exception);
-                continue;
-            }
-            write(file, AttackOverride.from(page));
+        StylePage page = StyleRegistry.get(styleId);
+        String folder = page == null ? UNSOURCED : namespaceOf(page);
+        return directory.resolve(folder).resolve(sanitize(styleId) + EXTENSION);
+    }
+
+    private static String ownerNamespace(String styleId, Path file) {
+        Path relative = directory().relativize(file);
+        if (isOwnerFolder(relative)) {
+            return relative.getName(1).toString();
         }
+        String first = relative.getName(0).toString();
+        if (relative.getNameCount() > 1 && !UNSOURCED.equals(first)) {
+            return first;
+        }
+        int split = styleId.indexOf(NAMESPACE_SEPARATOR);
+        return split > 0 ? styleId.substring(0, split) : UNSOURCED;
     }
 
     private static boolean write(Path file, AttackOverride override) {
@@ -129,6 +209,7 @@ public final class AttackOverrides {
                 .resultOrPartial(error -> CombatStyles.LOGGER.error("Encode failed: {}", error))
                 .map(json -> {
                     try {
+                        Files.createDirectories(file.getParent());
                         Files.writeString(file, new GsonBuilder().setPrettyPrinting()
                                 .create().toJson(json));
                         return Boolean.TRUE;
@@ -140,34 +221,16 @@ public final class AttackOverrides {
                 .orElse(Boolean.FALSE);
     }
 
-    public static int reload() {
-        OVERRIDES.clear();
-        GENERATED.clear();
-        Path directory = directory();
-        if (!Files.isDirectory(directory)) {
-            return 0;
-        }
-
-        try (Stream<Path> files = Files.walk(directory)) {
-            files.filter(Files::isRegularFile)
-                    .filter(path -> path.toString().endsWith(EXTENSION)).forEach(path -> {
-                String fileName = path.getFileName().toString();
-                String stem = fileName.substring(0, fileName.length() - EXTENSION.length());
-                load(path, styleIdForFile(stem));
-            });
-        } catch (IOException exception) {
-            CombatStyles.LOGGER.error("Unable to list {}", directory, exception);
-        }
-        return OVERRIDES.size();
-    }
-
     private static void load(Path path, String styleId) {
         try {
             JsonElement json = JsonParser.parseString(Files.readString(path));
             AttackOverride.CODEC.parse(JsonOps.INSTANCE, json)
                     .resultOrPartial(error ->
                             CombatStyles.LOGGER.error("Invalid override {}: {}", styleId, error))
-                    .ifPresent(override -> OVERRIDES.put(styleId, override));
+                    .ifPresent(override -> {
+                        OVERRIDES.put(styleId, override);
+                        FILES.put(styleId, path);
+                    });
         } catch (IOException exception) {
             CombatStyles.LOGGER.error("Unable to read {}", path, exception);
         }
@@ -177,33 +240,92 @@ public final class AttackOverrides {
         if (styleId == null || styleId.isBlank() || override == null) {
             return false;
         }
-        Path directory = directory();
-        StylePage page = StyleRegistry.get(styleId);
-        Path file = page == null
-                ? directory.resolve(UNSOURCED).resolve(fileNameOf(styleId))
-                : fileFor(directory, page);
-        try {
-            Files.createDirectories(file.getParent());
-        } catch (IOException exception) {
-            CombatStyles.LOGGER.error("Unable to create {}", file.getParent(), exception);
+        StylePage base = StyleRegistry.raw(styleId);
+        AttackOverride trimmed = base == null
+                ? override
+                : override.withoutMatching(AttackOverride.from(base));
+        if (trimmed.isBlank()) {
+            clear(styleId);
+            return true;
+        }
+        Path target = ownerFile(styleId);
+        if (target == null || !write(target, trimmed)) {
             return false;
         }
-        if (!write(file, override)) {
-            return false;
+        Path previous = FILES.put(styleId, target);
+        if (previous != null && !previous.equals(target)) {
+            delete(previous);
         }
-        OVERRIDES.put(styleId, override);
+        OVERRIDES.put(styleId, trimmed);
         StyleRegistry.rebuild();
         return true;
     }
 
+    public static boolean clear(String styleId) {
+        Path file = styleId == null ? null : FILES.remove(styleId);
+        OVERRIDES.remove(styleId);
+        boolean removed = file != null && delete(file);
+        StyleRegistry.rebuild();
+        return removed;
+    }
+
+    public static boolean has(String styleId) {
+        return styleId != null && get(styleId) != null;
+    }
+
+    private static boolean delete(Path file) {
+        try {
+            return Files.deleteIfExists(file);
+        } catch (IOException exception) {
+            CombatStyles.LOGGER.error("Unable to delete {}", file, exception);
+            return false;
+        }
+    }
+
+    public static Refresh refresh(String namespace) {
+        boolean everything = namespace == null || namespace.isBlank()
+                || ALL_NAMESPACES.equalsIgnoreCase(namespace);
+        Path directory = directory();
+        Path backup = ConfigPaths.of(ConfigPaths.ATTACKS_BACKUP)
+                .resolve(LocalDateTime.now().format(BACKUP_STAMP));
+        List<String> lines = new ArrayList<>();
+        int moved = 0;
+        for (Map.Entry<String, Path> entry : new LinkedHashMap<>(FILES).entrySet()) {
+            String styleId = entry.getKey();
+            Path file = entry.getValue();
+            if (!everything && !namespace.equalsIgnoreCase(ownerNamespace(styleId, file))) {
+                continue;
+            }
+            StylePage base = StyleRegistry.raw(styleId);
+            AttackOverride override = OVERRIDES.get(styleId);
+            if (override != null && base != null) {
+                List<String> differences = override.differencesFrom(AttackOverride.from(base));
+                if (!differences.isEmpty()) {
+                    lines.add(styleId + ": " + String.join(", ", differences));
+                }
+            }
+            Path target = backup.resolve(directory.relativize(file));
+            try {
+                Files.createDirectories(target.getParent());
+                Files.move(file, target);
+                moved++;
+            } catch (IOException exception) {
+                CombatStyles.LOGGER.error("Unable to back up {}", file, exception);
+            }
+        }
+        reload();
+        StyleRegistry.rebuild();
+        return new Refresh(moved, lines, backup);
+    }
+
+    public static Set<String> namespaces() {
+        Set<String> namespaces = new TreeSet<>();
+        FILES.forEach((styleId, file) -> namespaces.add(ownerNamespace(styleId, file)));
+        return namespaces;
+    }
+
     public static boolean isEditable(String styleId) {
-        if (styleId == null || styleId.isBlank()) {
-            return false;
-        }
-        if (CustomAttacks.isDatapackOwned(styleId)) {
-            return false;
-        }
-        return !CustomStyles.isDatapackOwned(styleId);
+        return styleId != null && !styleId.isBlank();
     }
 
     public static void acceptSync(Map<String, AttackOverride> synced) {

@@ -5,7 +5,6 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.profiling.ProfilerFiller;
 
 import net.pixeldreamstudios.combat_styles.DataIntegrity;
-import net.pixeldreamstudios.combat_styles.config.EquipmentDropConfig;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -22,12 +21,7 @@ public class StyleIndexReloader implements PreparableReloadListener {
         return CompletableFuture.completedFuture((Void) null)
                 .thenCompose(barrier::wait)
                 .thenRunAsync(() -> {
-                    AttackOverrides.reload();
-                    CustomAttackConfig.reload();
-                    CustomStyleConfig.reload();
-                    EquipmentDropConfig.load();
-                    StyleRegistry.rebuild();
-                    DefaultStyleConfig.reload();
+                    StyleConfigs.reloadAll();
                     DataIntegrity.verify();
                 }, applyExecutor);
     }

@@ -15,6 +15,7 @@ import net.pixeldreamstudios.combat_styles.client.ClientConfigSync;
 import net.pixeldreamstudios.combat_styles.client.ClientStyleData;
 import net.pixeldreamstudios.combat_styles.client.CooldownMirror;
 import net.pixeldreamstudios.combat_styles.network.ApplyPosePayload;
+import net.pixeldreamstudios.combat_styles.network.ApplyWeaponCategoryPayload;
 import net.pixeldreamstudios.combat_styles.network.ApplySequencePayload;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
 import net.pixeldreamstudios.combat_styles.network.ExtractStylePayload;
@@ -33,15 +34,12 @@ import net.pixeldreamstudios.combat_styles.network.ApplyStackEquipmentPayload;
 import net.pixeldreamstudios.combat_styles.network.HoldComboPayload;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.network.SyncDefaultStylesPayload;
-import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.network.SyncAffixesPayload;
+import net.pixeldreamstudios.combat_styles.network.SyncLootPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncAttackOverridesPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncEquipmentPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncLearnedPayload;
 import net.pixeldreamstudios.combat_styles.style.AttackOverrides;
-import net.pixeldreamstudios.combat_styles.style.CustomAttacks;
-import net.pixeldreamstudios.combat_styles.style.CustomStyles;
-import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
 
 @EventBusSubscriber(modid = CombatStyles.MOD_ID)
 public final class NetworkManagerImpl {
@@ -78,6 +76,12 @@ public final class NetworkManagerImpl {
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer player) {
                         NetworkManager.handleApplyPose(player, payload);
+                    }
+                }));
+        registrar.playToServer(ApplyWeaponCategoryPayload.TYPE, ApplyWeaponCategoryPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        NetworkManager.handleApplyWeaponCategory(player, payload);
                     }
                 }));
         registrar.playToServer(ExtractStylePayload.TYPE, ExtractStylePayload.STREAM_CODEC,
@@ -128,7 +132,10 @@ public final class NetworkManagerImpl {
                         payload.fromData(), payload.overridden())));
         registrar.playToClient(SyncAffixesPayload.TYPE, SyncAffixesPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
-                        AffixRegistry.acceptSync(payload.affixes())));
+                        payload.applyToClient()));
+        registrar.playToClient(SyncLootPayload.TYPE, SyncLootPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        payload.applyToClient()));
         registrar.playToClient(SyncAttackOverridesPayload.TYPE,
                 SyncAttackOverridesPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
@@ -151,12 +158,7 @@ public final class NetworkManagerImpl {
     }
 
     private static void acceptDefaults(SyncDefaultStylesPayload payload) {
-        DefaultStyles.acceptSync(payload.sequences(), payload.slotLimits(), payload.appending());
-        DefaultStyles.acceptSyncTuning(payload.tuning());
-        DefaultStyles.acceptSyncSticky(payload.sticky());
-        DefaultStyles.acceptSyncLocked(payload.locked());
-        CustomStyles.acceptSync(payload.customStyles(), payload.configStyles());
-        CustomAttacks.acceptSync(payload.customAttacks(), payload.configAttacks());
+        payload.applyToClient();
     }
 
     public static void sendDefaultStylesToClient(ServerPlayer player, SyncDefaultStylesPayload payload) {
@@ -168,6 +170,10 @@ public final class NetworkManagerImpl {
     }
 
     public static void sendAffixesToClient(ServerPlayer player, SyncAffixesPayload payload) {
+        PacketDistributor.sendToPlayer(player, payload);
+    }
+
+    public static void sendLootToClient(ServerPlayer player, SyncLootPayload payload) {
         PacketDistributor.sendToPlayer(player, payload);
     }
 
@@ -193,6 +199,10 @@ public final class NetworkManagerImpl {
     }
 
     public static void sendApplyPose(ApplyPosePayload payload) {
+        PacketDistributor.sendToServer(payload);
+    }
+
+    public static void sendApplyWeaponCategory(ApplyWeaponCategoryPayload payload) {
         PacketDistributor.sendToServer(payload);
     }
 
