@@ -91,6 +91,10 @@ public final class SpellEngineCompat {
         return SpellEngineBridge.isSpellCloud(entity);
     }
 
+    public static boolean prepareSummon(Entity spawned, Player owner) {
+        return SpellEngineBridge.prepareSummon(spawned, owner);
+    }
+
     public static void init() {
         SpellEngineBridge.init();
     }

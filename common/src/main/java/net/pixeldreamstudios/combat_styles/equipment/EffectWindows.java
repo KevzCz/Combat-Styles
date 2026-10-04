@@ -17,6 +17,10 @@ public final class EffectWindows {
         return Gates.windowOpen(player, GateScope.EFFECT, itemId, effectKey);
     }
 
+    public static boolean armed(Player player, EquipmentRuntime.Match match) {
+        return Gates.windowOpen(player, GateScope.EFFECT, match.owner(), match.key());
+    }
+
     public static int remaining(Player player, String itemId, String effectKey) {
         return Gates.windowRemaining(player, GateScope.EFFECT, itemId, effectKey);
     }
@@ -30,7 +34,7 @@ public final class EffectWindows {
     }
 
     public static boolean arm(Player player, EquipmentRuntime.Match match) {
-        return Gates.arm(player, GateScope.EFFECT, match.id(), match.key(),
+        return Gates.arm(player, GateScope.EFFECT, match.owner(), match.key(),
                 match.entry().cooldown());
     }
 
@@ -39,12 +43,12 @@ public final class EffectWindows {
         if (!window.windowed()) {
             return !EquipmentRuntime.consumeProcCooldown(player, match);
         }
-        return Gates.claim(player, GateScope.EFFECT, match.id(), match.key(),
+        return Gates.claim(player, GateScope.EFFECT, match.owner(), match.key(),
                 window, arms(match));
     }
 
     public static boolean claimSwing(Player player, EquipmentRuntime.Match match) {
-        return Gates.claim(player, GateScope.EFFECT, match.id(), match.key(),
+        return Gates.claim(player, GateScope.EFFECT, match.owner(), match.key(),
                 match.entry().cooldown(), false);
     }
 }

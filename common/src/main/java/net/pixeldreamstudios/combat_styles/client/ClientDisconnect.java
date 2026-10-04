@@ -24,6 +24,7 @@ public final class ClientDisconnect {
         CustomStyles.clearSync();
         CustomAttacks.clearSync();
         EquipmentRegistry.clearSync();
+        ClientSummons.clear();
         AffixRegistry.clearSync();
         AttackOverrides.clearSync();
         BookRolls.DEFINITIONS.clearSync();

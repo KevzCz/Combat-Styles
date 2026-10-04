@@ -109,6 +109,7 @@ public class ConfigScreen extends PanelScreen {
         all.addAll(ConfigOptions.statusEffects());
         all.addAll(ConfigOptions.abilities());
         all.addAll(ConfigOptions.equipmentDrops());
+        all.addAll(ConfigOptions.summons());
         all.add(ConfigOptions.action("hudMove",
                 Component.translatable(KEY_HUD_MOVE).getString(),
                 () -> minecraft.setScreen(new HudPlacementScreen(this)))

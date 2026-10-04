@@ -13,6 +13,7 @@ import net.pixeldreamstudios.combat_styles.equipment.EventKind;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentEffect;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
+import net.pixeldreamstudios.combat_styles.equipment.ProfileVariant;
 import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
 import net.pixeldreamstudios.combat_styles.loot.BookRoll;
 import net.pixeldreamstudios.combat_styles.loot.BookRolls;
@@ -20,6 +21,7 @@ import net.pixeldreamstudios.combat_styles.loot.WeaponRoll;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRolls;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.ai.attributes.DefaultAttributes;
 import net.bettercombat.api.WeaponAttributes;
 import net.pixeldreamstudios.combat_styles.platform.WeaponRegistryAccess;
 import net.pixeldreamstudios.combat_styles.style.CustomStyle;
@@ -32,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 
 public final class DataIntegrity {
+
+    private static final int MAX_SUMMON_COUNT = 16;
 
     private static final List<EventKind> TARGETED_EVENTS = List.of(EventKind.ON_HURT,
             EventKind.ON_SHIELD_BLOCK, EventKind.ON_PROJECTILE_HIT, EventKind.ON_KILL,
@@ -167,6 +171,19 @@ public final class DataIntegrity {
         for (StyleAffix affix : AffixRegistry.all()) {
             for (AffixEffects.OnHit effects : List.of(affix.onHit(), affix.onSwing())) {
                 for (AffixEffects.Summon summon : effects.summons()) {
+                    String where = "affix " + affix.serializedId();
+                    if (!summon.raisesVictim() && !knownEntity(summon.entity())) {
+                        problems.add(where + " summons unknown entity " + summon.entity());
+                    }
+                    if (summon.count() > MAX_SUMMON_COUNT) {
+                        problems.add(where + " summons " + summon.count() + " at once; more than "
+                                + MAX_SUMMON_COUNT + " is capped");
+                    }
+                    if ((!summon.equipment().isEmpty() || !summon.attributes().isEmpty())
+                            && !summon.raisesVictim() && !holdsGear(summon.entity())) {
+                        problems.add(where + " gives equipment or attributes to " + summon.entity()
+                                + ", which is not a living mob and cannot hold them");
+                    }
                     summon.ability()
                             .filter(ability -> !AbilityRegistry.has(ability))
                             .ifPresent(ability -> problems.add("affix " + affix.serializedId()
@@ -273,15 +290,38 @@ public final class DataIntegrity {
             }
         });
 
-        effect.summonReplacement().ifPresent(replacement -> {
-            if (!knownEntity(replacement.becomeEntity())) {
-                found.add(where + " becomes unknown entity " + replacement.becomeEntity());
+        triggered.effect().summonProfile().ifPresent(profile -> {
+            String entity = profile.entity().orElse("");
+            if (triggered.trigger().isEvent() && !triggered.cooldown().windowed()) {
+                found.add(where + " puts a summon profile on an event trigger with no window;"
+                        + " give it uses or a duration, or it is never active");
             }
-            for (String ability : replacement.abilities()) {
-                if (!AbilityRegistry.has(ability)) {
-                    found.add(where + " replacement names unknown ability " + ability);
+            List<String> named = new ArrayList<>(profile.abilities());
+            profile.finale().ifPresent(named::add);
+            for (ProfileVariant variant : profile.variants()) {
+                named.addAll(variant.abilities());
+                variant.finale().ifPresent(named::add);
+            }
+            for (String ability : named) {
+                if (AbilityRegistry.has(ability) && !AbilityRegistry.usableBy(ability, entity)) {
+                    found.add(where + " summon profile gives " + entity + " the ability " + ability
+                            + ", which only " + AbilityRegistry.entitiesFor(ability) + " can use");
                 }
             }
+            profile.companion().ifPresent(companion -> {
+                if (companion.count() > MAX_SUMMON_COUNT) {
+                    found.add(where + " keeps " + companion.count() + " companions; more than "
+                            + MAX_SUMMON_COUNT + " is likely a mistake");
+                }
+                if (entity.isEmpty()) {
+                    found.add(where + " has a companion block but names no entity");
+                }
+                if ((!companion.equipment().isEmpty() || !companion.attributes().isEmpty())
+                        && !holdsGear(entity)) {
+                    found.add(where + " gives equipment or attributes to " + entity
+                            + ", which is not a living mob and cannot hold them");
+                }
+            });
         });
 
         effect.summonDive().ifPresent(dive -> {
@@ -351,6 +391,12 @@ public final class DataIntegrity {
             }
         }
         return false;
+    }
+
+    private static boolean holdsGear(String entityId) {
+        ResourceLocation id = ResourceLocation.tryParse(entityId);
+        return id != null && BuiltInRegistries.ENTITY_TYPE.getOptional(id)
+                .map(DefaultAttributes::hasSupplier).orElse(false);
     }
 
     private static boolean knownEntity(String entityId) {

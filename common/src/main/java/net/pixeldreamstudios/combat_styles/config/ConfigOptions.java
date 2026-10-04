@@ -20,6 +20,7 @@ public final class ConfigOptions {
     public static final String STATUS_EFFECTS = "Status Effects";
     public static final String ABILITIES = "Abilities";
     public static final String EQUIPMENT = "Equipment Drops";
+    public static final String SUMMONS = "Summons";
 
     public static final String SUGGEST_LOOT_TABLES = "loot_tables";
     public static final String SUGGEST_TABLE_PATTERNS = "table_patterns";
@@ -384,6 +385,51 @@ public final class ConfigOptions {
                     () -> (double) entry.fx.pitch,
                     value -> entry.fx.pitch = value.floatValue()).in(group));
         }
+        return options;
+    }
+
+    public static List<Option> summons() {
+        List<Option> options = new ArrayList<>();
+        options.add(decimal("summons.follow_start_distance", "Follow start distance",
+                () -> SummonTuning.get().followStartDistance,
+                value -> SummonTuning.get().followStartDistance = value)
+                .describedAs("Summons walk back to you once they are this many blocks away.")
+                .in(SUMMONS));
+        options.add(decimal("summons.follow_stop_distance", "Follow stop distance",
+                () -> SummonTuning.get().followStopDistance,
+                value -> SummonTuning.get().followStopDistance = value)
+                .describedAs("Summons stop following once they are this close to you.")
+                .in(SUMMONS));
+        options.add(decimal("summons.teleport_distance", "Teleport distance",
+                () -> SummonTuning.get().teleportDistance,
+                value -> SummonTuning.get().teleportDistance = value)
+                .describedAs("Summons teleport next to you past this distance, even mid-fight. 0 never teleports.")
+                .in(SUMMONS));
+        options.add(decimal("summons.hunt_range", "Hunt range",
+                () -> SummonTuning.get().huntRange,
+                value -> SummonTuning.get().huntRange = value)
+                .describedAs("Summons only chase targets within this many blocks.")
+                .in(SUMMONS));
+        options.add(decimal("summons.roster_radius", "Roster radius",
+                () -> SummonTuning.get().rosterRadius,
+                value -> SummonTuning.get().rosterRadius = value)
+                .describedAs("How far around you summons count for commands and limits.")
+                .in(SUMMONS));
+        options.add(bool("summons.recall_strays", "Recall strays",
+                () -> SummonTuning.get().recallStrays,
+                value -> SummonTuning.get().recallStrays = value)
+                .describedAs("Bring summons back when they wander past the roster radius.")
+                .in(SUMMONS));
+        options.add(integer("summons.max_commanded_per_order", "Max commanded per order",
+                () -> SummonTuning.get().maxCommandedPerOrder,
+                value -> SummonTuning.get().maxCommandedPerOrder = value)
+                .describedAs("Most summons a single recall or focus order moves.")
+                .in(SUMMONS));
+        options.add(decimal("summons.minimum_damage", "Minimum damage",
+                () -> (double) SummonTuning.get().minimumDamage,
+                value -> SummonTuning.get().minimumDamage = value.floatValue())
+                .describedAs("Summon hits below this damage are skipped.")
+                .in(SUMMONS));
         return options;
     }
 

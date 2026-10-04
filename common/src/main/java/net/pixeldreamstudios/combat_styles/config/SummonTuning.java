@@ -45,6 +45,10 @@ public final class SummonTuning {
         public double rosterRadius = 24.0D;
         public boolean recallStrays = true;
         public int maxCommandedPerOrder = 16;
+        public double followStartDistance = 6.0D;
+        public double followStopDistance = 2.5D;
+        public double teleportDistance = 12.0D;
+        public double huntRange = 24.0D;
     }
 
     private static final class Section<T> {
@@ -99,15 +103,52 @@ public final class SummonTuning {
                 CombatStyles.LOGGER.warn("Could not read {}", path, failure);
             }
         }
+        complete &= readRoot(root);
+        if (!complete) {
+            save();
+        }
+    }
+
+    private static boolean readRoot(JsonObject root) {
+        boolean complete = true;
         Values parsed = GSON.fromJson(root, Values.class);
         values = parsed != null ? parsed : new Values();
+        for (String key : GSON.toJsonTree(new Values()).getAsJsonObject().keySet()) {
+            complete &= root.has(key);
+        }
         for (Map.Entry<String, Section<?>> section : SECTIONS.entrySet()) {
             complete &= root.has(section.getKey());
             section.getValue().read(root, section.getKey());
         }
-        if (!complete) {
-            save();
+        return complete;
+    }
+
+    public static JsonObject toJson() {
+        JsonObject root = GSON.toJsonTree(values).getAsJsonObject();
+        for (Map.Entry<String, Section<?>> section : SECTIONS.entrySet()) {
+            root.add(section.getKey(), GSON.toJsonTree(section.getValue().value));
         }
+        return root;
+    }
+
+    public static void accept(JsonElement json) {
+        if (json != null && json.isJsonObject()) {
+            readRoot(json.getAsJsonObject());
+        }
+    }
+
+    public static boolean applyEdit(JsonElement json) {
+        if (json == null || !json.isJsonObject()) {
+            return false;
+        }
+        try {
+            readRoot(json.getAsJsonObject());
+        } catch (RuntimeException failure) {
+            CombatStyles.LOGGER.warn("Rejected malformed summon tuning edit", failure);
+            return false;
+        }
+        save();
+        return true;
     }
 
     public static void save() {
@@ -118,10 +159,7 @@ public final class SummonTuning {
             CombatStyles.LOGGER.warn("Could not create {}", path.getParent(), failure);
             return;
         }
-        JsonObject root = GSON.toJsonTree(values).getAsJsonObject();
-        for (Map.Entry<String, Section<?>> section : SECTIONS.entrySet()) {
-            root.add(section.getKey(), GSON.toJsonTree(section.getValue().value));
-        }
+        JsonObject root = toJson();
         try (Writer writer = Files.newBufferedWriter(path)) {
             GSON.toJson(root, writer);
         } catch (IOException failure) {

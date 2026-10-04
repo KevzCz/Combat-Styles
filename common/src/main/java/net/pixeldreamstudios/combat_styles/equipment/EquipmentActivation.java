@@ -20,6 +20,7 @@ import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Predicate;
 
 public final class EquipmentActivation {
@@ -63,6 +64,15 @@ public final class EquipmentActivation {
         }
         react(player, EquipmentContext.castBy(player, event),
                 trigger -> trigger.activation().reactsToCast(), "spell cast");
+    }
+
+    public static void summoned(Player player, SummonEvent event) {
+        if (event == null) {
+            return;
+        }
+        react(player, EquipmentContext.summonedBy(player, event),
+                trigger -> trigger.activation().summon().hears(event.kind()),
+                "summon " + event.kind().name().toLowerCase(Locale.ROOT));
     }
 
     public static void projectileHit(Player player, ProjectileHitEvent event) {

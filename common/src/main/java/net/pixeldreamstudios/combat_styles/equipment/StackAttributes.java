@@ -69,7 +69,7 @@ public final class StackAttributes {
         return List.copyOf(definition.passiveAttributes().entrySet());
     }
 
-    private static Holder<Attribute> holderOf(String attributeId) {
+    public static Holder<Attribute> holderOf(String attributeId) {
         ResourceLocation id = ResourceLocation.tryParse(attributeId);
         if (id == null) {
             return null;

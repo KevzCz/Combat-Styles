@@ -53,6 +53,7 @@ public final class EquipmentTooltip {
     private static final String KEY_REWRITES_MORE = "item.combat_styles.effect.rewrites_more";
     private static final String KEY_KEEPS = "item.combat_styles.effect.keeps";
     private static final String KEY_AT_MOST = "item.combat_styles.effect.at_most";
+    private static final String KEY_RESPAWNS = "item.combat_styles.effect.respawns";
     private static final String KEY_REPLACES = "tooltip.combat_styles.equip_replaces";
     private static final String KEY_ECHO = "tooltip.combat_styles.equip_echo";
     private static final String KEY_WORN = "tooltip.combat_styles.equip_worn";
@@ -295,15 +296,15 @@ public final class EquipmentTooltip {
                 StyleText.formatDecimal(dive.damageShare())).withStyle(BODY)));
     }
 
-    private static void appendSummonReplacement(SummonReplacement replacement,
+    private static void appendSummonReplacement(SummonProfile replacement,
                                                 List<Component> tooltip) {
-        if (replacement == null) {
+        if (replacement == null || !replacement.replacesSummons()) {
             return;
         }
         tooltip.add(Component.empty());
         tooltip.add(Component.translatable(KEY_REPLACE_HEADER).withStyle(HEADER));
         tooltip.add(TooltipGem.SUMMON.bullet(Component.translatable(KEY_REPLACE_ALL,
-                StyleText.registryName(replacement.entity())).withStyle(BODY)));
+                StyleText.registryName(replacement.entity().orElse(""))).withStyle(BODY)));
 
         replacement.maxActive().ifPresent(max -> tooltip.add(TooltipGem.SUMMON.bullet(
                 Component.translatable(KEY_REPLACE_MAX, max).withStyle(BODY))));
@@ -424,7 +425,7 @@ public final class EquipmentTooltip {
             appendEcho(echoOf(effect), tooltip);
             appendRepeat(effect, tooltip);
             appendTuning(effect.tuneAffixes(), granted, tooltip);
-            appendSummonReplacement(effect.summonReplacement().orElse(null), tooltip);
+            appendSummonReplacement(effect.summonProfile().orElse(null), tooltip);
             appendSummonDive(effect.summonDive().orElse(null), tooltip);
         }
         appendGate(entry.cooldown(), tooltip);
@@ -1240,11 +1241,14 @@ public final class EquipmentTooltip {
             }
         });
         effect.summonProfile().ifPresent(profile -> {
-            int anchored = profile.anchored().orElse(0);
-            if (anchored > 0) {
-                tooltip.add(TooltipGem.SUMMON.bullet(Component.translatable(KEY_KEEPS, anchored,
-                        StyleText.registryName(profile.entity().orElse(""))).withStyle(BODY)));
-            }
+            profile.companion().filter(companion -> companion.count() > 0).ifPresent(companion -> {
+                tooltip.add(TooltipGem.SUMMON.bullet(Component.translatable(KEY_KEEPS,
+                        companion.count(), StyleText.registryName(profile.entity().orElse("")))
+                        .withStyle(BODY)));
+                tooltip.add(TooltipGem.SUMMON.bullet(Component.translatable(KEY_RESPAWNS,
+                        StyleText.formatDecimal(companion.respawnTicks() / (double) SECOND))
+                        .withStyle(BODY)));
+            });
             profile.maxActive().ifPresent(max -> tooltip.add(TooltipGem.SUMMON.bullet(
                     Component.translatable(KEY_AT_MOST, max).withStyle(BODY))));
         });

@@ -4,6 +4,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -11,6 +12,8 @@ import net.minecraft.server.level.ServerPlayer;
 
 import net.pixeldreamstudios.combat_styles.network.ApplyPosePayload;
 import net.pixeldreamstudios.combat_styles.network.ApplyWeaponCategoryPayload;
+import net.pixeldreamstudios.combat_styles.network.SummonSyncPayload;
+import net.pixeldreamstudios.combat_styles.network.SummonCommandPayload;
 import net.pixeldreamstudios.combat_styles.network.ApplySequencePayload;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
 import net.pixeldreamstudios.combat_styles.network.ExtractStylePayload;
@@ -40,6 +43,12 @@ public final class NetworkManagerImpl {
         PayloadTypeRegistry.playC2S().register(ApplySequencePayload.TYPE, ApplySequencePayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(ApplyPosePayload.TYPE, ApplyPosePayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(ApplyWeaponCategoryPayload.TYPE, ApplyWeaponCategoryPayload.STREAM_CODEC);
+        PayloadTypeRegistry.playC2S().register(SummonCommandPayload.TYPE, SummonCommandPayload.STREAM_CODEC);
+        PayloadTypeRegistry.playS2C().register(SummonSyncPayload.TYPE, SummonSyncPayload.STREAM_CODEC);
+        ServerPlayNetworking.registerGlobalReceiver(SummonCommandPayload.TYPE, (payload, context) ->
+                context.server().execute(() -> NetworkManager.handleSummonCommand(context.player(), payload)));
+        EntityTrackingEvents.START_TRACKING.register((entity, player) ->
+                NetworkManager.onStartTracking(player, entity));
         PayloadTypeRegistry.playC2S().register(ExtractStylePayload.TYPE, ExtractStylePayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(SwungAttackPayload.TYPE, SwungAttackPayload.STREAM_CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SwungAttackPayload.TYPE, (payload, context) ->
@@ -155,6 +164,14 @@ public final class NetworkManagerImpl {
 
     public static void sendApplyWeaponCategory(ApplyWeaponCategoryPayload payload) {
         ClientPlayNetworking.send(payload);
+    }
+
+    public static void sendSummonCommand(SummonCommandPayload payload) {
+        ClientPlayNetworking.send(payload);
+    }
+
+    public static void sendSummonToClient(ServerPlayer player, SummonSyncPayload payload) {
+        ServerPlayNetworking.send(player, payload);
     }
 
     @Environment(EnvType.CLIENT)

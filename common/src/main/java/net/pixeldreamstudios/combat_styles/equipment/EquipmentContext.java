@@ -24,14 +24,15 @@ public record EquipmentContext(Player player,
                           boolean hitPass,
                           float dealtDamage,
                           ProjectileHitEvent projectileHit,
-                          SpellCastEvent cast) {
+                          SpellCastEvent cast,
+                          SummonEvent summoned) {
 
     public EquipmentContext(Player player, StyleEntry entry, WeaponAttributes.Attack attack,
                        int slotIndex, int sequenceSize, int swingCount,
                        boolean killed, boolean summonHit, LivingEntity target,
                        HurtEvent hurt, ShotEvent shot, BlockEvent blocked, UseEvent used) {
         this(player, entry, attack, slotIndex, sequenceSize, swingCount, killed, summonHit,
-                target, hurt, shot, blocked, used, false, 0.0F, null, null);
+                target, hurt, shot, blocked, used, false, 0.0F, null, null, null);
     }
 
     public EquipmentContext(Player player, StyleEntry entry, WeaponAttributes.Attack attack,
@@ -58,7 +59,7 @@ public record EquipmentContext(Player player,
                 ? this
                 : new EquipmentContext(player, entry, attack, slotIndex, sequenceSize,
                         swingCount, killed, summonHit, hit, hurt, shot, blocked, used,
-                        hitPass, dealtDamage, projectileHit, cast);
+                        hitPass, dealtDamage, projectileHit, cast, summoned);
     }
 
     public static EquipmentContext hurtBy(Player player, HurtEvent hurt) {
@@ -106,7 +107,7 @@ public record EquipmentContext(Player player,
         return new EquipmentContext(player, CombatState.swungEntry(player), null, -1, 0,
                 EquipmentRuntime.swingCount(player), false, false,
                 hit == null ? null : hit.victim(), null, null, null, null,
-                true, hit == null ? 0.0F : hit.amount(), hit, null);
+                true, hit == null ? 0.0F : hit.amount(), hit, null, null);
     }
 
     public static EquipmentContext castBy(Player player, SpellCastEvent cast) {
@@ -114,21 +115,29 @@ public record EquipmentContext(Player player,
                 null);
         return new EquipmentContext(player, base.entry(), base.attack(), base.slotIndex(),
                 base.sequenceSize(), base.swingCount(), false, false, base.target(), null, null,
-                null, null, false, 0.0F, null, cast);
+                null, null, false, 0.0F, null, cast, null);
+    }
+
+    public static EquipmentContext summonedBy(Player player, SummonEvent event) {
+        EquipmentContext base = eventFor(player, event == null ? null : event.other(), null, null,
+                null);
+        return new EquipmentContext(player, base.entry(), base.attack(), base.slotIndex(),
+                base.sequenceSize(), base.swingCount(), false, false, base.target(), null, null,
+                null, null, false, 0.0F, null, null, event);
     }
 
     public EquipmentContext withoutSummonHit() {
         return summonHit
                 ? new EquipmentContext(player, entry, attack, slotIndex, sequenceSize,
                         swingCount, killed, false, target, hurt, shot, blocked, used,
-                        hitPass, dealtDamage, projectileHit, cast)
+                        hitPass, dealtDamage, projectileHit, cast, summoned)
                 : this;
     }
 
     public EquipmentContext onHitPass(boolean hitPass, float dealt) {
         return new EquipmentContext(player, entry, attack, slotIndex, sequenceSize,
                 swingCount, killed, summonHit, target, hurt, shot, blocked, used,
-                hitPass, dealt, projectileHit, cast);
+                hitPass, dealt, projectileHit, cast, summoned);
     }
 
     public boolean hasTarget() {
@@ -137,7 +146,7 @@ public record EquipmentContext(Player player,
 
     public boolean fromSwing() {
         return hurt == null && shot == null && blocked == null && used == null
-                && projectileHit == null && cast == null;
+                && projectileHit == null && cast == null && summoned == null;
     }
 
     public String hitbox() {

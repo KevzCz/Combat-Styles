@@ -6,6 +6,8 @@ import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
+import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
+import net.pixeldreamstudios.combat_styles.entity.SummonCompanion;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,12 +26,15 @@ public record SummonProfile(Optional<String> entity,
                             List<ProfileVariant> variants,
                             List<String> exempt,
                             List<String> replacedSummonedEntities,
-                            boolean replacesSummons) {
+                            boolean replacesSummons,
+                            Optional<SummonCompanion> companion,
+                            Optional<DamageSpec> damageSpec,
+                            boolean ownDamage) {
 
     public static final SummonProfile EMPTY = new SummonProfile(Optional.empty(), List.of(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Map.of(), List.of(), List.of(),
-            List.of(), false);
+            List.of(), false, Optional.empty(), Optional.empty(), false);
 
     public static final Codec<SummonProfile> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf("entity").forGetter(SummonProfile::entity),
@@ -53,7 +58,13 @@ public record SummonProfile(Optional<String> entity,
             Codec.STRING.listOf().optionalFieldOf("replaced_summoned_entities", List.of())
                     .forGetter(SummonProfile::replacedSummonedEntities),
             Codec.BOOL.optionalFieldOf("replaces_summons", Boolean.FALSE)
-                    .forGetter(SummonProfile::replacesSummons)
+                    .forGetter(SummonProfile::replacesSummons),
+            SummonCompanion.CODEC.optionalFieldOf("companion")
+                    .forGetter(SummonProfile::companion),
+            DamageSpec.CODEC.optionalFieldOf("damage_spec")
+                    .forGetter(SummonProfile::damageSpec),
+            Codec.BOOL.optionalFieldOf("own_damage", Boolean.FALSE)
+                    .forGetter(SummonProfile::ownDamage)
     ).apply(instance, SummonProfile::new));
 
     public SummonProfile {
@@ -64,6 +75,11 @@ public record SummonProfile(Optional<String> entity,
                 : List.copyOf(replacedSummonedEntities);
         tuning = AbilityConfig.keyed(tuning);
         variants = variants == null ? List.of() : List.copyOf(variants);
+        companion = companion == null ? Optional.empty() : companion;
+        damageSpec = damageSpec == null ? Optional.empty() : damageSpec;
+        if (companion.isEmpty() && anchored != null && anchored.isPresent()) {
+            companion = Optional.of(SummonCompanion.ofCount(anchored.get()));
+        }
     }
 
     public Resolved resolve(Player player, ProfileCondition.ConditionContext context) {
@@ -163,6 +179,15 @@ public record SummonProfile(Optional<String> entity,
                 }
             }
             return profile.maxActive().orElse(fallback);
+        }
+
+        public Optional<SummonCompanion> companion() {
+            return profile.companion().map(base -> {
+                int count = anchoredOr(base.count());
+                return count == base.count() ? base : new SummonCompanion(count,
+                        base.respawnTicks(), base.equipment(), base.attributes(), base.spectral(),
+                        base.follow());
+            });
         }
 
         public int anchoredOr(int fallback) {

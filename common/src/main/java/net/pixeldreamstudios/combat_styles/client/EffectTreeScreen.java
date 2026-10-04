@@ -8,6 +8,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -513,6 +514,25 @@ public class EffectTreeScreen extends PanelScreen {
         setFocused(valueBox);
     }
 
+    private boolean openSlotPicker(JsonTreeModel.Node node) {
+        if (!EffectSchema.SUMMON_SLOTS.contains(node.key())
+                || !EffectSchema.KEY_SUMMON_EQUIPMENT.equals(keyOf(parentPathOf(node.path())))
+                || !node.value().isJsonPrimitive()) {
+            return false;
+        }
+        EquipmentSlot slot = EquipmentSlot.byName(node.key());
+        minecraft.setScreen(MatchTargetScreen.forSlot(this, slot, node.value().getAsString(),
+                picked -> {
+                    if (picked.isEmpty()) {
+                        JsonTreeModel.remove(root, node.path());
+                    } else {
+                        JsonTreeModel.set(root, node.path(), new JsonPrimitive(picked));
+                    }
+                    rebuild();
+                }));
+        return true;
+    }
+
     private boolean openMatchTargets(JsonTreeModel.Node node) {
         String listPath = node.value().isJsonArray() ? node.path() : parentPathOf(node.path());
         if (!node.value().isJsonArray() && !(JsonTreeModel.resolve(root, listPath) instanceof JsonArray)) {
@@ -721,7 +741,7 @@ public class EffectTreeScreen extends PanelScreen {
             }
             int valueRight = right - REMOVE_WIDTH - 4;
 
-            if (openMatchTargets(node)) {
+            if (openMatchTargets(node) || openSlotPicker(node)) {
                 return true;
             }
 
@@ -770,7 +790,9 @@ public class EffectTreeScreen extends PanelScreen {
                 }
             }
 
-            List<String> choices = EffectChoices.choicesFor(EffectSchema.join(schemaRoot, node.path()), node.key());
+            List<String> choices = EffectChoices.narrowedFor(node.key(),
+                    EffectChoices.choicesFor(EffectSchema.join(schemaRoot, node.path()), node.key()),
+                    nearestEntity(node.path()));
             if (!choices.isEmpty()) {
                 ChoicePickerScreen picker = new ChoicePickerScreen(this,
                         labelFor(node), choices,
@@ -791,6 +813,22 @@ public class EffectTreeScreen extends PanelScreen {
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private String nearestEntity(String path) {
+        String current = path == null ? "" : path;
+        while (true) {
+            int split = current.lastIndexOf('/');
+            current = split < 0 ? "" : current.substring(0, split);
+            JsonObject holder = JsonTreeModel.objectAt(root, current);
+            if (holder != null && holder.has(EffectChoices.entityKey())
+                    && holder.get(EffectChoices.entityKey()).isJsonPrimitive()) {
+                return holder.get(EffectChoices.entityKey()).getAsString();
+            }
+            if (current.isEmpty()) {
+                return null;
+            }
+        }
     }
 
     @Override

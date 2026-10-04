@@ -1,7 +1,6 @@
 package net.pixeldreamstudios.combat_styles.equipment;
 
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.affix.EffectChance;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
@@ -34,15 +33,21 @@ public final class CycleChance {
 
     public static boolean passes(Player player, EquipmentDefinition definition, String effectKey,
                                  TriggeredEffect entry) {
+        return passes(player, definition, 0, effectKey, entry);
+    }
+
+    public static boolean passes(Player player, EquipmentDefinition definition, int copy,
+                                 String effectKey, TriggeredEffect entry) {
         if (player == null || !applies(definition, effectKey, entry)) {
             return true;
         }
-        String local = EffectKeys.of(definition.id(), effectKey);
+        String owner = EffectKeys.ownerOf(definition.id(), copy);
+        String local = EffectKeys.of(owner, effectKey);
         if (player.level().isClientSide()) {
             return MIRRORED.contains(local);
         }
         String key = player.getUUID() + SEPARATOR + local;
-        long epoch = epochOf(player, definition, effectKey, entry);
+        long epoch = epochOf(player, owner, effectKey, entry);
         Roll held = ROLLS.get(key);
         if (held != null && held.epoch() == epoch) {
             return held.passed();
@@ -61,10 +66,10 @@ public final class CycleChance {
         return !entry.trigger().swingDriven() && StateEdges.tracked(entry);
     }
 
-    private static long epochOf(Player player, EquipmentDefinition definition, String effectKey,
+    private static long epochOf(Player player, String owner, String effectKey,
                                 TriggeredEffect entry) {
         return stateDriven(entry)
-                ? StateEdges.liveSince(player, definition.id(), effectKey)
+                ? StateEdges.liveSince(player, owner, effectKey)
                 : EquipmentRuntime.comboCycle(player);
     }
 
@@ -73,15 +78,13 @@ public final class CycleChance {
             return Set.of();
         }
         Set<String> marks = new LinkedHashSet<>();
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            EquipmentDefinition definition = worn.definition();
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 if (applies(definition, named.getKey(), named.getValue())
-                        && passes(player, definition, named.getKey(), named.getValue())) {
-                    marks.add(ChargeMirror.ROLL_MARK + EffectKeys.of(definition.id(), named.getKey()));
+                        && passes(player, definition, worn.copy(), named.getKey(),
+                                named.getValue())) {
+                    marks.add(ChargeMirror.ROLL_MARK + EffectKeys.of(worn.owner(), named.getKey()));
                 }
             }
         }

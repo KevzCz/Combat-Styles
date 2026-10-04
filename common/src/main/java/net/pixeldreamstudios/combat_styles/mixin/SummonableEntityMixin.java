@@ -2,7 +2,10 @@ package net.pixeldreamstudios.combat_styles.mixin;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -12,21 +15,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.entity.SummonData;
+import net.pixeldreamstudios.combat_styles.entity.SummonFollow;
 import net.pixeldreamstudios.combat_styles.entity.SummonOwner;
 
 import java.util.UUID;
 
 @Mixin(Entity.class)
 public abstract class SummonableEntityMixin implements SummonData {
-
-    @Unique
-    private static final String TAG_OWNER = "CombatStylesSummonOwner";
-
-    @Unique
-    private static final String TAG_DAMAGE = "CombatStylesSummonDamage";
-
-    @Unique
-    private static final int ADOPT_WINDOW = 20;
 
     @Unique
     private UUID combat_styles$entityOwner;
@@ -36,6 +31,18 @@ public abstract class SummonableEntityMixin implements SummonData {
 
     @Unique
     private DamageSpec combat_styles$entitySpec;
+
+    @Unique
+    private boolean combat_styles$entitySpectral;
+
+    @Unique
+    private boolean combat_styles$stale;
+
+    @Unique
+    private SummonFollow combat_styles$entityFollow = SummonFollow.DEFAULTS;
+
+    @Unique
+    private UUID combat_styles$entityCastBy;
 
     @Override
     public UUID combat_styles$summonOwner() {
@@ -73,39 +80,66 @@ public abstract class SummonableEntityMixin implements SummonData {
     }
 
     @Override
+    public boolean combat_styles$spectral() {
+        return combat_styles$entitySpectral;
+    }
+
+    @Override
+    public void combat_styles$setSpectral(boolean spectral) {
+        combat_styles$entitySpectral = spectral;
+    }
+
+    @Override
+    public UUID combat_styles$castBy() {
+        return combat_styles$entityCastBy;
+    }
+
+    @Override
+    public void combat_styles$setCastBy(UUID caster) {
+        combat_styles$entityCastBy = caster;
+    }
+
+    @Override
+    public SummonFollow combat_styles$follow() {
+        return combat_styles$entityFollow;
+    }
+
+    @Override
+    public void combat_styles$setFollow(SummonFollow follow) {
+        combat_styles$entityFollow = follow == null ? SummonFollow.DEFAULTS : follow;
+    }
+
+    @Override
     public void combat_styles$applySummonGoals() {
     }
 
-    @Inject(method = "tick", at = @At("HEAD"))
-    private void combat_styles$adoptOwner(CallbackInfo callback) {
-        Entity self = (Entity) (Object) this;
-        if (combat_styles$entityOwner != null || self.level().isClientSide()
-                || self.tickCount > ADOPT_WINDOW) {
-            return;
-        }
-        UUID inherited = SummonOwner.inheritedOwner(self);
-        if (inherited != null) {
-            combat_styles$entityOwner = inherited;
-            combat_styles$applySummonGoals();
-        }
-    }
-
-    @Inject(method = "saveWithoutId", at = @At("RETURN"))
-    private void combat_styles$save(CompoundTag tag,
-                                    CallbackInfoReturnable<CompoundTag> callback) {
-        if (combat_styles$entityOwner != null) {
-            tag.putUUID(TAG_OWNER, combat_styles$entityOwner);
-        }
-        if (combat_styles$entityDamage > 0.0F) {
-            tag.putFloat(TAG_DAMAGE, combat_styles$entityDamage);
+    @Inject(method = "push(Lnet/minecraft/world/entity/Entity;)V", at = @At("HEAD"), cancellable = true)
+    private void combat_styles$ownerPassesThrough(Entity other, CallbackInfo callback) {
+        if (SummonOwner.ownerPair((Entity) (Object) this, other)) {
+            callback.cancel();
         }
     }
 
     @Inject(method = "load", at = @At("TAIL"))
-    private void combat_styles$load(CompoundTag tag, CallbackInfo callback) {
-        if (tag.hasUUID(TAG_OWNER)) {
-            combat_styles$entityOwner = tag.getUUID(TAG_OWNER);
+    private void combat_styles$markStale(CompoundTag tag, CallbackInfo callback) {
+        combat_styles$stale = SummonOwner.isSummon((Entity) (Object) this);
+    }
+
+    @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
+    private void combat_styles$clearStale(CallbackInfo callback) {
+        Entity self = (Entity) (Object) this;
+        if (combat_styles$stale && !self.level().isClientSide()) {
+            self.discard();
+            callback.cancel();
         }
-        combat_styles$entityDamage = tag.getFloat(TAG_DAMAGE);
+    }
+
+    @Inject(method = "spawnAtLocation(Lnet/minecraft/world/item/ItemStack;F)Lnet/minecraft/world/entity/item/ItemEntity;",
+            at = @At("HEAD"), cancellable = true)
+    private void combat_styles$dropNothing(ItemStack stack, float offsetY,
+                                           CallbackInfoReturnable<ItemEntity> callback) {
+        if (SummonOwner.isSummon((Entity) (Object) this) && !stack.is(Items.LEAD)) {
+            callback.setReturnValue(null);
+        }
     }
 }

@@ -26,7 +26,6 @@ import net.pixeldreamstudios.combat_styles.equipment.EventPayloads;
 import net.pixeldreamstudios.combat_styles.equipment.StyleSubstitution;
 import net.pixeldreamstudios.combat_styles.equipment.SummonDive;
 import net.pixeldreamstudios.combat_styles.equipment.SummonProfile;
-import net.pixeldreamstudios.combat_styles.equipment.SummonReplacement;
 import net.pixeldreamstudios.combat_styles.equipment.SelfEffectList;
 import net.pixeldreamstudios.combat_styles.equipment.TooltipOverride;
 import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
@@ -105,7 +104,6 @@ public class EffectEditorScreen extends PanelScreen {
     private static final String ROW_ECHO = "screen.combat_styles.effect_row_echo";
     private static final String ROW_SPELLS = "screen.combat_styles.effect_row_spells";
     private static final String ROW_RESET = "screen.combat_styles.effect_row_reset";
-    private static final String ROW_SUMMON_REPLACE = "screen.combat_styles.effect_row_summon_replace";
     private static final String ROW_SUMMON_PROFILE = "screen.combat_styles.effect_row_summon_profile";
     private static final String ROW_SUMMON_DIVE = "screen.combat_styles.effect_row_summon_dive";
     private static final String ROW_HIDE_TOOLTIP = "screen.combat_styles.effect_row_hide_tooltip";
@@ -128,7 +126,7 @@ public class EffectEditorScreen extends PanelScreen {
                 ROW_TRIGGER, ROW_COOLDOWN, ROW_SUBSTITUTE, ROW_SUBSTITUTION, ROW_AUGMENT,
                 ROW_GRANTS, ROW_TUNES, ROW_ATTRS, ROW_DAMAGE_BONUS, ROW_ON_SWING, ROW_ON_HIT,
                 ROW_EVENTS, ROW_ECHO,
-                ROW_RESET, ROW_SUMMON_REPLACE, ROW_SUMMON_PROFILE, ROW_SUMMON_DIVE,
+                ROW_RESET, ROW_SUMMON_PROFILE, ROW_SUMMON_DIVE,
                 ROW_HIDE_TOOLTIP, ROW_TOOLTIP_TEXT, ROW_DELAY, ROW_SELF_EFFECTS));
         if (SpellEngineCompat.isLoaded()) {
             rows.add(rows.indexOf(ROW_ECHO), ROW_SPELLS);
@@ -286,7 +284,6 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_TOOLTIP_TEXT -> flag(!effect.tooltip().isEmpty());
             case ROW_DELAY -> delayLabel();
             case ROW_SELF_EFFECTS -> count(effect.selfEffects().size());
-            case ROW_SUMMON_REPLACE -> flag(payload.summonReplacement().isPresent());
             case ROW_SUMMON_PROFILE -> flag(payload.summonProfile().isPresent());
             case ROW_SUMMON_DIVE -> flag(payload.summonDive().isPresent());
             default -> Component.empty();
@@ -348,8 +345,6 @@ public class EffectEditorScreen extends PanelScreen {
                     lines.addAll(RefTooltip.forAffix(tuned.getKey(), tuned.getValue()));
                 }
             }
-            case ROW_SUMMON_REPLACE -> payload.summonReplacement()
-                    .ifPresent(summon -> lines.addAll(RefTooltip.forEntity(summon.entity())));
             case ROW_SUMMON_PROFILE -> payload.summonProfile()
                     .flatMap(SummonProfile::entity)
                     .ifPresent(entity -> lines.addAll(RefTooltip.forEntity(entity)));
@@ -447,10 +442,6 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_SPELLS -> openTree(ROW_SPELLS, SpellLocks.CODEC, payload.spells(),
                     applied -> setPayload(EquipmentEffects.withSpells(payload(),
                             applied.orElse(SpellLocks.NONE))));
-            case ROW_SUMMON_REPLACE -> openTree(ROW_SUMMON_REPLACE,
-                    SummonReplacement.CODEC, payload.summonReplacement().orElse(null),
-                    applied -> setPayload(
-                            EquipmentEffects.withSummonReplacement(payload(), applied)));
             case ROW_SUMMON_PROFILE -> openTree(ROW_SUMMON_PROFILE, SummonProfile.CODEC,
                     payload.summonProfile().orElse(SummonProfile.EMPTY),
                     applied -> setPayload(
@@ -534,7 +525,6 @@ public class EffectEditorScreen extends PanelScreen {
         return switch (labelKey) {
             case ROW_TRIGGER -> EffectSchema.ROOT_TRIGGER;
             case ROW_SUBSTITUTION -> EffectSchema.ROOT_SUBSTITUTION;
-            case ROW_SUMMON_REPLACE -> EffectSchema.ROOT_SUMMON_REPLACE;
             case ROW_SUMMON_PROFILE -> EffectSchema.ROOT_SUMMON_PROFILE;
             case ROW_SUMMON_DIVE -> EffectSchema.ROOT_SUMMON_DIVE;
             case ROW_ECHO -> EffectSchema.ROOT_ECHO;
@@ -650,8 +640,6 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_EVENTS -> setPayload(EquipmentEffects.withEvents(payload, EventPayloads.EMPTY));
             case ROW_ECHO -> setPayload(EquipmentEffects.withEcho(payload, Optional.empty()));
             case ROW_SPELLS -> setPayload(EquipmentEffects.withSpells(payload, SpellLocks.NONE));
-            case ROW_SUMMON_REPLACE -> setPayload(EquipmentEffects.withSummonReplacement(
-                    payload, Optional.empty()));
             case ROW_SUMMON_PROFILE -> setPayload(EquipmentEffects.withSummonProfile(
                     payload, Optional.empty()));
             case ROW_SUMMON_DIVE -> setPayload(EquipmentEffects.withSummonDive(
@@ -682,7 +670,6 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_EVENTS -> !payload.events().isEmpty();
             case ROW_ECHO -> payload.echo().isPresent();
             case ROW_SPELLS -> !payload.spells().isEmpty();
-            case ROW_SUMMON_REPLACE -> payload.summonReplacement().isPresent();
             case ROW_SUMMON_PROFILE -> payload.summonProfile().isPresent();
             case ROW_SUMMON_DIVE -> payload.summonDive().isPresent();
             case ROW_GRANTS -> !payload.grantAffixes().isEmpty();

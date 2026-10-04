@@ -4,10 +4,11 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 public record ActivationGate(ShootGate shoot, BlockGate block, UseGate onUse,
-                             ProjectileHitGate projectileHit, DealtGate dealt, CastGate cast) {
+                             ProjectileHitGate projectileHit, DealtGate dealt, CastGate cast,
+                             SummonGate summon) {
 
     public static final ActivationGate ANY = new ActivationGate(ShootGate.ANY, BlockGate.ANY,
-            UseGate.ANY, ProjectileHitGate.ANY, DealtGate.ANY, CastGate.ANY);
+            UseGate.ANY, ProjectileHitGate.ANY, DealtGate.ANY, CastGate.ANY, SummonGate.ANY);
 
     public static final MapCodec<ActivationGate> CODEC =
             RecordCodecBuilder.mapCodec(instance -> instance.group(
@@ -22,7 +23,8 @@ public record ActivationGate(ShootGate shoot, BlockGate block, UseGate onUse,
                             .forGetter(ActivationGate::projectileHit),
                     DealtGate.CODEC.forGetter(ActivationGate::dealt),
                     CastGate.CODEC.optionalFieldOf(CastGate.KEY, CastGate.ANY)
-                            .forGetter(ActivationGate::cast)
+                            .forGetter(ActivationGate::cast),
+                    SummonGate.CODEC.forGetter(ActivationGate::summon)
             ).apply(instance, ActivationGate::new));
 
     public ActivationGate {
@@ -32,6 +34,7 @@ public record ActivationGate(ShootGate shoot, BlockGate block, UseGate onUse,
         projectileHit = projectileHit == null ? ProjectileHitGate.ANY : projectileHit;
         dealt = dealt == null ? DealtGate.ANY : dealt;
         cast = cast == null ? CastGate.ANY : cast;
+        summon = summon == null ? SummonGate.ANY : summon;
     }
 
     public boolean reactsToProjectileHit() {
@@ -40,7 +43,7 @@ public record ActivationGate(ShootGate shoot, BlockGate block, UseGate onUse,
 
     public boolean isEmpty() {
         return shoot.isEmpty() && block.isEmpty() && !usesItem()
-                && projectileHit.isEmpty() && dealt.isEmpty() && cast.isEmpty();
+                && projectileHit.isEmpty() && dealt.isEmpty() && cast.isEmpty() && summon.isEmpty();
     }
 
     public boolean usesItem() {
@@ -57,6 +60,10 @@ public record ActivationGate(ShootGate shoot, BlockGate block, UseGate onUse,
 
     public boolean reactsToCast() {
         return cast.reactsToCast();
+    }
+
+    public boolean reactsToSummon() {
+        return !summon.isEmpty();
     }
 
     public String rejects(EquipmentContext context) {
@@ -80,6 +87,10 @@ public record ActivationGate(ShootGate shoot, BlockGate block, UseGate onUse,
         if (dealtRejection != null) {
             return dealtRejection;
         }
-        return cast.rejects(context);
+        String castRejection = cast.rejects(context);
+        if (castRejection != null) {
+            return castRejection;
+        }
+        return summon.rejects(context);
     }
 }

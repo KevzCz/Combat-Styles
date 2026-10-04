@@ -6,6 +6,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public record SummonReplacement(String becomeEntity,
@@ -41,25 +42,9 @@ public record SummonReplacement(String becomeEntity,
         exempt = exempt == null ? List.of() : List.copyOf(exempt);
     }
 
-    public String entity() {
-        return becomeEntity;
-    }
-
-    public boolean replaces(String entityId) {
-        if (becomeEntity.equals(entityId) || exempt.contains(entityId)) {
-            return false;
-        }
-        return replacedSummonedEntities.isEmpty()
-                || replacedSummonedEntities.contains(entityId);
-    }
-
-    public String abilityFor(int slot) {
-        return abilities.isEmpty()
-                ? null
-                : abilities.get(Math.floorMod(slot, abilities.size()));
-    }
-
-    public float damageScale() {
-        return damageMultiplier.orElse(1.0F);
+    public SummonProfile asProfile() {
+        return new SummonProfile(Optional.of(becomeEntity), abilities, maxActive, Optional.empty(),
+                damageMultiplier, lifespan, damageScaling, Optional.empty(), Map.of(), List.of(),
+                exempt, replacedSummonedEntities, true, Optional.empty(), Optional.empty(), false);
     }
 }

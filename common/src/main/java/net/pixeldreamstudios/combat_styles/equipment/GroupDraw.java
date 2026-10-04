@@ -1,7 +1,6 @@
 package net.pixeldreamstudios.combat_styles.equipment;
 
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.affix.EffectChance;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
@@ -52,6 +51,11 @@ public final class GroupDraw {
 
     public static boolean holds(Player player, EquipmentDefinition definition,
                                 String effectKey) {
+        return holds(player, definition, 0, effectKey);
+    }
+
+    public static boolean holds(Player player, EquipmentDefinition definition, int copy,
+                                String effectKey) {
         EffectGroup group = definition.groupOf(effectKey);
         if (group == null) {
             return true;
@@ -64,25 +68,27 @@ public final class GroupDraw {
             if (definition.groupSubstitutes(group)) {
                 return effectKey.equals(SubstitutionChoice.of(player, definition.id()));
             }
-            Set<String> mirrored = MIRRORED.get(localKey(definition.id(), name));
+            Set<String> mirrored = MIRRORED.get(localKey(
+                    EffectKeys.ownerOf(definition.id(), copy), name));
             return mirrored != null && mirrored.contains(effectKey);
         }
-        return drawFor(player, definition, group, name).contains(effectKey);
+        return drawFor(player, definition, copy, group, name).contains(effectKey);
     }
 
     private static String localKey(String itemId, String name) {
         return itemId + SEPARATOR + name;
     }
 
-    private static Set<String> drawFor(Player player, EquipmentDefinition definition,
+    private static Set<String> drawFor(Player player, EquipmentDefinition definition, int copy,
                                        EffectGroup group, String name) {
-        String key = player.getUUID() + SEPARATOR + localKey(definition.id(), name);
+        String owner = EffectKeys.ownerOf(definition.id(), copy);
+        String key = player.getUUID() + SEPARATOR + localKey(owner, name);
         boolean perCharge = perCycle(definition, group);
         if (perCharge && EquipmentRuntime.awaitingCycle(player, definition.id())) {
             return Set.of();
         }
         int cycle = EquipmentRuntime.comboCycle(player);
-        long pass = perCharge ? STANDING_PASS : passOf(player, definition, group, name);
+        long pass = perCharge ? STANDING_PASS : passOf(player, definition, owner, group, name);
         Drawn cached = DRAWS.get(key);
         if (cached != null) {
             if (perCharge && cached.cycle() == cycle) {
@@ -95,7 +101,7 @@ public final class GroupDraw {
         Set<String> drawn = roll(player, definition, group);
         DRAWS.put(key, new Drawn(drawn, cycle, pass));
         if (CombatDebug.enabled(player)) {
-            CombatDebug.note(player, "groupdraw — " + definition.id() + "#" + name
+            CombatDebug.note(player, "groupdraw — " + owner + "#" + name
                     + " drew " + drawn + " of " + group.entries().size()
                     + (perCharge
                             ? " held for combo cycle " + cycle
@@ -108,16 +114,16 @@ public final class GroupDraw {
         return definition.groupSubstitutes(group) && !group.armsOnSwing();
     }
 
-    private static long passOf(Player player, EquipmentDefinition definition,
+    private static long passOf(Player player, EquipmentDefinition definition, String owner,
                                EffectGroup group, String name) {
         if (group.trigger().arms(group.cooldown()) || definition.groupArmsOnSwing(group)) {
-            return Gates.windowOpenedAt(player, GateScope.GROUP, definition.id(), name);
+            return Gates.windowOpenedAt(player, GateScope.GROUP, owner, name);
         }
         if (StateEdges.tracked(definition, group)) {
             String edge = StateEdges.groupKey(name);
             return group.cooldown().holdWhileActive()
-                    ? StateEdges.liveSince(player, definition.id(), edge)
-                    : Gates.windowOpenedAt(player, GateScope.HELD, definition.id(), edge);
+                    ? StateEdges.liveSince(player, owner, edge)
+                    : Gates.windowOpenedAt(player, GateScope.HELD, owner, edge);
         }
         return STANDING_PASS;
     }
@@ -133,8 +139,9 @@ public final class GroupDraw {
         if (player == null || itemId == null) {
             return;
         }
-        String prefix = player.getUUID() + SEPARATOR + itemId + SEPARATOR;
-        DRAWS.keySet().removeIf(key -> key.startsWith(prefix));
+        String prefix = player.getUUID() + SEPARATOR;
+        DRAWS.keySet().removeIf(key -> key.startsWith(prefix)
+                && EffectKeys.ownedBy(itemOf(key.substring(prefix.length())), itemId));
     }
 
     private static Set<String> roll(Player player, EquipmentDefinition definition,
@@ -199,18 +206,16 @@ public final class GroupDraw {
             return Set.of();
         }
         Set<String> marks = new LinkedHashSet<>();
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            EquipmentDefinition definition = worn.definition();
             for (Map.Entry<String, EffectGroup> named : definition.groups().entrySet()) {
                 EffectGroup group = named.getValue();
                 if (definition.groupSubstitutes(group)) {
                     continue;
                 }
-                String local = localKey(definition.id(), named.getKey());
-                Set<String> drawn = drawFor(player, definition, group, named.getKey());
+                String local = localKey(worn.owner(), named.getKey());
+                Set<String> drawn = drawFor(player, definition, worn.copy(), group,
+                        named.getKey());
                 if (drawn.isEmpty()) {
                     marks.add(ChargeMirror.DRAW_MARK + local + SEPARATOR);
                     continue;

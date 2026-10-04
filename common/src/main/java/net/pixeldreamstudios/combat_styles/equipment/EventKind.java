@@ -20,7 +20,13 @@ public enum EventKind implements StringRepresentable {
     ON_CAST("on_cast", false, trigger -> trigger.activation().reactsToCast()),
     ON_KILL("on_kill", true, trigger -> trigger.onKill().orElse(false)),
     ON_MISS("on_miss", true, trigger -> trigger.onMiss().orElse(false)),
-    ON_SUMMON_HIT("on_summon_hit", true, trigger -> trigger.onSummonHit().orElse(false));
+    ON_SUMMON_HIT("on_summon_hit", true, trigger -> trigger.onSummonHit().orElse(false)),
+    ON_SUMMON_SPAWN(SummonGate.ON_SPAWN, false,
+            trigger -> trigger.activation().summon().hears(SummonEvent.Kind.SPAWN)),
+    ON_SUMMON_DEATH(SummonGate.ON_DEATH, false,
+            trigger -> trigger.activation().summon().hears(SummonEvent.Kind.DEATH)),
+    ON_SUMMON_KILL(SummonGate.ON_KILL, false,
+            trigger -> trigger.activation().summon().hears(SummonEvent.Kind.KILL));
 
     public static final Codec<EventKind> CODEC = Codec.STRING.comapFlatMap(EventKind::parse,
             EventKind::serializedName);
@@ -88,6 +94,13 @@ public enum EventKind implements StringRepresentable {
         }
         if (context.cast() != null) {
             return ON_CAST;
+        }
+        if (context.summoned() != null) {
+            return switch (context.summoned().kind()) {
+                case SPAWN -> ON_SUMMON_SPAWN;
+                case DEATH -> ON_SUMMON_DEATH;
+                case KILL -> ON_SUMMON_KILL;
+            };
         }
         return null;
     }

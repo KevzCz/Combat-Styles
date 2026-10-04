@@ -17,8 +17,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class SummonProfiles {
 
+    public record Sourced(EquipmentDefinition definition, int copy, String effectKey,
+                          SummonProfile profile) {
+
+        public String key() {
+            return EffectKeys.ownerOf(definition.id(), copy) + KEY_SEPARATOR + effectKey;
+        }
+    }
+
     private record Cached(long tick, SummonProfile.Resolved resolved) {
     }
+
+    private static final String KEY_SEPARATOR = "|";
 
     private static final Map<UUID, Cached> RESOLVED = new ConcurrentHashMap<>();
 
@@ -29,32 +39,57 @@ public final class SummonProfiles {
         RESOLVED.remove(playerId);
     }
 
-    private static List<TriggeredEffect> liveEffects(Player player, EquipmentDefinition definition) {
-        List<TriggeredEffect> live = new ArrayList<>();
+    private static List<Map.Entry<String, TriggeredEffect>> liveEffects(Player player,
+                                                                        EquipmentDefinition definition,
+                                                                        int copy) {
+        List<Map.Entry<String, TriggeredEffect>> live = new ArrayList<>();
         for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
             if (player == null
-                    || EquipmentRuntime.liveAtRest(player, definition, named.getKey(), named.getValue())) {
-                live.add(named.getValue());
+                    || EquipmentRuntime.liveAtRest(player, definition, copy, named.getKey(),
+                            named.getValue())) {
+                live.add(named);
             }
         }
         return live;
     }
 
-    public static SummonProfile profileOf(Player player, ItemStack stack) {
+    public static List<Sourced> sourcedOf(Player player, ItemStack stack) {
+        List<Sourced> found = new ArrayList<>();
         if (stack == null || stack.isEmpty()) {
-            return null;
+            return found;
         }
         EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
         if (definition == null) {
-            return null;
+            return found;
         }
-        for (TriggeredEffect entry : liveEffects(player, definition)) {
-            SummonProfile profile = entry.effect().summonProfile().orElse(null);
-            if (profile != null) {
-                return profile;
-            }
+        return sourcedOf(player, definition, player == null ? 0
+                : WornEquipment.copyOf(player, stack));
+    }
+
+    private static List<Sourced> sourcedOf(Player player, EquipmentDefinition definition,
+                                           int copy) {
+        List<Sourced> found = new ArrayList<>();
+        for (Map.Entry<String, TriggeredEffect> entry : liveEffects(player, definition, copy)) {
+            entry.getValue().effect().summonProfile().ifPresent(profile ->
+                    found.add(new Sourced(definition, copy, entry.getKey(), profile)));
         }
-        return null;
+        return found;
+    }
+
+    public static List<Sourced> liveProfiles(Player player) {
+        List<Sourced> found = new ArrayList<>();
+        if (player == null) {
+            return found;
+        }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            found.addAll(sourcedOf(player, worn.definition(), worn.copy()));
+        }
+        return found;
+    }
+
+    public static SummonProfile profileOf(Player player, ItemStack stack) {
+        List<Sourced> found = sourcedOf(player, stack);
+        return found.isEmpty() ? null : found.getFirst().profile();
     }
 
     public static SummonProfile heldProfileOf(Player player) {
@@ -83,63 +118,43 @@ public final class SummonProfiles {
         return held != null ? held : wornProfileOf(player);
     }
 
-    public static SummonProfile replacingProfileOf(Player player) {
-        SummonProfile held = heldProfileOf(player);
-        if (held != null && held.replacesSummons()) {
-            return held;
+    public static SummonProfile profileFor(Player player, String entityId) {
+        for (Sourced sourced : liveProfiles(player)) {
+            if (sourced.profile().entity().map(id -> id.equals(entityId)).orElse(false)) {
+                return sourced.profile();
+            }
         }
-        SummonProfile worn = wornProfileOf(player);
-        return worn != null && worn.replacesSummons() ? worn : null;
+        return null;
     }
 
-    public static SummonReplacement replacementFor(Player player, String summonedId) {
-        if (player == null || summonedId == null) {
-            return replacementFor(player);
+    public static SummonProfile replacingProfileOf(Player player) {
+        for (Sourced sourced : liveProfiles(player)) {
+            if (sourced.profile().replacesSummons()) {
+                return sourced.profile();
+            }
         }
-        SummonReplacement blanket = null;
-        for (ItemStack worn : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(worn);
-            if (definition == null) {
+        return null;
+    }
+
+    public static SummonProfile replacementFor(Player player, String summonedId) {
+        SummonProfile blanket = null;
+        for (Sourced sourced : liveProfiles(player)) {
+            SummonProfile profile = sourced.profile();
+            if (summonedId == null || !profile.replaces(summonedId)) {
                 continue;
             }
-            for (TriggeredEffect entry : liveEffects(player, definition)) {
-                SummonReplacement replacement =
-                        entry.effect().summonReplacement().orElse(null);
-                if (replacement == null || !replacement.replaces(summonedId)) {
-                    continue;
-                }
-                if (!replacement.replacedSummonedEntities().isEmpty()) {
-                    return replacement;
-                }
-                if (blanket == null) {
-                    blanket = replacement;
-                }
+            if (!profile.replacedSummonedEntities().isEmpty()) {
+                return profile;
+            }
+            if (blanket == null) {
+                blanket = profile;
             }
         }
         return blanket;
     }
 
-    public static SummonReplacement replacementFor(Player player) {
-        if (player == null) {
-            return null;
-        }
-        for (ItemStack worn : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(worn);
-            if (definition == null) {
-                continue;
-            }
-            for (TriggeredEffect entry : liveEffects(player, definition)) {
-                SummonReplacement replacement =
-                        entry.effect().summonReplacement().orElse(null);
-                if (replacement != null) {
-                    return replacement;
-                }
-            }
-        }
-        return null;
-    }
     public static boolean replacesSummons(Player player) {
-        return replacementFor(player) != null;
+        return replacingProfileOf(player) != null;
     }
 
     public static final ProfileCondition.ConditionContext CONTEXT =

@@ -19,6 +19,7 @@ import net.pixeldreamstudios.combat_styles.entity.ConfigurableSummon;
 import net.pixeldreamstudios.combat_styles.entity.SummonHooks;
 import net.pixeldreamstudios.combat_styles.entity.SummonOrders;
 import net.pixeldreamstudios.combat_styles.entity.SummonRoster;
+import net.pixeldreamstudios.combat_styles.entity.SummonSpawner;
 import net.pixeldreamstudios.combat_styles.equipment.BurstSequence;
 import net.pixeldreamstudios.combat_styles.equipment.CombatState;
 import net.pixeldreamstudios.combat_styles.equipment.ComboControl;
@@ -32,7 +33,6 @@ import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentEffect;
 import net.pixeldreamstudios.combat_styles.equipment.StyleSubstitution;
 import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
-import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRuntime;
 import net.pixeldreamstudios.combat_styles.equipment.EventKind;
@@ -42,7 +42,7 @@ import net.pixeldreamstudios.combat_styles.network.SwingHastePayload;
 import net.pixeldreamstudios.combat_styles.equipment.MissTracker;
 import net.pixeldreamstudios.combat_styles.equipment.PendingExtraHit;
 import net.pixeldreamstudios.combat_styles.equipment.PendingGrants;
-import net.pixeldreamstudios.combat_styles.equipment.WornItems;
+import net.pixeldreamstudios.combat_styles.equipment.WornEquipment;
 import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 import net.pixeldreamstudios.combat_styles.equipment.ClientSwing;
 import net.pixeldreamstudios.combat_styles.api.SwingTiming;
@@ -1062,18 +1062,16 @@ public final class AffixDamageDealer {
             }
         }
 
-        for (ItemStack worn : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(worn);
-            if (definition == null) {
-                continue;
-            }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            EquipmentDefinition definition = worn.definition();
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 TriggeredEffect triggered = named.getValue();
                 EquipmentEffect granting = triggered.effect();
                 boolean passes = (context == null
                         || triggered.trigger().matches(context, triggered.cooldown()))
                         && EquipmentRuntime.rewriteAllowed(player,
-                                new EquipmentRuntime.Match(definition, triggered, named.getKey()));
+                                new EquipmentRuntime.Match(definition, triggered, named.getKey(),
+                                        worn.copy()));
                 if (passes && !granting.tuneAffixes().isEmpty()) {
                     if (tuning == null) {
                         tuning = new LinkedHashMap<>();
@@ -1377,7 +1375,7 @@ public final class AffixDamageDealer {
                 }
             }
             boolean passed = entry.armsOnSwing()
-                    ? (onHit ? EffectWindows.armed(player, match.id(), match.key())
+                    ? (onHit ? EffectWindows.armed(player, match)
                             : EffectWindows.claimSwing(player, match))
                     : EffectWindows.claim(player, match);
             if (!passed) {
@@ -1837,7 +1835,7 @@ public final class AffixDamageDealer {
         if (deferred(player, spawn, group -> runGroup(player, group, target, dealtDamage))) {
             return;
         }
-        AffixMechanics.applySummons(level, player, target, spawn.summons(), dealtDamage);
+        SummonSpawner.applySummons(level, player, target, spawn.summons(), dealtDamage);
         AffixMechanics.runCommands(level, player, spawn.commands());
     }
 

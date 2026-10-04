@@ -8,6 +8,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 
@@ -43,6 +44,8 @@ import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
 import net.pixeldreamstudios.combat_styles.style.SequenceLimits;
 import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
+import net.pixeldreamstudios.combat_styles.entity.SummonCommands;
+import net.pixeldreamstudios.combat_styles.entity.SummonData;
 import net.pixeldreamstudios.combat_styles.style.SequenceService;
 import net.pixeldreamstudios.combat_styles.style.StyleCost;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
@@ -101,6 +104,34 @@ public final class NetworkManager {
     @ExpectPlatform
     public static void sendApplyWeaponCategory(ApplyWeaponCategoryPayload payload) {
         throw new AssertionError();
+    }
+
+    @ExpectPlatform
+    public static void sendSummonCommand(SummonCommandPayload payload) {
+        throw new AssertionError();
+    }
+
+    @ExpectPlatform
+    public static void sendSummonToClient(ServerPlayer player, SummonSyncPayload payload) {
+        throw new AssertionError();
+    }
+
+    public static void onStartTracking(ServerPlayer player, Entity entity) {
+        if (player != null && entity instanceof SummonData data
+                && data.combat_styles$summonOwner() != null) {
+            sendSummonToClient(player, new SummonSyncPayload(entity.getId(), entity.getUUID(),
+                    data.combat_styles$summonOwner(), data.combat_styles$spectral()));
+        }
+    }
+
+    public static void handleSummonCommand(ServerPlayer player, SummonCommandPayload payload) {
+        if (player == null || payload == null) {
+            return;
+        }
+        switch (payload.command()) {
+            case RECALL -> SummonCommands.recall(player);
+            case FOCUS -> SummonCommands.focus(player, player.level().getEntity(payload.targetId()));
+        }
     }
 
     @ExpectPlatform

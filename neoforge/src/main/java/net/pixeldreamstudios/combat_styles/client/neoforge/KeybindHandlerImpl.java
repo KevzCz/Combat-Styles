@@ -1,5 +1,6 @@
 package net.pixeldreamstudios.combat_styles.client.neoforge;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
@@ -18,6 +19,8 @@ public final class KeybindHandlerImpl {
 
     private static KeyMapping openCustomizer;
     private static KeyMapping openEquipment;
+    private static KeyMapping recallSummons;
+    private static KeyMapping focusSummons;
 
     private KeybindHandlerImpl() {
     }
@@ -39,12 +42,31 @@ public final class KeybindHandlerImpl {
                 KeybindHandler.CATEGORY);
         event.register(openEquipment);
 
+        recallSummons = new KeyMapping(
+                KeybindHandler.SUMMON_RECALL,
+                InputConstants.UNKNOWN.getValue(),
+                KeybindHandler.CATEGORY);
+        event.register(recallSummons);
+
+        focusSummons = new KeyMapping(
+                KeybindHandler.SUMMON_FOCUS,
+                InputConstants.UNKNOWN.getValue(),
+                KeybindHandler.CATEGORY);
+        event.register(focusSummons);
+
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post tick) -> {
+            Minecraft client = Minecraft.getInstance();
             while (openCustomizer.consumeClick()) {
-                KeybindHandler.openCustomizer(Minecraft.getInstance());
+                KeybindHandler.openCustomizer(client);
             }
             while (openEquipment.consumeClick()) {
-                KeybindHandler.openEquipment(Minecraft.getInstance());
+                KeybindHandler.openEquipment(client);
+            }
+            while (recallSummons.consumeClick()) {
+                KeybindHandler.recallSummons(client);
+            }
+            while (focusSummons.consumeClick()) {
+                KeybindHandler.focusSummons(client);
             }
         });
     }

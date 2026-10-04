@@ -102,15 +102,6 @@ public final class EquipmentEffects {
                 effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
     }
 
-    public static EquipmentEffect withSummonReplacement(EquipmentEffect effect,
-                                                        Optional<SummonReplacement> value) {
-        return new EquipmentEffect(effect.substituteStyle(), effect.augment(),
-                effect.grantAffixes(), effect.onSwing(), effect.onHit(),
-                effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
-                effect.attributes(), effect.substitution(), value,
-                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(), effect.events());
-    }
-
     public static EquipmentEffect withSummonProfile(EquipmentEffect effect,
                                                     Optional<SummonProfile> value) {
         return new EquipmentEffect(effect.substituteStyle(), effect.augment(),

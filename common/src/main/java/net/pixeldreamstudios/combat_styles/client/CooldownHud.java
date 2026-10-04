@@ -5,12 +5,9 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
-import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
-import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
-import net.pixeldreamstudios.combat_styles.equipment.WornItems;
+import net.pixeldreamstudios.combat_styles.equipment.WornEquipment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -76,15 +73,8 @@ public final class CooldownHud {
 
     private static List<HudRow> rowsFor(Player player, boolean hideWhenReady) {
         List<HudRow> rows = new ArrayList<>();
-        for (ItemStack stack : WornItems.of(player)) {
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
-            HudRow row = HudRow.of(stack, definition);
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            HudRow row = HudRow.of(worn.stack(), worn.definition(), worn.copy());
             if (!hideWhenReady || !row.idle()) {
                 rows.add(row);
             }

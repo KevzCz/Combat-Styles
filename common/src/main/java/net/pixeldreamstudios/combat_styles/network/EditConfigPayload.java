@@ -33,7 +33,8 @@ public record EditConfigPayload(Kind kind, String id, String json)
         STYLE_BOOK,
         STYLE_BOOK_CLEAR,
         WEAPON_ROLL,
-        WEAPON_ROLL_CLEAR;
+        WEAPON_ROLL_CLEAR,
+        SUMMON_TUNING;
 
         private static final IntFunction<Kind> BY_ID =
                 ByIdMap.continuous(Kind::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

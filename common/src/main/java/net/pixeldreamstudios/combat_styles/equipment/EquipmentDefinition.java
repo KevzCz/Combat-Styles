@@ -264,13 +264,17 @@ public record EquipmentDefinition(String id,
     }
 
     public Map<String, AttributeBonus> conditionalAttributes(Player player) {
+        return conditionalAttributes(player, 0);
+    }
+
+    public Map<String, AttributeBonus> conditionalAttributes(Player player, int copy) {
         Map<String, AttributeBonus> found = new LinkedHashMap<>();
         for (Map.Entry<String, TriggeredEffect> named : effects.entrySet()) {
             TriggeredEffect entry = named.getValue();
             if (isPermanent(named.getKey(), entry)) {
                 continue;
             }
-            if (!EquipmentRuntime.liveAtRest(player, this, named.getKey(), entry)) {
+            if (!EquipmentRuntime.liveAtRest(player, this, copy, named.getKey(), entry)) {
                 continue;
             }
             for (Map.Entry<String, AttributeBonus> bonus

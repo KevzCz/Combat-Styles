@@ -16,6 +16,9 @@ import net.pixeldreamstudios.combat_styles.client.ClientStyleData;
 import net.pixeldreamstudios.combat_styles.client.CooldownMirror;
 import net.pixeldreamstudios.combat_styles.network.ApplyPosePayload;
 import net.pixeldreamstudios.combat_styles.network.ApplyWeaponCategoryPayload;
+import net.pixeldreamstudios.combat_styles.network.SummonSyncPayload;
+import net.pixeldreamstudios.combat_styles.network.SummonCommandPayload;
+import net.pixeldreamstudios.combat_styles.client.ClientSummons;
 import net.pixeldreamstudios.combat_styles.network.ApplySequencePayload;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
 import net.pixeldreamstudios.combat_styles.network.ExtractStylePayload;
@@ -103,6 +106,15 @@ public final class NetworkManagerImpl {
                         NetworkManager.handleApplyStackEquipment(player, payload);
                     }
                 }));
+        registrar.playToServer(SummonCommandPayload.TYPE, SummonCommandPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        NetworkManager.handleSummonCommand(player, payload);
+                    }
+                }));
+        registrar.playToClient(SummonSyncPayload.TYPE, SummonSyncPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> ClientSummons.accept(payload)));
         registrar.playToClient(AlignComboPayload.TYPE, AlignComboPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(
                         () -> ComboHold.align(context.player(), payload.combo())));
@@ -208,6 +220,21 @@ public final class NetworkManagerImpl {
 
     public static void sendApplyWeaponCategory(ApplyWeaponCategoryPayload payload) {
         PacketDistributor.sendToServer(payload);
+    }
+
+    public static void sendSummonCommand(SummonCommandPayload payload) {
+        PacketDistributor.sendToServer(payload);
+    }
+
+    public static void sendSummonToClient(ServerPlayer player, SummonSyncPayload payload) {
+        PacketDistributor.sendToPlayer(player, payload);
+    }
+
+    @SubscribeEvent
+    public static void onStartTracking(PlayerEvent.StartTracking event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            NetworkManager.onStartTracking(player, event.getTarget());
+        }
     }
 
     public static void sendExtractStyle(ExtractStylePayload payload) {

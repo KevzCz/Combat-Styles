@@ -53,4 +53,30 @@ public final class SummonRoster {
     public static int count(Player player) {
         return of(player).size();
     }
+
+    public static List<Entity> all(Player player) {
+        if (player == null) {
+            return List.of();
+        }
+        List<Entity> found = new ArrayList<>();
+        for (Entity entity : player.level().getEntities(player,
+                player.getBoundingBox().inflate(SummonTuning.get().rosterRadius),
+                candidate -> SummonOwner.isSummon(candidate) || candidate instanceof ConfigurableSummon)) {
+            if (entity.isRemoved() || !entity.isAlive()) {
+                continue;
+            }
+            if (entity instanceof ConfigurableSummon summon) {
+                if (!summon.fading() && summon.ownedBy(player)) {
+                    found.add(entity);
+                }
+            } else if (SummonOwner.ownedBy(entity, player)) {
+                found.add(entity);
+            }
+        }
+        return List.copyOf(found);
+    }
+
+    public static int count(Player player, boolean everySummon) {
+        return everySummon ? all(player).size() : count(player);
+    }
 }

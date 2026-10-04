@@ -1,5 +1,6 @@
 package net.pixeldreamstudios.combat_styles.style;
 
+import com.google.common.collect.MapMaker;
 import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.resources.ResourceLocation;
 
@@ -26,6 +27,8 @@ public final class StyleRegistry {
     private static final Map<String, StylePage> PAGES = new ConcurrentHashMap<>();
     private static final Map<String, StylePage> RAW_PAGES = new ConcurrentHashMap<>();
     private static final Map<String, List<StylePage>> BY_CATEGORY = new ConcurrentHashMap<>();
+    private static volatile Map<String, Map<String, StylePage>> bySignature = Map.of();
+    private static final Map<WeaponAttributes, List<StylePage>> NODES = new MapMaker().weakKeys().makeMap();
     private static volatile List<String> categories = List.of();
     private static volatile List<WeaponAttributes.Sound> swingSounds = List.of();
     private static final double BASELINE_ARC = 120.0D;
@@ -45,6 +48,8 @@ public final class StyleRegistry {
             RAW_PAGES.clear();
             BY_CATEGORY.clear();
             categories = List.of();
+            bySignature = Map.of();
+            NODES.clear();
             swingSounds = List.of();
             return;
         }
@@ -159,6 +164,8 @@ public final class StyleRegistry {
         RAW_PAGES.putAll(raw);
         BY_CATEGORY.clear();
         BY_CATEGORY.putAll(byCategory);
+        bySignature = signaturesOf(byCategory);
+        NODES.clear();
         categories = List.copyOf(byCategory.keySet());
         swingSounds = List.copyOf(sounds.values());
 
@@ -189,6 +196,20 @@ public final class StyleRegistry {
             }
         }
         return null;
+    }
+
+    private static Map<String, Map<String, StylePage>> signaturesOf(Map<String, List<StylePage>> byCategory) {
+        Map<String, Map<String, StylePage>> signed = new HashMap<>();
+        for (Map.Entry<String, List<StylePage>> category : byCategory.entrySet()) {
+            Map<String, StylePage> pages = new HashMap<>();
+            for (StylePage page : category.getValue()) {
+                if (page.attack() != null) {
+                    pages.putIfAbsent(signatureOf(page.attack()), page);
+                }
+            }
+            signed.put(category.getKey(), Map.copyOf(pages));
+        }
+        return Map.copyOf(signed);
     }
 
     private static String signatureOf(WeaponAttributes.Attack attack) {
@@ -285,24 +306,26 @@ public final class StyleRegistry {
         if (attributes == null || attributes.attacks() == null || attributes.category() == null) {
             return List.of();
         }
-        List<StylePage> pool = forCategory(attributes.category());
-        if (pool.isEmpty()) {
-            return List.of();
+        List<StylePage> cached = NODES.get(attributes);
+        if (cached != null) {
+            return cached;
         }
+        Map<String, StylePage> signed = bySignature.getOrDefault(attributes.category(), Map.of());
         List<StylePage> nodes = new ArrayList<>();
-        for (WeaponAttributes.Attack attack : attributes.attacks()) {
-            if (attack == null || attack.animation() == null) {
-                continue;
-            }
-            String signature = signatureOf(attack);
-            for (StylePage page : pool) {
-                if (signature.equals(signatureOf(page.attack()))) {
+        if (!signed.isEmpty()) {
+            for (WeaponAttributes.Attack attack : attributes.attacks()) {
+                if (attack == null || attack.animation() == null) {
+                    continue;
+                }
+                StylePage page = signed.get(signatureOf(attack));
+                if (page != null) {
                     nodes.add(page);
-                    break;
                 }
             }
         }
-        return List.copyOf(nodes);
+        List<StylePage> found = List.copyOf(nodes);
+        NODES.put(attributes, found);
+        return found;
     }
 
     public static StylePage raw(String styleId) {

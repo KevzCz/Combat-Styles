@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.client.PendingClaims;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
+import net.pixeldreamstudios.combat_styles.entity.SummonOwner;
 import net.pixeldreamstudios.combat_styles.style.AttackBehaviour;
 import net.pixeldreamstudios.combat_styles.style.AttackPlacement;
 import net.pixeldreamstudios.combat_styles.style.AttackShaping;
@@ -97,6 +98,20 @@ public class HitboxOffsetMixin {
                 candidate -> candidate.isPickable() && candidate.isAlive());
     }
 
+    @Unique
+    private static List<Entity> combat_styles$withoutOwnSummons(Player player, List<Entity> found) {
+        if (found == null) {
+            return null;
+        }
+        List<Entity> kept = new ArrayList<>(found.size());
+        for (Entity candidate : found) {
+            if (!SummonOwner.ownerPair(player, candidate)) {
+                kept.add(candidate);
+            }
+        }
+        return kept;
+    }
+
     @Inject(method = "findAttackTargetResult", at = @At("RETURN"), require = 1)
     private static void combat_styles$offsetHitbox(Player player, Entity cursorTarget,
                                                    WeaponAttributes.Attack attack, double range,
@@ -105,6 +120,7 @@ public class HitboxOffsetMixin {
         if (result == null || result.obb == null || player == null) {
             return;
         }
+        result.entities = combat_styles$withoutOwnSummons(player, result.entities);
         boolean debug = CombatStylesConfig.get().debugLogging() && !PendingClaims.previewing();
         AttackBehaviour scoped = ExtraAttackScope.active();
         AttackBehaviour behaviour = scoped == null
@@ -148,7 +164,7 @@ public class HitboxOffsetMixin {
         } else {
             combat_styles$matchBoxes(player, moved, boxes, candidates, matched);
         }
-        result.entities = matched;
+        result.entities = combat_styles$withoutOwnSummons(player, matched);
         if (debug) {
             StringBuilder nearby = new StringBuilder();
             for (Entity candidate : candidates) {

@@ -112,16 +112,14 @@ public final class SpellLockState {
         Map<String, Lock> spells = new LinkedHashMap<>();
         Map<String, Lock> schools = new LinkedHashMap<>();
         Map<String, SpellTuning> tunes = new LinkedHashMap<>();
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            ItemStack stack = worn.stack();
+            EquipmentDefinition definition = worn.definition();
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 TriggeredEffect entry = named.getValue();
                 SpellLocks locks = entry.effect().spells();
-                if (locks.isEmpty()
-                        || !EquipmentRuntime.liveAtRest(player, definition, named.getKey(), entry)) {
+                if (locks.isEmpty() || !EquipmentRuntime.liveAtRest(player, definition,
+                        worn.copy(), named.getKey(), entry)) {
                     continue;
                 }
                 ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());

@@ -5,6 +5,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.TraceableEntity;
@@ -12,13 +13,21 @@ import net.minecraft.world.entity.projectile.Projectile;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
+import net.pixeldreamstudios.combat_styles.equipment.ProjectileImpactScope;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.UUID;
 
 public final class SummonStrike {
 
     private static final ThreadLocal<Boolean> STRIKING =
             ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+    private static final ThreadLocal<Entity> STRIKER = new ThreadLocal<>();
+
+    private static final ThreadLocal<Deque<Entity>> CASTING =
+            ThreadLocal.withInitial(ArrayDeque::new);
 
     private SummonStrike() {
     }
@@ -51,14 +60,59 @@ public final class SummonStrike {
             return false;
         }
         STRIKING.set(Boolean.TRUE);
+        STRIKER.set(summon);
         try {
             DamageDealer.dealSpec(owner, target, data.combat_styles$summonSpec(),
                     damage, source);
             AffixDamageDealer.onSummonHit(owner, target, damage);
         } finally {
             STRIKING.set(Boolean.FALSE);
+            STRIKER.remove();
         }
         return true;
+    }
+
+    public static Entity striking() {
+        return STRIKER.get();
+    }
+
+    public static void beginCast(Entity caster) {
+        if (caster != null && !caster.level().isClientSide()) {
+            CASTING.get().push(caster);
+        }
+    }
+
+    public static void endCast(Entity caster) {
+        if (caster != null && !caster.level().isClientSide()) {
+            CASTING.get().remove(caster);
+        }
+    }
+
+    public static void linkCast(Entity spawned) {
+        Entity caster = asSummon(CASTING.get().peek());
+        if (caster != null && !(spawned instanceof Mob) && spawned instanceof SummonData data) {
+            data.combat_styles$setCastBy(caster.getUUID());
+        }
+    }
+
+    private static Entity castingFor(DamageSource source) {
+        Entity caster = asSummon(CASTING.get().peek());
+        if (caster == null) {
+            return null;
+        }
+        Entity attacker = source.getEntity();
+        return attacker != null && (attacker == caster
+                || attacker.getUUID().equals(((SummonData) caster).combat_styles$summonOwner()))
+                ? caster
+                : null;
+    }
+
+    private static Entity castBy(Entity carrier) {
+        if (!(carrier instanceof SummonData data) || data.combat_styles$castBy() == null
+                || !(carrier.level() instanceof ServerLevel server)) {
+            return null;
+        }
+        return asSummon(server.getEntity(data.combat_styles$castBy()));
     }
 
     public static boolean shieldsOwner(LivingEntity target, DamageSource source) {
@@ -104,9 +158,22 @@ public final class SummonStrike {
                 return caster;
             }
         }
-        return carrier instanceof OwnableEntity ownable
-                ? asSummon(ownerEntity(carrier, ownable))
-                : null;
+        if (carrier instanceof OwnableEntity ownable) {
+            Entity owned = asSummon(ownerEntity(carrier, ownable));
+            if (owned != null) {
+                return owned;
+            }
+        }
+        Entity casting = castingFor(source);
+        if (casting != null) {
+            return casting;
+        }
+        Entity linked = castBy(carrier);
+        if (linked != null) {
+            return linked;
+        }
+        linked = castBy(ProjectileImpactScope.landingFor(source));
+        return linked != null ? linked : castBy(ProjectileImpactScope.carrierFor(source));
     }
 
     private static Entity ownerEntity(Entity carrier, OwnableEntity ownable) {

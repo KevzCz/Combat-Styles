@@ -104,9 +104,6 @@ public final class EffectSummary {
                 lines.add(Component.translatable(KEY_RESET).withStyle(ChatFormatting.GRAY));
             }
         });
-        effect.summonReplacement().ifPresent(summon ->
-                lines.add(Component.translatable(KEY_SUMMON,
-                        StyleText.registryName(summon.entity())).withStyle(ChatFormatting.GREEN)));
         effect.summonProfile().ifPresent(profile -> profile.entity().ifPresent(entity ->
                 lines.add(Component.translatable(KEY_SUMMON, StyleText.registryName(entity))
                         .withStyle(ChatFormatting.GREEN))));

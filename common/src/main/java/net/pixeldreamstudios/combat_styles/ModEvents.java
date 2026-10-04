@@ -24,7 +24,10 @@ import net.pixeldreamstudios.combat_styles.affix.ProjectileUpkeep;
 import net.pixeldreamstudios.combat_styles.attribute.AttackAttributes;
 import net.pixeldreamstudios.combat_styles.command.CombatStylesCommand;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
+import net.pixeldreamstudios.combat_styles.entity.SummonCaps;
+import net.pixeldreamstudios.combat_styles.entity.SummonCompanions;
 import net.pixeldreamstudios.combat_styles.entity.SummonHooks;
+import net.pixeldreamstudios.combat_styles.entity.SummonLifecycle;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentHurt;
 import net.pixeldreamstudios.combat_styles.equipment.EffectWindows;
 import net.pixeldreamstudios.combat_styles.equipment.Gates;
@@ -114,6 +117,9 @@ public final class ModEvents {
             ComboControl.forget(player.getUUID());
             PendingGrants.forget(player.getUUID());
             SummonHooks.forget(player.getUUID());
+            SummonLifecycle.clearOwned(player.getServer(), player.getUUID());
+            SummonCompanions.forget(player.getUUID());
+            SummonCaps.forget(player.getUUID());
             SummonProfiles.forget(player.getUUID());
             AttackAttributes.forget(player.getUUID());
             AffixMechanics.forget(player.getUUID());
@@ -161,6 +167,7 @@ public final class ModEvents {
                 MovesetProjection.project(player);
                 EquipmentAttributes.sync(player);
                 SummonHooks.keepAlive(player);
+                SummonCompanions.tick(player);
                 if (SpellEngineCompat.isLoaded()) {
                     SpellLockState.update(player);
                 }

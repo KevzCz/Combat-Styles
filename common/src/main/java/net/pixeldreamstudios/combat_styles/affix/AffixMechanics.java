@@ -14,12 +14,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -36,19 +33,13 @@ import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.equipment.ClientSwing;
 import net.pixeldreamstudios.combat_styles.entity.AbilityRegistry;
-import net.pixeldreamstudios.combat_styles.entity.ConfigurableSummon;
 import net.pixeldreamstudios.combat_styles.entity.SummonOrders;
-import net.pixeldreamstudios.combat_styles.entity.SummonAi;
-import net.pixeldreamstudios.combat_styles.entity.SummonData;
-import net.pixeldreamstudios.combat_styles.entity.SummonOwner;
+import net.pixeldreamstudios.combat_styles.entity.SummonLifecycle;
+import net.pixeldreamstudios.combat_styles.entity.SummonSpawner;
 import net.pixeldreamstudios.combat_styles.equipment.CombatState;
 import net.pixeldreamstudios.combat_styles.equipment.DodgeState;
 import net.pixeldreamstudios.combat_styles.equipment.IFrameState;
 import net.pixeldreamstudios.combat_styles.equipment.DashGlide;
-import net.pixeldreamstudios.combat_styles.equipment.SummonProfile;
-import net.pixeldreamstudios.combat_styles.equipment.SummonProfiles;
-import net.pixeldreamstudios.combat_styles.equipment.SummonReplacement;
-import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -66,10 +57,7 @@ public final class AffixMechanics {
     private static final String KEY_SEPARATOR = "|";
     private static final int BLINK_SEARCH_DEPTH = 4;
     private static final double BLINK_WALL_MARGIN = 0.35D;
-    private static final int MAX_SUMMONS_PER_EFFECT = 16;
     private static final int COMMAND_PERMISSION = 2;
-    private static final double SPAWN_MIN_RADIUS = 1.0D;
-    private static final double ANGLE_JITTER = 0.6D;
 
     public static final double MAX_DASH_FORWARD = 128.0D;
     public static final double MAX_DASH_UPWARD = 64.0D;
@@ -90,8 +78,6 @@ public final class AffixMechanics {
     private static final Map<String, Long> COOLDOWNS = new ConcurrentHashMap<>();
     private static final List<Expiry> EXPIRING = new CopyOnWriteArrayList<>();
 
-    private static final List<Despawn> DESPAWNING = new CopyOnWriteArrayList<>();
-
     private record Expiry(LivingEntity holder, Holder<Attribute> attribute,
                           ResourceLocation modifierId, long expiresAt,
                           double perStack, AttributeModifier.Operation operation,
@@ -102,9 +88,6 @@ public final class AffixMechanics {
     }
 
     private static final Set<ShieldExpiry> SHIELDS = ConcurrentHashMap.newKeySet();
-
-    private record Despawn(Entity entity, long expiresAt) {
-    }
 
     private AffixMechanics() {
     }
@@ -464,20 +447,8 @@ public final class AffixMechanics {
         });
         EXPIRING.addAll(decayed);
 
-        DESPAWNING.removeIf(despawn -> {
-            if (gameTime < despawn.expiresAt()) {
-                return false;
-            }
-            Entity entity = despawn.entity();
-            if (!entity.isAlive()) {
-                return true;
-            }
-            if (entity instanceof ConfigurableSummon summon && summon.beginDespawn()) {
-                return summon.fading();
-            }
-            entity.discard();
-            return true;
-        });
+        SummonSpawner.tickDespawns(gameTime);
+        SummonLifecycle.tick(gameTime);
     }
 
     private static Vec3 flatten(Vec3 aim) {
@@ -647,172 +618,6 @@ public final class AffixMechanics {
         }
     }
 
-    public static void applySummons(ServerLevel level, Player player, LivingEntity target,
-                                    List<AffixEffects.Summon> summons) {
-        applySummons(level, player, target, summons, 0.0F);
-    }
-
-    public static void applySummons(ServerLevel level, Player player, LivingEntity target,
-                                    List<AffixEffects.Summon> summons, float dealtDamage) {
-        for (AffixEffects.Summon summon : summons) {
-            ResourceLocation id = ResourceLocation.tryParse(summon.entity());
-            if (id == null) {
-                continue;
-            }
-            EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getOptional(id).orElse(null);
-            if (type == null) {
-                CombatStyles.LOGGER.warn("Unknown summon entity {}", id);
-                continue;
-            }
-            SummonProfile replacing = SummonProfiles.replacingProfileOf(player);
-            SummonProfile profile = SummonProfiles.profileFor(player);
-            if (replacing != null && replacing.replaces(summon.entity())) {
-                ResourceLocation profileId = ResourceLocation.tryParse(replacing.entity().orElse(""));
-                EntityType<?> profileType = profileId == null
-                        ? null
-                        : BuiltInRegistries.ENTITY_TYPE.getOptional(profileId).orElse(null);
-                if (profileType != null) {
-                    type = profileType;
-                }
-            }
-            SummonReplacement replacement =
-                    SummonProfiles.replacementFor(player, summon.entity());
-            if (replacement != null && replacement.replaces(summon.entity())) {
-                ResourceLocation replacementId = ResourceLocation.tryParse(replacement.entity());
-                EntityType<?> replacementType = replacementId == null
-                        ? null
-                        : BuiltInRegistries.ENTITY_TYPE.getOptional(replacementId).orElse(null);
-                if (replacementType == null) {
-                    CombatStyles.LOGGER.warn("Unknown replacement entity {}", replacement.entity());
-                } else {
-                    type = replacementType;
-                }
-            }
-            if (!EffectChance.rolls(player, summon.chance())) {
-                continue;
-            }
-            AffixEffects.Scaling override = profile != null
-                    ? profile.damageScaling().orElse(null)
-                    : (replacement == null ? null : replacement.damageScaling().orElse(null));
-            float summonDamage = summonDamage(player, summon, dealtDamage, override);
-            if (summonDamage <= 0.0F) {
-                if (CombatDebug.enabled(player)) {
-                    CombatDebug.skipped(player, "summon", summon.entity()
-                            + " resolved 0 damage (hit dealt " + dealtDamage + ")");
-                }
-            }
-
-            if (retargetExisting(level, player, target, summon, summonDamage)) {
-                continue;
-            }
-
-            int wanted = Math.min(summon.count(), MAX_SUMMONS_PER_EFFECT);
-            int spread = wanted > 1 ? wanted : 0;
-            double baseAngle = level.random.nextDouble() * Math.PI * 2.0D;
-            for (int i = 0; i < wanted; i++) {
-                Entity spawned = type.create(level);
-                if (spawned == null) {
-                    break;
-                }
-                ConfigurableSummon configurable = spawned instanceof ConfigurableSummon summoned
-                        ? summoned
-                        : null;
-                if (configurable != null && !configurable.canSpawn(player, i)) {
-                    break;
-                }
-
-                placeSummon(level, player, spawned, configurable, summon, target,
-                        i, spread, baseAngle);
-
-                if (configurable != null) {
-                    configurable.onSpawned(player, i);
-                    configureSummon(player, target, configurable, summon, profile,
-                            replacement, summonDamage, i);
-                } else if (spawned instanceof SummonData data) {
-                    data.combat_styles$setSummonDamage(summonDamage);
-                    data.combat_styles$setSummonSpec(summon.damageSpec().orElse(null));
-                    if (CombatDebug.enabled(player)) {
-                        CombatDebug.fired(player, "summon", summon.entity()
-                                + " stored damage " + summonDamage
-                                + (summon.damageSpec().isPresent() ? " (spec)" : " (ratio)"));
-                    }
-                } else {
-                    if (CombatDebug.enabled(player)) {
-                        CombatDebug.skipped(player, "summon", summon.entity()
-                                + " is not a Mob; damage cannot be stored");
-                    }
-                }
-
-                SummonOwner.stamp(spawned, player);
-                if (spawned instanceof SummonData goals) {
-                    goals.combat_styles$applySummonGoals();
-                }
-                if (spawned instanceof Mob mob && summon.inheritTarget() && target != null
-                        && SummonAi.huntable(mob, target)) {
-                    mob.setTarget(target);
-                }
-                level.addFreshEntity(spawned);
-                int lifespan = lifespanFor(summon, profile, replacement);
-                if (lifespan > 0
-                        && (configurable == null || configurable.despawnsWithLifespan())) {
-                    DESPAWNING.add(new Despawn(spawned,
-                            level.getGameTime() + lifespan));
-                }
-            }
-        }
-    }
-
-    private static void placeSummon(ServerLevel level, Player player, Entity spawned,
-                                    ConfigurableSummon configurable,
-                                    AffixEffects.Summon summon, LivingEntity target,
-                                    int index, int spread, double baseAngle) {
-        double angle = configurable == null
-                ? Double.NaN
-                : configurable.formationAngle(index, spread);
-        if (Double.isNaN(angle)) {
-            angle = spread == 0
-                    ? level.random.nextDouble() * Math.PI * 2.0D
-                    : baseAngle + (Math.PI * 2.0D / spread) * index
-                            + level.random.nextDouble() * ANGLE_JITTER;
-        }
-        double lift = configurable == null ? 0.0D : configurable.spawnLift();
-        ProjectileSpawn placement = summon.spawn().orElse(null);
-        if (placement != null) {
-            Vec3 origin = placement.originFor(player, target, index, Math.max(1, spread));
-            spawned.setPos(origin.x, origin.y + lift, origin.z);
-            return;
-        }
-        double distance = SPAWN_MIN_RADIUS + Math.sqrt(level.random.nextDouble())
-                * Math.max(0.0D, summon.radius() - SPAWN_MIN_RADIUS);
-        spawned.setPos(player.getX() + Math.cos(angle) * distance,
-                player.getY() + lift,
-                player.getZ() + Math.sin(angle) * distance);
-    }
-
-    private static int lifespanFor(AffixEffects.Summon summon, SummonProfile profile,
-                                   SummonReplacement replacement) {
-        if (profile != null) {
-            return profile.lifespan().orElse(summon.lifespanTicks());
-        }
-        return replacement == null
-                ? summon.lifespanTicks()
-                : replacement.lifespan().orElse(summon.lifespanTicks());
-    }
-
-    private static void configureSummon(Player player, LivingEntity target,
-                                        ConfigurableSummon configurable,
-                                        AffixEffects.Summon summon, SummonProfile profile,
-                                        SummonReplacement replacement,
-                                        float summonDamage, int index) {
-        float damage = summonDamage * configurable.damageScale(player);
-        int lifespan = lifespanFor(summon, profile, replacement);
-        configurable.configure(player, target, damage, lifespan);
-        String ability = configurable.abilityFor(player, profile,
-                summon.ability().orElse(null), index);
-        SummonOrders.commandOne(player, configurable, target, ability, 0.0F, null);
-    }
-
-    private static final double REUSE_SEARCH_RADIUS = 24.0D;
     private static final Set<String> WARNED = new HashSet<>();
 
     public static void applyOrder(ServerLevel level, Player player, LivingEntity target,
@@ -830,49 +635,6 @@ public final class AffixMechanics {
 
         SummonOrders.command(player, target, order.ability(), damage, order.targets(),
                 order.tuning().orElse(null));
-    }
-
-    private static boolean retargetExisting(ServerLevel level, Player player,
-                                            LivingEntity target, AffixEffects.Summon summon,
-                                            float damage) {
-        if (summon.ability().isEmpty()) {
-            return false;
-        }
-        AABB area = player.getBoundingBox().inflate(REUSE_SEARCH_RADIUS);
-        for (Entity entity : level.getEntities(player, area, candidate ->
-                candidate instanceof ConfigurableSummon)) {
-            ConfigurableSummon existing = (ConfigurableSummon) entity;
-            if (!existing.reusable() || entity.isRemoved()) {
-                continue;
-            }
-            if (!SummonOwner.ownedBy(entity, player)) {
-                continue;
-            }
-            existing.configure(player, target, damage, summon.lifespanTicks());
-            String ability = summon.ability().orElse(null);
-            if (ability != null) {
-                SummonOrders.commandAll(player, target, ability, damage);
-            }
-            return true;
-        }
-        return false;
-    }
-
-    private static float summonDamage(Player player, AffixEffects.Summon summon,
-                                      float dealtDamage, AffixEffects.Scaling override) {
-        DamageSpec spec = summon.damageSpec().orElse(null);
-        if (spec != null) {
-            return spec.amountFor(player, dealtDamage);
-        }
-        if (summon.damageRatio() <= 0.0F || dealtDamage <= 0.0F) {
-            return 0.0F;
-        }
-        float ratio = summon.damageRatio();
-        if (override != null) {
-            ratio = override.apply(ratio,
-                    SpellPowerAccess.valueOf(player, override.sources(), override.strongest()));
-        }
-        return dealtDamage * ratio;
     }
 
     public static void runCommands(ServerLevel level, Player player,

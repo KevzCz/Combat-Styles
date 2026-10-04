@@ -74,6 +74,12 @@ public record EquipmentEffect(Optional<String> substituteStyle,
         spells = spells == null ? SpellLocks.NONE : spells;
         damageBonus = damageBonus == null ? List.of() : List.copyOf(damageBonus);
         events = events == null ? EventPayloads.EMPTY : events;
+        if (summonReplacement != null && summonReplacement.isPresent()) {
+            if (summonProfile == null || summonProfile.isEmpty()) {
+                summonProfile = Optional.of(summonReplacement.get().asProfile());
+            }
+            summonReplacement = Optional.empty();
+        }
     }
 
     public static final EquipmentEffect EMPTY = new EquipmentEffect(Optional.empty(),

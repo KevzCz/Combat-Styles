@@ -72,32 +72,44 @@ public final class EquipmentRuntime {
 
     public static boolean liveAtRest(Player player, EquipmentDefinition definition,
                                      String effectKey, TriggeredEffect entry) {
-        return liveAtRest(player, definition, effectKey, entry,
+        return liveAtRest(player, definition, 0, effectKey, entry);
+    }
+
+    public static boolean liveAtRest(Player player, EquipmentDefinition definition, int copy,
+                                     String effectKey, TriggeredEffect entry) {
+        return liveAtRest(player, definition, copy, effectKey, entry,
                 !EquipmentDefinition.substitutes(entry.effect()));
     }
 
     public static boolean liveAtRest(Player player, EquipmentDefinition definition,
                                      String effectKey, TriggeredEffect entry,
                                      boolean swingGates) {
+        return liveAtRest(player, definition, 0, effectKey, entry, swingGates);
+    }
+
+    public static boolean liveAtRest(Player player, EquipmentDefinition definition, int copy,
+                                     String effectKey, TriggeredEffect entry,
+                                     boolean swingGates) {
+        String owner = EffectKeys.ownerOf(definition.id(), copy);
         EffectGroup group = definition.groupOf(effectKey);
         String name = group == null ? null : groupNameOf(definition, group);
         boolean held = group != null && holdingEffect(player, definition, effectKey);
         if (group != null && !held) {
-            if (name == null || !groupLive(player, definition, group, name, swingGates)) {
+            if (name == null || !groupLive(player, definition, copy, group, name, swingGates)) {
                 return false;
             }
-            if (!GroupWindows.armed(player, definition.id(), name)
-                    && groupCooling(player, definition, effectKey)) {
+            if (!GroupWindows.armed(player, owner, name)
+                    && groupCooling(player, definition, copy, effectKey)) {
                 return false;
             }
         }
-        if (!effectLive(player, definition, effectKey, entry, swingGates)) {
+        if (!effectLive(player, definition, copy, effectKey, entry, swingGates)) {
             return false;
         }
-        if (!CycleChance.passes(player, definition, effectKey, entry)) {
+        if (!CycleChance.passes(player, definition, copy, effectKey, entry)) {
             return false;
         }
-        return group == null || held || GroupDraw.holds(player, definition, effectKey);
+        return group == null || held || GroupDraw.holds(player, definition, copy, effectKey);
     }
 
     private static boolean holdingEffect(Player player, EquipmentDefinition definition,
@@ -118,14 +130,14 @@ public final class EquipmentRuntime {
                 || EquipmentProviders.isEmpty()) {
             return;
         }
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null || substitutedThisAttack(player, definition.id())) {
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            EquipmentDefinition definition = worn.definition();
+            if (substitutedThisAttack(player, definition.id())) {
                 continue;
             }
             boolean opened = false;
             for (Map.Entry<String, EffectGroup> named : definition.groups().entrySet()) {
-                opened |= GroupWindows.openOnSwing(player, definition.id(), named.getKey(),
+                opened |= GroupWindows.openOnSwing(player, worn.owner(), named.getKey(),
                         named.getValue(), context);
             }
             if (opened && player instanceof ServerPlayer served) {
@@ -134,31 +146,33 @@ public final class EquipmentRuntime {
         }
     }
 
-    private static boolean groupLive(Player player, EquipmentDefinition definition,
+    private static boolean groupLive(Player player, EquipmentDefinition definition, int copy,
                                      EffectGroup group, String name, boolean swingGates) {
         if (group.trigger().arms(group.cooldown()) || definition.groupArmsOnSwing(group)) {
-            return GroupWindows.armed(player, definition.id(), name);
+            return GroupWindows.armed(player, EffectKeys.ownerOf(definition.id(), copy), name);
         }
         boolean gates = swingGates && !definition.groupSubstitutes(group);
         if (StateEdges.tracked(definition, group)) {
-            return StateEdges.held(player, definition, name, group, swingCount(player), gates);
+            return StateEdges.held(player, definition, copy, name, group, swingCount(player),
+                    gates);
         }
         return !group.gated()
                 || group.trigger().readyAtRest(player, swingCount(player), definition, gates);
     }
 
-    private static boolean effectLive(Player player, EquipmentDefinition definition,
+    private static boolean effectLive(Player player, EquipmentDefinition definition, int copy,
                                       String effectKey, TriggeredEffect entry,
                                       boolean swingGates) {
         if (entry.trigger().arms(entry.cooldown()) || entry.armsOnSwing()) {
-            return EffectWindows.armed(player, definition.id(), effectKey);
+            return EffectWindows.armed(player, EffectKeys.ownerOf(definition.id(), copy),
+                    effectKey);
         }
         if (entry.trigger().reactsToHurt()) {
             return false;
         }
         if (StateEdges.tracked(entry)) {
-            return StateEdges.held(player, definition, effectKey, entry, swingCount(player),
-                    swingGates);
+            return StateEdges.held(player, definition, copy, effectKey, entry,
+                    swingCount(player), swingGates);
         }
         return entry.trigger().readyAtRest(player, swingCount(player), definition, swingGates);
     }
@@ -568,7 +582,16 @@ public final class EquipmentRuntime {
         return null;
     }
 
-    public record Match(EquipmentDefinition definition, TriggeredEffect entry, String key) {
+    public record Match(EquipmentDefinition definition, TriggeredEffect entry, String key, int copy) {
+
+        public Match(EquipmentDefinition definition, TriggeredEffect entry, String key) {
+            this(definition, entry, key, 0);
+        }
+
+        public String owner() {
+            return EffectKeys.ownerOf(definition.id(), copy);
+        }
+
         public EquipmentEffect effect() {
             return entry.effect();
         }
@@ -603,16 +626,13 @@ public final class EquipmentRuntime {
             return List.of();
         }
         List<Match> matched = new ArrayList<>();
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            EquipmentDefinition definition = worn.definition();
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 TriggeredEffect entry = named.getValue();
                 if (entry.trigger().matches(context, entry.cooldown())
                         || summonPayloadMatches(context, entry)) {
-                    matched.add(new Match(definition, entry, named.getKey()));
+                    matched.add(new Match(definition, entry, named.getKey(), worn.copy()));
                 }
             }
         }
@@ -667,12 +687,12 @@ public final class EquipmentRuntime {
 
     public static void recordAttackProc(Player player, Match match) {
         ATTACK_PROCS.computeIfAbsent(player.getUUID(), key -> ConcurrentHashMap.newKeySet())
-                .add(EffectKeys.of(match.id(), match.key()));
+                .add(EffectKeys.of(match.owner(), match.key()));
     }
 
     public static boolean procdThisAttack(Player player, Match match) {
         Set<String> procs = ATTACK_PROCS.get(player.getUUID());
-        return procs != null && procs.contains(EffectKeys.of(match.id(), match.key()));
+        return procs != null && procs.contains(EffectKeys.of(match.owner(), match.key()));
     }
 
     public static List<Match> perAttackFor(Player player, EquipmentContext context) {
@@ -692,11 +712,8 @@ public final class EquipmentRuntime {
             eligible.removeIf(EquipmentRuntime::procsPerAttack);
         }
         List<Match> ready = new ArrayList<>(eligible.size());
-        Map<String, Integer> seen = new HashMap<>();
         for (Match match : pickGroups(player, context, eligible)) {
-            String slot = EffectKeys.of(match.id(), match.key());
-            int copy = seen.merge(slot, 1, Integer::sum) - 1;
-            if (match.entry().cooldown().windowed() || !consumeCooldown(player, match, copy)) {
+            if (match.entry().cooldown().windowed() || !consumeCooldown(player, match)) {
                 ready.add(match);
             }
         }
@@ -758,21 +775,22 @@ public final class EquipmentRuntime {
             return true;
         }
         String name = groupNameOf(match);
-        if (name == null || !GroupWindows.wouldClaim(player, match.id(), name, group, context)) {
+        if (name == null || !GroupWindows.wouldClaim(player, match.owner(), name, group, context)) {
             return false;
         }
         if (sharesDraw(match.definition(), group)) {
             return !(fromAttack(context) && substitutedThisAttack(player, match.id()))
-                    && GroupDraw.holds(player, match.definition(), match.key());
+                    && GroupDraw.holds(player, match.definition(), match.copy(), match.key());
         }
         List<Match> contenders = new ArrayList<>();
         for (Match other : eligible) {
-            if (other.definition() == match.definition() && name.equals(groupNameOf(other))) {
+            if (other.definition() == match.definition() && other.copy() == match.copy()
+                    && name.equals(groupNameOf(other))) {
                 contenders.add(other);
             }
         }
-        GroupRoll roll = rollGroup(player, context, group, match.id(), name, contenders);
-        return (roll.passed() || GroupWindows.armed(player, match.id(), name))
+        GroupRoll roll = rollGroup(player, context, group, match.owner(), name, contenders);
+        return (roll.passed() || GroupWindows.armed(player, match.owner(), name))
                 && roll.picked().contains(match.key());
     }
 
@@ -786,17 +804,17 @@ public final class EquipmentRuntime {
                 return false;
             }
             if (arms || entry.armsOnSwing()) {
-                return EffectWindows.armed(player, match.id(), match.key());
+                return EffectWindows.armed(player, match);
             }
-            return EffectWindows.armed(player, match.id(), match.key())
-                    || !Gates.cooling(player, GateScope.EFFECT, match.id(), match.key(), window);
+            return EffectWindows.armed(player, match)
+                    || !Gates.cooling(player, GateScope.EFFECT, match.owner(), match.key(), window);
         }
-        return !Cooldowns.active(player, match.id(), match.key(), 0, Cooldowns.Track.PROC);
+        return !Cooldowns.active(player, match.id(), match.key(), match.copy(), Cooldowns.Track.PROC);
     }
 
     public static boolean rewriteAllowed(Player player, Match match) {
         EquipmentDefinition definition = match.definition();
-        if (!CycleChance.passes(player, definition, match.key(), match.entry())) {
+        if (!CycleChance.passes(player, definition, match.copy(), match.key(), match.entry())) {
             return false;
         }
         EffectGroup group = definition.groupOf(match.key());
@@ -805,37 +823,37 @@ public final class EquipmentRuntime {
             if (name == null) {
                 return false;
             }
-            boolean open = GroupWindows.armed(player, match.id(), name);
+            boolean open = GroupWindows.armed(player, match.owner(), name);
             if ((group.trigger().arms(group.cooldown()) || definition.groupArmsOnSwing(group))
                     && !open) {
                 return false;
             }
-            if (!open && Gates.cooling(player, GateScope.GROUP, match.id(), name,
+            if (!open && Gates.cooling(player, GateScope.GROUP, match.owner(), name,
                     group.cooldown())) {
                 return false;
             }
             if (StateEdges.tracked(definition, group) && !StateEdges.held(player, definition,
-                    name, group, swingCount(player), false)) {
+                    match.copy(), name, group, swingCount(player), false)) {
                 return false;
             }
-            if (!GroupDraw.holds(player, definition, match.key())) {
+            if (!GroupDraw.holds(player, definition, match.copy(), match.key())) {
                 return false;
             }
         }
         TriggeredEffect entry = match.entry();
         EffectCooldown window = entry.cooldown();
         if (entry.trigger().arms(window) || entry.armsOnSwing()) {
-            return EffectWindows.armed(player, match.id(), match.key());
+            return EffectWindows.armed(player, match);
         }
         if (window.windowed()) {
-            return EffectWindows.armed(player, match.id(), match.key())
-                    || !Gates.cooling(player, GateScope.EFFECT, match.id(), match.key(), window);
+            return EffectWindows.armed(player, match)
+                    || !Gates.cooling(player, GateScope.EFFECT, match.owner(), match.key(), window);
         }
-        if (StateEdges.tracked(entry) && !StateEdges.held(player, definition, match.key(),
-                entry, swingCount(player), false)) {
+        if (StateEdges.tracked(entry) && !StateEdges.held(player, definition,
+                match.copy(), match.key(), entry, swingCount(player), false)) {
             return false;
         }
-        return !Cooldowns.active(player, match.id(), match.key(), 0, Cooldowns.Track.PROC);
+        return !Cooldowns.active(player, match.id(), match.key(), match.copy(), Cooldowns.Track.PROC);
     }
 
     public static List<Match> pickGroups(Player player, EquipmentContext context,
@@ -853,7 +871,7 @@ public final class EquipmentRuntime {
             if (grouped == null) {
                 grouped = new LinkedHashMap<>();
             }
-            grouped.computeIfAbsent(EffectKeys.of(match.id(), group),
+            grouped.computeIfAbsent(EffectKeys.of(match.owner(), group),
                     ignored -> new ArrayList<>()).add(match);
         }
         if (grouped == null) {
@@ -897,30 +915,30 @@ public final class EquipmentRuntime {
             }
             List<Match> held = new ArrayList<>(contenders.size());
             for (Match match : contenders) {
-                if (GroupDraw.holds(player, match.definition(), match.key())) {
+                if (GroupDraw.holds(player, match.definition(), match.copy(), match.key())) {
                     held.add(match);
                 }
             }
             if (held.isEmpty()
-                    || !GroupWindows.claim(player, first.id(), name, group, context, true)) {
+                    || !GroupWindows.claim(player, first.owner(), name, group, context, true)) {
                 return List.of();
             }
-            GroupDraw.endPass(player, first.id(), name);
+            GroupDraw.endPass(player, first.owner(), name);
             if (GroupDraw.perCycle(first.definition(), group)) {
                 awaitCycle(player, first.id());
             }
             return held;
         }
-        GroupRoll roll = rollGroup(player, context, group, first.id(), name, contenders);
+        GroupRoll roll = rollGroup(player, context, group, first.owner(), name, contenders);
         boolean arming = group.trigger().arms(group.cooldown()) && context != null
                 && group.trigger().eventFiring(context);
         if (roll.picked().isEmpty() && !arming) {
             CombatDebug.skipped(player, first.id(), "group " + name + " picked nothing");
             return List.of();
         }
-        if (!GroupWindows.claim(player, first.id(), name, group, context, roll.passed())
+        if (!GroupWindows.claim(player, first.owner(), name, group, context, roll.passed())
                 && !(arming && roll.passed() && firesOnEvent(context, contenders)
-                        && GroupWindows.claimUse(player, first.id(), name, group))) {
+                        && GroupWindows.claimUse(player, first.owner(), name, group))) {
             return List.of();
         }
         List<Match> drawn = new ArrayList<>(contenders.size());
@@ -1041,9 +1059,9 @@ public final class EquipmentRuntime {
             return true;
         }
         if (CycleChance.applies(match.definition(), match.key(), match.entry())) {
-            return CycleChance.passes(player, match.definition(), match.key(), match.entry());
+            return CycleChance.passes(player, match.definition(), match.copy(), match.key(), match.entry());
         }
-        String key = player.getUUID() + PLAYER_SEPARATOR + EffectKeys.of(match.id(), match.key());
+        String key = player.getUUID() + PLAYER_SEPARATOR + EffectKeys.of(match.owner(), match.key());
         long tick = player.level().getGameTime();
         int target = context == null || context.target() == null
                 ? NO_TARGET
@@ -1177,7 +1195,8 @@ public final class EquipmentRuntime {
         boolean armingHere = armsWithoutPayload(match) && armsInHitPass(match) == onHit;
         if (onHit) {
             return effect.onHit().isPresent() || !effect.grantAffixes().isEmpty()
-                    || effect.summonReplacement().isPresent() || effect.rewritesAttack()
+                    || effect.summonProfile().filter(SummonProfile::replacesSummons).isPresent()
+                    || effect.rewritesAttack()
                     || effect.summonDive().isPresent() || effect.echo().isPresent()
                     || effect.substitution().filter(StyleSubstitution::inserts).isPresent()
                     || selfHere || armingHere || eventHere;
@@ -1438,13 +1457,18 @@ public final class EquipmentRuntime {
 
     private static boolean groupCooling(Player player, EquipmentDefinition definition,
                                         String effectKey) {
+        return groupCooling(player, definition, 0, effectKey);
+    }
+
+    private static boolean groupCooling(Player player, EquipmentDefinition definition, int copy,
+                                        String effectKey) {
         EffectGroup group = definition.groupOf(effectKey);
         if (group == null) {
             return false;
         }
         String name = groupNameOf(definition, group);
-        return name != null && Gates.cooling(player, GateScope.GROUP, definition.id(),
-                name, group.cooldown());
+        return name != null && Gates.cooling(player, GateScope.GROUP,
+                EffectKeys.ownerOf(definition.id(), copy), name, group.cooldown());
     }
 
     private static void claimGroupUse(Player player, String id) {
@@ -1526,14 +1550,11 @@ public final class EquipmentRuntime {
             return Set.of();
         }
         Set<String> out = new LinkedHashSet<>();
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            EquipmentDefinition definition = worn.definition();
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 TriggeredEffect entry = named.getValue();
-                if (!liveAtRest(player, definition, named.getKey(), entry)) {
+                if (!liveAtRest(player, definition, worn.copy(), named.getKey(), entry)) {
                     continue;
                 }
                 if (!Cooldowns.active(player, definition.id(), named.getKey(), 0,
@@ -1551,31 +1572,29 @@ public final class EquipmentRuntime {
             return Map.of();
         }
         Map<String, Integer> out = new LinkedHashMap<>();
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            EquipmentDefinition definition = worn.definition();
             String itemId = definition.id();
+            String owner = worn.owner();
             int longest = 0;
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 int charge = Cooldowns.remaining(player, itemId, named.getKey(), 0,
                         Cooldowns.Track.CHARGE);
                 int lane = Math.max(charge, Math.max(
-                        Cooldowns.remaining(player, itemId, named.getKey(), 0,
+                        Cooldowns.remaining(player, itemId, named.getKey(), worn.copy(),
                                 Cooldowns.Track.PROC),
-                        StateEdges.remaining(player, itemId, named.getKey())));
+                        StateEdges.remaining(player, owner, named.getKey())));
                 if (lane > 0) {
-                    out.merge(EffectKeys.of(itemId, named.getKey()), lane, Math::max);
+                    out.merge(EffectKeys.of(owner, named.getKey()), lane, Math::max);
                 }
                 longest = Math.max(longest, charge);
             }
             for (Map.Entry<String, EffectGroup> named : definition.groups().entrySet()) {
-                int group = GroupWindows.remaining(player, itemId, named.getKey());
-                int lane = Math.max(group, StateEdges.remaining(player, itemId,
+                int group = GroupWindows.remaining(player, owner, named.getKey());
+                int lane = Math.max(group, StateEdges.remaining(player, owner,
                         StateEdges.groupKey(named.getKey())));
                 if (lane > 0) {
-                    out.merge(EffectKeys.of(itemId, named.getKey()), lane, Math::max);
+                    out.merge(EffectKeys.of(owner, named.getKey()), lane, Math::max);
                 }
                 longest = Math.max(longest, group);
             }
@@ -1591,16 +1610,14 @@ public final class EquipmentRuntime {
             return Map.of();
         }
         Map<String, Integer> out = new LinkedHashMap<>();
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            EquipmentDefinition definition = worn.definition();
             String itemId = definition.id();
+            String owner = worn.owner();
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 int ticks = named.getValue().cooldownTicks();
                 if (ticks > 0) {
-                    out.merge(EffectKeys.of(itemId, named.getKey()), ticks, Math::max);
+                    out.merge(EffectKeys.of(owner, named.getKey()), ticks, Math::max);
                     out.merge(itemId, ticks, Math::max);
                 }
             }
@@ -1611,7 +1628,7 @@ public final class EquipmentRuntime {
                     ticks = group.duration();
                 }
                 if (ticks > 0) {
-                    out.merge(EffectKeys.of(itemId, named.getKey()), ticks, Math::max);
+                    out.merge(EffectKeys.of(owner, named.getKey()), ticks, Math::max);
                     out.merge(itemId, ticks, Math::max);
                 }
             }
@@ -1645,19 +1662,19 @@ public final class EquipmentRuntime {
     }
 
     public static boolean consumeProcCooldown(Player player, Match match) {
-        return consumeCooldown(player, match, 0);
+        return consumeCooldown(player, match);
     }
 
-    private static boolean consumeCooldown(Player player, Match match, int copy) {
+    private static boolean consumeCooldown(Player player, Match match) {
         int ticks = match.entry().cooldownTicks();
         if (ticks <= 0) {
             return false;
         }
-        if (Cooldowns.active(player, match.id(), match.key(), copy,
+        if (Cooldowns.active(player, match.id(), match.key(), match.copy(),
                 Cooldowns.Track.PROC)) {
             return true;
         }
-        Cooldowns.start(player, match.id(), match.key(), copy,
+        Cooldowns.start(player, match.id(), match.key(), match.copy(),
                 Cooldowns.Track.PROC, ticks);
         return false;
     }

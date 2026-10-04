@@ -1,7 +1,6 @@
 package net.pixeldreamstudios.combat_styles.equipment;
 
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -44,25 +43,27 @@ public final class StateEdges {
                 && !definition.groupArmsOnSwing(group);
     }
 
-    public static boolean held(Player player, EquipmentDefinition definition, String effectKey,
-                               TriggeredEffect entry, int swingCount, boolean swingGates) {
-        return held(player, definition, effectKey, entry.trigger(), entry.cooldown(),
-                swingCount, swingGates);
+    public static boolean held(Player player, EquipmentDefinition definition, int copy,
+                               String effectKey, TriggeredEffect entry, int swingCount,
+                               boolean swingGates) {
+        return held(player, definition, EffectKeys.ownerOf(definition.id(), copy), effectKey,
+                entry.trigger(), entry.cooldown(), swingCount, swingGates);
     }
 
-    public static boolean held(Player player, EquipmentDefinition definition, String groupName,
-                               EffectGroup group, int swingCount, boolean swingGates) {
-        return held(player, definition, groupKey(groupName), group.trigger(), group.cooldown(),
-                swingCount, swingGates);
+    public static boolean held(Player player, EquipmentDefinition definition, int copy,
+                               String groupName, EffectGroup group, int swingCount,
+                               boolean swingGates) {
+        return held(player, definition, EffectKeys.ownerOf(definition.id(), copy),
+                groupKey(groupName), group.trigger(), group.cooldown(), swingCount, swingGates);
     }
 
-    private static boolean held(Player player, EquipmentDefinition definition, String name,
-                                EquipmentTrigger trigger, EffectCooldown cooldown,
+    private static boolean held(Player player, EquipmentDefinition definition, String owner,
+                                String name, EquipmentTrigger trigger, EffectCooldown cooldown,
                                 int swingCount, boolean swingGates) {
         if (!cooldown.holdWhileActive()) {
-            return Gates.windowOpen(player, GateScope.HELD, definition.id(), name);
+            return Gates.windowOpen(player, GateScope.HELD, owner, name);
         }
-        if (Gates.windowOpen(player, GateScope.LOCKOUT, definition.id(), name)) {
+        if (Gates.windowOpen(player, GateScope.LOCKOUT, owner, name)) {
             return false;
         }
         return trigger.readyAtRest(player, swingCount, definition, swingGates);
@@ -89,24 +90,22 @@ public final class StateEdges {
         Set<String> previous = LIVE.getOrDefault(player.getUUID(), Set.of());
         Set<String> current = ConcurrentHashMap.newKeySet();
         Set<String> worn = new HashSet<>();
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
-            worn.add(definition.id());
+        for (WornEquipment piece : WornEquipment.of(player)) {
+            EquipmentDefinition definition = piece.definition();
+            String owner = piece.owner();
+            worn.add(owner);
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 TriggeredEffect entry = named.getValue();
                 if (tracked(entry)) {
-                    step(player, definition, named.getKey(), entry.trigger(), entry.cooldown(),
-                            swings, !EquipmentDefinition.substitutes(entry.effect()),
-                            previous, current);
+                    step(player, definition, owner, named.getKey(), entry.trigger(),
+                            entry.cooldown(), swings,
+                            !EquipmentDefinition.substitutes(entry.effect()), previous, current);
                 }
             }
             for (Map.Entry<String, EffectGroup> named : definition.groups().entrySet()) {
                 EffectGroup group = named.getValue();
                 if (tracked(definition, group)) {
-                    step(player, definition, groupKey(named.getKey()), group.trigger(),
+                    step(player, definition, owner, groupKey(named.getKey()), group.trigger(),
                             group.cooldown(), swings, !definition.groupSubstitutes(group),
                             previous, current);
                 }
@@ -129,23 +128,24 @@ public final class StateEdges {
         }
     }
 
-    private static void step(Player player, EquipmentDefinition definition, String name,
-                             EquipmentTrigger trigger, EffectCooldown cooldown, int swings,
-                             boolean swingGates, Set<String> previous, Set<String> current) {
-        String mark = EffectKeys.of(definition.id(), name);
+    private static void step(Player player, EquipmentDefinition definition, String owner,
+                             String name, EquipmentTrigger trigger, EffectCooldown cooldown,
+                             int swings, boolean swingGates, Set<String> previous,
+                             Set<String> current) {
+        String mark = EffectKeys.of(owner, name);
         boolean was = previous.contains(mark);
         if (cooldown.holdWhileActive()) {
-            if (held(player, definition, name, trigger, cooldown, swings, swingGates)) {
+            if (held(player, definition, owner, name, trigger, cooldown, swings, swingGates)) {
                 current.add(mark);
             } else if (was) {
-                Gates.lockOut(player, GateScope.LOCKOUT, definition.id(), name, cooldown.ticks());
+                Gates.lockOut(player, GateScope.LOCKOUT, owner, name, cooldown.ticks());
             }
             return;
         }
         if (trigger.readyAtRest(player, swings, definition, swingGates)) {
             current.add(mark);
             if (!was && cooldown.windowed()) {
-                Gates.arm(player, GateScope.HELD, definition.id(), name, cooldown);
+                Gates.arm(player, GateScope.HELD, owner, name, cooldown);
             }
         }
     }

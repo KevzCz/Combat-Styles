@@ -152,11 +152,9 @@ public final class EquipmentAttributes {
         List<ItemStack> accessories = AccessoryCompat.isLoaded()
                 ? AccessoryCompat.equipped(player)
                 : List.of();
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            ItemStack stack = worn.stack();
+            EquipmentDefinition definition = worn.definition();
             boolean inAccessorySlot = containsStack(accessories, stack);
             for (Map.Entry<String, AttributeBonus> entry
                     : definition.passiveAttributes().entrySet()) {
@@ -168,7 +166,7 @@ public final class EquipmentAttributes {
                 add(merged, entry.getKey(), declared, definition.id());
             }
             for (Map.Entry<String, AttributeBonus> entry
-                    : definition.conditionalAttributes(player).entrySet()) {
+                    : definition.conditionalAttributes(player, worn.copy()).entrySet()) {
                 AttributeBonus declared = entry.getValue();
                 if (declared == null || declared.amount() == 0.0D
                         || !placed(player, stack, declared, inAccessorySlot)) {

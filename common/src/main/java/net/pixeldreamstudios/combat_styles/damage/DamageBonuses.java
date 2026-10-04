@@ -4,18 +4,16 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.entity.SummonOwner;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentActivation;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
-import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRuntime;
 import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
-import net.pixeldreamstudios.combat_styles.equipment.WornItems;
+import net.pixeldreamstudios.combat_styles.equipment.WornEquipment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -88,15 +86,13 @@ public final class DamageBonuses {
             return cached.bonuses();
         }
         List<DamageBonus> found = new ArrayList<>();
-        for (ItemStack stack : WornItems.of(player)) {
-            EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-            if (definition == null) {
-                continue;
-            }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            EquipmentDefinition definition = worn.definition();
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 TriggeredEffect entry = named.getValue();
                 if (!entry.effect().damageBonus().isEmpty()
-                        && EquipmentRuntime.liveAtRest(player, definition, named.getKey(), entry)) {
+                        && EquipmentRuntime.liveAtRest(player, definition, worn.copy(),
+                                named.getKey(), entry)) {
                     found.addAll(entry.effect().damageBonus());
                 }
             }

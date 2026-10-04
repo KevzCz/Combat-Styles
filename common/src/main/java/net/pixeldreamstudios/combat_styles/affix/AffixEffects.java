@@ -9,6 +9,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 
+import net.pixeldreamstudios.combat_styles.entity.SummonEquipment;
+import net.pixeldreamstudios.combat_styles.entity.SummonStats;
 import net.pixeldreamstudios.combat_styles.entity.SummonTargeting;
 import net.pixeldreamstudios.combat_styles.equipment.AbilityTuning;
 import net.pixeldreamstudios.combat_styles.equipment.StateGate;
@@ -629,7 +631,11 @@ public final class AffixEffects {
                          boolean inheritTarget, float damageRatio,
                          Optional<DamageSpec> damageSpec,
                          Optional<String> ability, float chance,
-                         Optional<ProjectileSpawn> spawn) {
+                         Optional<ProjectileSpawn> spawn, Optional<Integer> maxActive,
+                         SummonEquipment equipment, SummonStats attributes,
+                         boolean spectral, boolean keepGear, boolean ownDamage) {
+        public static final String VICTIM = "@victim";
+
         public static final Codec<Summon> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("entity").forGetter(Summon::entity),
                 Codec.INT.optionalFieldOf("count", 1).forGetter(Summon::count),
@@ -640,8 +646,31 @@ public final class AffixEffects {
                 DamageSpec.CODEC.optionalFieldOf("damage_spec").forGetter(Summon::damageSpec),
                 Codec.STRING.optionalFieldOf("ability").forGetter(Summon::ability),
                 Codec.FLOAT.optionalFieldOf("chance", 1.0F).forGetter(Summon::chance),
-                ProjectileSpawn.CODEC.optionalFieldOf("spawn").forGetter(Summon::spawn)
+                ProjectileSpawn.CODEC.optionalFieldOf("spawn").forGetter(Summon::spawn),
+                Codec.INT.optionalFieldOf("max_active").forGetter(Summon::maxActive),
+                SummonEquipment.CODEC.optionalFieldOf("equipment", SummonEquipment.NONE)
+                        .forGetter(Summon::equipment),
+                SummonStats.CODEC.optionalFieldOf("attributes", SummonStats.NONE)
+                        .forGetter(Summon::attributes),
+                Codec.BOOL.optionalFieldOf("spectral", Boolean.FALSE).forGetter(Summon::spectral),
+                Codec.BOOL.optionalFieldOf("keep_gear", Boolean.FALSE).forGetter(Summon::keepGear),
+                Codec.BOOL.optionalFieldOf("own_damage", Boolean.FALSE).forGetter(Summon::ownDamage)
         ).apply(instance, Summon::new));
+
+        public Summon {
+            equipment = equipment == null ? SummonEquipment.NONE : equipment;
+            attributes = attributes == null ? SummonStats.NONE : attributes;
+        }
+
+        public boolean raisesVictim() {
+            return VICTIM.equals(entity);
+        }
+
+        public Summon asEntity(String id) {
+            return new Summon(id, count, lifespanTicks, radius, inheritTarget, damageRatio,
+                    damageSpec, ability, chance, spawn, maxActive, equipment, attributes,
+                    spectral, keepGear, ownDamage);
+        }
     }
 
     public record Command(String command, boolean asServer) {

@@ -23,4 +23,16 @@ public interface SummonData {
     void combat_styles$applySummonGoals();
 
     void combat_styles$setSummonSpec(DamageSpec spec);
+
+    boolean combat_styles$spectral();
+
+    void combat_styles$setSpectral(boolean spectral);
+
+    UUID combat_styles$castBy();
+
+    void combat_styles$setCastBy(UUID caster);
+
+    SummonFollow combat_styles$follow();
+
+    void combat_styles$setFollow(SummonFollow follow);
 }

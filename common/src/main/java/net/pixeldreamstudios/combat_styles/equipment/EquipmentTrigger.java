@@ -55,7 +55,7 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
     public boolean requiresActivation() {
         if (reactsToHurt() || activation.reactsToShoot() || activation.reactsToBlock()
                 || activation.usesItem() || activation.reactsToProjectileHit()
-                || activation.reactsToCast()) {
+                || activation.reactsToCast() || activation.reactsToSummon()) {
             return true;
         }
         for (EquipmentTrigger required : allOf) {
@@ -96,7 +96,8 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
                 || phase.onMiss().orElse(false) || phase.onSummonHit().orElse(false)
                 || activation.reactsToShoot() || activation.reactsToBlock()
                 || activation.usesItem() || activation.reactsToProjectileHit()
-                || activation.reactsToCast();
+                || activation.reactsToCast()
+                || activation.reactsToSummon();
     }
 
     public boolean isEvent() {
@@ -151,6 +152,9 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
         }
         if (activation.reactsToCast()) {
             return context.cast() != null;
+        }
+        if (activation.reactsToSummon()) {
+            return context.summoned() != null;
         }
         return false;
     }
@@ -217,6 +221,7 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
                 || activation.reactsToShoot() || activation.reactsToBlock()
                 || !activation.dealt().isEmpty()
                 || activation.reactsToCast()
+                || activation.reactsToSummon()
                 || (activation.usesItem() && activation.onUse().instant());
     }
 

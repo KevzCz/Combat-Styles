@@ -8,6 +8,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -46,6 +47,8 @@ import net.spell_engine.api.spell.registry.SpellRegistry;
 import net.spell_engine.api.spell.event.SpellEvents;
 import net.spell_engine.entity.SpellCloud;
 import net.spell_engine.entity.SpellProjectile;
+import net.spell_engine.entity.SummonedEntity;
+import net.spell_engine.api.spell.summon.SpellSummoned;
 import net.spell_engine.internals.SpellExecution;
 import net.spell_engine.internals.SpellModifiers;
 import net.spell_engine.internals.casting.SpellCast;
@@ -578,6 +581,47 @@ final class SpellEngineBridge {
 
     public static boolean isSpellCloud(Entity entity) {
         return isLoaded() && entity instanceof SpellCloud;
+    }
+
+    public static boolean prepareSummon(Entity spawned, Player owner) {
+        if (!isLoaded() || owner == null || !(spawned instanceof SpellSummoned summoned)) {
+            return false;
+        }
+        try {
+            ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(spawned.getType());
+            Registry<Spell> spells = SpellRegistry.from(owner.level());
+            for (Spell spell : spells) {
+                Spell.Impact.Action.Summon summon = summonOf(spell, entityId);
+                if (summon != null) {
+                    summoned.onSummonedBySpell(new SpellSummoned.Args(owner, spells.wrapAsHolder(spell),
+                            summon.behaviour, summon.attribute_scaling,
+                            new SpellExecution.ImpactContext()));
+                    return true;
+                }
+            }
+            if (spawned instanceof SummonedEntity entity) {
+                entity.setOwnerUuid(owner.getUUID());
+            }
+        } catch (Throwable throwable) {
+            CombatStyles.LOGGER.error("Unable to prepare Spell Engine summon {}", spawned, throwable);
+        }
+        return false;
+    }
+
+    private static Spell.Impact.Action.Summon summonOf(Spell spell, ResourceLocation entityId) {
+        if (spell == null || spell.impacts == null || entityId == null) {
+            return null;
+        }
+        for (Spell.Impact impact : spell.impacts) {
+            Spell.Impact.Action.Summon summon = impact == null || impact.action == null
+                    ? null
+                    : impact.action.summon;
+            if (summon != null && summon.behaviour != null
+                    && entityId.toString().equals(summon.entity_type_id)) {
+                return summon;
+            }
+        }
+        return null;
     }
 
     public static Object castSpell(Player player, ResourceLocation spellId, CastSpell.Target target,

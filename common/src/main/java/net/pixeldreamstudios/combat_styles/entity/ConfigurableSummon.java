@@ -43,6 +43,9 @@ public interface ConfigurableSummon extends OwnableEntity {
     default void onSpawned(Player owner, int index) {
     }
 
+    default void companionSpawned(Player owner, int slot, int count) {
+    }
+
     default String abilityFor(Player owner, SummonProfile profile, String declared, int index) {
         return declared;
     }

@@ -43,8 +43,9 @@ public record HudRow(ItemStack stack, String itemId, List<Lane> lanes,
         lanes = lanes == null ? List.of() : List.copyOf(lanes);
     }
 
-    public static HudRow of(ItemStack stack, EquipmentDefinition definition) {
+    public static HudRow of(ItemStack stack, EquipmentDefinition definition, int copy) {
         String itemId = definition.id();
+        String owner = EffectKeys.ownerOf(itemId, copy);
         List<Lane> lanes = new ArrayList<>();
         Set<String> claimed = new LinkedHashSet<>();
         for (Map.Entry<String, EffectGroup> named : definition.groups().entrySet()) {
@@ -57,16 +58,16 @@ public record HudRow(ItemStack stack, String itemId, List<Lane> lanes,
                 }
                 claimed.add(effect);
                 if (!collapses) {
-                    lanes.add(laneFor(itemId, effect, definition.effects().get(effect)));
+                    lanes.add(laneFor(owner, effect, definition.effects().get(effect)));
                 }
             }
             if (collapses) {
-                lanes.add(laneFor(itemId, named.getKey(), null));
+                lanes.add(laneFor(owner, named.getKey(), null));
             }
         }
         for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
             if (claimed.add(named.getKey())) {
-                lanes.add(laneFor(itemId, named.getKey(), named.getValue()));
+                lanes.add(laneFor(owner, named.getKey(), named.getValue()));
             }
         }
         return new HudRow(stack, itemId, lanes,
@@ -74,8 +75,8 @@ public record HudRow(ItemStack stack, String itemId, List<Lane> lanes,
                 CooldownMirror.procFlash(itemId), CooldownMirror.armed(itemId));
     }
 
-    private static Lane laneFor(String itemId, String name, TriggeredEffect entry) {
-        String key = EffectKeys.of(itemId, name);
+    private static Lane laneFor(String owner, String name, TriggeredEffect entry) {
+        String key = EffectKeys.of(owner, name);
         int remaining = CooldownMirror.remaining(key);
         LaneState state = remaining > 0
                 ? LaneState.COOLING

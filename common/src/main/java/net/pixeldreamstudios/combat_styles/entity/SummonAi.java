@@ -2,12 +2,14 @@ package net.pixeldreamstudios.combat_styles.entity;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+
+import net.pixeldreamstudios.combat_styles.affix.AffixTargets;
+import net.pixeldreamstudios.combat_styles.config.SummonTuning;
 
 import java.util.UUID;
 
 public final class SummonAi {
-
-    private static final double FOLLOW_RANGE = 24.0D;
 
     private SummonAi() {
     }
@@ -23,21 +25,17 @@ public final class SummonAi {
         if (candidate == null || !candidate.isAlive() || candidate == summon) {
             return false;
         }
-        UUID owner = summon instanceof SummonData data
-                ? data.combat_styles$summonOwner()
-                : null;
+        Player owner = SummonOwner.ownerPlayer(summon);
         if (owner == null) {
-            return true;
-        }
-        if (candidate.getUUID().equals(owner)) {
             return false;
         }
-        if (candidate instanceof SummonData other) {
-            UUID otherOwner = other.combat_styles$summonOwner();
-            if (owner.equals(otherOwner)) {
-                return false;
-            }
+        if (candidate == owner || SummonOwner.ownedBy(candidate, owner)) {
+            return false;
         }
-        return candidate.distanceToSqr(summon) <= FOLLOW_RANGE * FOLLOW_RANGE;
+        if (!AffixTargets.canHit(owner, candidate)) {
+            return false;
+        }
+        double range = SummonTuning.get().huntRange;
+        return candidate.distanceToSqr(summon) <= range * range;
     }
 }

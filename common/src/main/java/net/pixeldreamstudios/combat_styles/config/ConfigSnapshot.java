@@ -12,6 +12,7 @@ public final class ConfigSnapshot {
     private static final String STATUS_EFFECTS = "status_effects";
     private static final String ABILITIES = "abilities";
     private static final String EQUIPMENT_DROPS = "equipment_drops";
+    private static final String SUMMONS = "summons";
 
     private ConfigSnapshot() {
     }
@@ -22,6 +23,7 @@ public final class ConfigSnapshot {
         json.add(STATUS_EFFECTS, StatusEffectConfig.toJson());
         json.add(ABILITIES, AbilityConfig.toJson());
         json.add(EQUIPMENT_DROPS, EquipmentDropConfig.toJson());
+        json.add(SUMMONS, SummonTuning.toJson());
         return json.toString();
     }
 
@@ -34,6 +36,7 @@ public final class ConfigSnapshot {
         StatusEffectConfig.accept(json.get(STATUS_EFFECTS));
         AbilityConfig.accept(json.get(ABILITIES));
         EquipmentDropConfig.accept(json.get(EQUIPMENT_DROPS));
+        SummonTuning.accept(json.get(SUMMONS));
         return true;
     }
 
@@ -42,6 +45,7 @@ public final class ConfigSnapshot {
         StatusEffectConfig.load();
         AbilityConfig.load();
         EquipmentDropConfig.load();
+        SummonTuning.load();
     }
 
     private static JsonObject parse(String raw) {

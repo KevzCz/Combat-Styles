@@ -5,8 +5,16 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.Equipable;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ProjectileWeaponItem;
+import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.item.TridentItem;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
 
 import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
@@ -16,6 +24,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
 
@@ -31,6 +40,7 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
     private static final int ICON_SIZE = 16;
     private static final int EXTRA_HEADER = 22;
     private static final String TAG_MARKER = "#";
+    private static final String SLOT_LABEL_PREFIX = "field.combat_styles.";
 
     private static final String KEY_TITLE = "screen.combat_styles.match_targets";
     private static final String KEY_SEARCH = "screen.combat_styles.match_search";
@@ -42,9 +52,14 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
     private static final String KEY_TAB_CATEGORIES = "screen.combat_styles.match_kind_category";
     private static final String KEY_COUNT_ANY = "screen.combat_styles.match_count_any";
     private static final String KEY_ANY = "screen.combat_styles.choice_any";
+    private static final String KEY_SLOT_TITLE = "screen.combat_styles.slot_picker";
+    private static final String KEY_SLOT_COUNT = "screen.combat_styles.slot_count";
+    private static final String KEY_SLOT_NONE = "screen.combat_styles.slot_none";
+    private static final String KEY_TAB_FITS = "screen.combat_styles.match_kind_fits";
 
     public enum Tab {
         INVENTORY,
+        FITS,
         ALL,
         TAGS,
         CATEGORIES
@@ -62,6 +77,11 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
     private final List<Row> everything = new ArrayList<>();
     private final List<Row> tagRows = new ArrayList<>();
     private final List<Row> categoryRows = new ArrayList<>();
+    private final List<Row> fitting = new ArrayList<>();
+
+    private EquipmentSlot slot;
+    private String picked = "";
+    private Consumer<String> onPick;
 
     private Tab tab = Tab.INVENTORY;
     private boolean emptyMeansAny;
@@ -86,6 +106,42 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
         this.onChanged = onChanged == null ? NO_CHANGE : onChanged;
     }
 
+    private MatchTargetScreen(Screen parent, Component title) {
+        super(title, parent);
+        this.items = new ArrayList<>();
+        this.tags = new ArrayList<>();
+        this.categories = new ArrayList<>();
+        this.onChanged = NO_CHANGE;
+    }
+
+    public static MatchTargetScreen forSlot(Screen parent, EquipmentSlot slot, String current,
+                                            Consumer<String> onPick) {
+        MatchTargetScreen screen = new MatchTargetScreen(parent, Component.translatable(KEY_SLOT_TITLE,
+                Component.translatable(SLOT_LABEL_PREFIX + slot.getName())));
+        screen.slot = slot;
+        screen.picked = current == null ? "" : current;
+        screen.onPick = onPick;
+        screen.tab = Tab.FITS;
+        return screen;
+    }
+
+    private static boolean fits(EquipmentSlot slot, ItemStack stack) {
+        Equipable equipable = Equipable.get(stack);
+        if (slot.isArmor() || slot == EquipmentSlot.BODY) {
+            return equipable != null && equipable.getEquipmentSlot() == slot;
+        }
+        Item item = stack.getItem();
+        if (item instanceof ProjectileWeaponItem || item instanceof TridentItem) {
+            return true;
+        }
+        if (slot == EquipmentSlot.OFFHAND && item instanceof ShieldItem) {
+            return true;
+        }
+        return stack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY)
+                .modifiers().stream()
+                .anyMatch(entry -> entry.attribute().equals(Attributes.ATTACK_DAMAGE));
+    }
+
     public MatchTargetScreen emptyMeansAny() {
         this.emptyMeansAny = true;
         return this;
@@ -96,6 +152,7 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
         everything.clear();
         tagRows.clear();
         categoryRows.clear();
+        fitting.clear();
         Set<String> seen = new LinkedHashSet<>();
         if (minecraft != null && minecraft.player != null) {
             for (ItemStack stack : minecraft.player.getInventory().items) {
@@ -112,6 +169,9 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
             ItemStack stack = new ItemStack(item);
             if (!stack.isEmpty()) {
                 everything.add(rowOf(stack));
+                if (slot != null && fits(slot, stack)) {
+                    fitting.add(rowOf(stack));
+                }
             }
         }
         BuiltInRegistries.ITEM.getTagNames()
@@ -174,6 +234,7 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
         }
         return switch (tab) {
             case ALL -> everything;
+            case FITS -> fitting;
             case TAGS -> tagRows;
             case CATEGORIES -> categoryRows;
             default -> inventory;
@@ -192,6 +253,9 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
 
     @Override
     protected Component headerNote() {
+        if (slot != null) {
+            return Component.translatable(KEY_SLOT_COUNT, visible().size());
+        }
         if (emptyMeansAny && chosenCount() == 0) {
             return Component.translatable(KEY_COUNT_ANY, visible().size());
         }
@@ -209,7 +273,7 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
 
     @Override
     protected boolean closeOnPick() {
-        return false;
+        return slot != null;
     }
 
     @Override
@@ -219,6 +283,10 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
 
     @Override
     protected void onPicked(Row row) {
+        if (slot != null) {
+            onPick.accept(row.id());
+            return;
+        }
         List<String> target = targetFor(tab);
         if (!target.remove(row.id())) {
             target.add(row.id());
@@ -229,6 +297,16 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
     @Override
     protected void addFooterButtons(int buttonY) {
         super.addFooterButtons(buttonY);
+        if (slot != null) {
+            addRenderableWidget(PanelButton.of(Component.translatable(KEY_SLOT_NONE), button -> {
+                onPick.accept("");
+                minecraft.setScreen(parent);
+            }).bounds(contentLeft(), buttonY, BUTTON_WIDTH, ScreenTheme.BUTTON_HEIGHT).build());
+            addTab(KEY_TAB_INVENTORY, Tab.INVENTORY, 0);
+            addTab(KEY_TAB_FITS, Tab.FITS, 1);
+            addTab(KEY_TAB_ALL, Tab.ALL, 2);
+            return;
+        }
         if (emptyMeansAny) {
             addRenderableWidget(PanelButton.of(Component.translatable(KEY_ANY), button -> {
                 items.clear();
@@ -259,7 +337,7 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
     @Override
     protected void renderRow(GuiGraphics graphics, Row row, int index,
                              int x, int y, int width, boolean hovered) {
-        boolean chosen = targetFor(tab).contains(row.id());
+        boolean chosen = slot != null ? row.id().equals(picked) : targetFor(tab).contains(row.id());
         ScreenDraw.rowBackground(graphics, x + 1, y, width - 2, ROW_HEIGHT - 1,
                 index, hovered, chosen);
         int textX = x + 2;

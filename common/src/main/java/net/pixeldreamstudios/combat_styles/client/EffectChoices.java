@@ -19,6 +19,7 @@ import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
 import net.pixeldreamstudios.combat_styles.equipment.CastGate;
 import net.pixeldreamstudios.combat_styles.equipment.CastPhase;
+import net.pixeldreamstudios.combat_styles.equipment.SummonGate;
 import net.pixeldreamstudios.combat_styles.equipment.AccessoryCompat;
 import net.pixeldreamstudios.combat_styles.equipment.AccessoryMatch;
 import net.pixeldreamstudios.combat_styles.equipment.ItemGate;
@@ -66,12 +67,16 @@ public final class EffectChoices {
     }
 
     private static final List<String> ENTITY_KEYS = List.of("entity", "summon",
-            "become_entity", "attacker", "replaced_summoned_entities", "entities", "target");
+            "become_entity", "attacker", "replaced_summoned_entities", "entities", "target",
+            SummonGate.ENTITIES);
+    private static final String EQUIPMENT_SEGMENT = "/equipment";
+    private static final String ENTITY_KEY = "entity";
+    private static final List<String> ABILITY_KEYS = List.of("ability", "finale", "abilities");
 
     private static final Set<String> ANY_WHEN_EMPTY = Set.of("damage_type", "taken_damage_type",
             "attacker", "target", "entity", "spell", "school", "replaced_summoned_entities",
             "entities", "impact_type", "impact_school", "cast_type", "weapon_categories",
-            "item_tags");
+            "item_tags", SummonGate.ENTITIES);
     private static final Set<String> ANY_WHEN_ABSENT = Set.of("hitbox", "style_id", "affix_id",
             "slot_band");
     private static final List<Set<String>> ANY_TOGETHER = List.of(
@@ -136,6 +141,9 @@ public final class EffectChoices {
         if (SchemaRegistry.hasChoices(key)) {
             return SchemaRegistry.choicesFor(key);
         }
+        if (scope.contains(EQUIPMENT_SEGMENT) && EffectSchema.SUMMON_SLOTS.contains(key)) {
+            return itemIds();
+        }
         return switch (key) {
             case "hitbox" -> EffectSchema.HITBOX_SHAPES;
             case "phase" -> scope.contains(CastGate.KEY)
@@ -184,7 +192,7 @@ public final class EffectChoices {
             case "style_id", "substitute_style", "custom_style_id" -> styleIds();
             case "affix_id", "affix", "affixes", "grant_affixes" -> affixIds();
             case "entity", "summon", "become_entity", "attacker",
-                    "replaced_summoned_entities", "target" -> entityIds();
+                    "replaced_summoned_entities", "target", SummonGate.ENTITIES -> entityIds();
             case "attribute" -> attributeIds();
             case "source", "scales_with" -> scalingSourceIds();
             case "damage_type", "taken_damage_type" -> damageTypeIds();
@@ -261,6 +269,17 @@ public final class EffectChoices {
     private static List<String> effectIds() {
         return BuiltInRegistries.MOB_EFFECT.keySet().stream()
                 .map(ResourceLocation::toString).sorted().toList();
+    }
+
+    public static List<String> narrowedFor(String key, List<String> choices, String entity) {
+        if (!ABILITY_KEYS.contains(key) || entity == null || entity.isBlank()) {
+            return choices;
+        }
+        return choices.stream().filter(ability -> AbilityRegistry.usableBy(ability, entity)).toList();
+    }
+
+    public static String entityKey() {
+        return ENTITY_KEY;
     }
 
     private static List<String> abilityIds() {

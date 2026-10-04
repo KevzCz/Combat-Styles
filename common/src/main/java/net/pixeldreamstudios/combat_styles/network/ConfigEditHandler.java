@@ -18,6 +18,7 @@ import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.config.DefinitionLayer;
 import net.pixeldreamstudios.combat_styles.config.EquipmentDropConfig;
 import net.pixeldreamstudios.combat_styles.config.StatusEffectConfig;
+import net.pixeldreamstudios.combat_styles.config.SummonTuning;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentOverrides;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
@@ -75,6 +76,7 @@ public final class ConfigEditHandler {
             case STYLE_BOOK_CLEAR -> BookRolls.DEFINITIONS.delete(payload.id());
             case WEAPON_ROLL -> saveDefinition(WeaponRolls.DEFINITIONS, payload.id(), json);
             case WEAPON_ROLL_CLEAR -> WeaponRolls.DEFINITIONS.delete(payload.id());
+            case SUMMON_TUNING -> SummonTuning.applyEdit(json);
         };
         if (!applied) {
             CombatStyles.LOGGER.warn("Edit {} {} from {} was not applied",
@@ -103,7 +105,7 @@ public final class ConfigEditHandler {
 
     private static boolean isSetting(EditConfigPayload.Kind kind) {
         return switch (kind) {
-            case MAIN_CONFIG, STATUS_EFFECT, ABILITY, EQUIPMENT_DROP -> true;
+            case MAIN_CONFIG, STATUS_EFFECT, ABILITY, EQUIPMENT_DROP, SUMMON_TUNING -> true;
             default -> false;
         };
     }

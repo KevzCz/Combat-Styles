@@ -12,6 +12,7 @@ import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.config.EquipmentDropConfig;
 import net.pixeldreamstudios.combat_styles.config.StatusEffectConfig;
+import net.pixeldreamstudios.combat_styles.config.SummonTuning;
 import net.pixeldreamstudios.combat_styles.network.ConfigEditHandler;
 import net.pixeldreamstudios.combat_styles.network.EditConfigPayload;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
@@ -84,6 +85,8 @@ public final class ConfigEdits {
         addEntries(edits, EditConfigPayload.Kind.STATUS_EFFECT, StatusEffectConfig.toJson());
         addEntries(edits, EditConfigPayload.Kind.ABILITY, AbilityConfig.toJson());
         addEntries(edits, EditConfigPayload.Kind.EQUIPMENT_DROP, EquipmentDropConfig.toJson());
+        edits.add(new EditConfigPayload(EditConfigPayload.Kind.SUMMON_TUNING,
+                EditConfigPayload.NONE, SummonTuning.toJson().toString()));
         return edits;
     }
 

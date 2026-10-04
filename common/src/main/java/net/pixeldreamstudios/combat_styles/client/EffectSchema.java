@@ -21,8 +21,13 @@ import net.pixeldreamstudios.combat_styles.affix.SpawnAnchor;
 import net.pixeldreamstudios.combat_styles.affix.SpreadMode;
 import net.pixeldreamstudios.combat_styles.api.SchemaRegistry;
 import net.pixeldreamstudios.combat_styles.config.SpellCompatState;
+import net.pixeldreamstudios.combat_styles.config.SummonTuning;
 import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 import net.pixeldreamstudios.combat_styles.entity.AbilityRegistry;
+import net.pixeldreamstudios.combat_styles.entity.SummonCompanion;
+import net.pixeldreamstudios.combat_styles.entity.SummonEquipment;
+import net.pixeldreamstudios.combat_styles.entity.SummonFollow;
+import net.pixeldreamstudios.combat_styles.entity.SummonStats;
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
@@ -62,8 +67,8 @@ import net.pixeldreamstudios.combat_styles.equipment.SlotBand;
 import net.pixeldreamstudios.combat_styles.equipment.SlotSelection;
 import net.pixeldreamstudios.combat_styles.equipment.StyleSubstitution;
 import net.pixeldreamstudios.combat_styles.equipment.SummonDive;
+import net.pixeldreamstudios.combat_styles.equipment.SummonGate;
 import net.pixeldreamstudios.combat_styles.equipment.SummonProfile;
-import net.pixeldreamstudios.combat_styles.equipment.SummonReplacement;
 import net.pixeldreamstudios.combat_styles.style.AttackAttribute;
 import net.pixeldreamstudios.combat_styles.style.AttackBehaviour;
 import net.pixeldreamstudios.combat_styles.style.AttackOverride;
@@ -105,7 +110,10 @@ public final class EffectSchema {
     private static final String KEY_TUNE = "tune";
     private static final String KEY_ITEMS = "items";
     static final String KEY_SLOT = AccessoryMatch.SLOT;
-    private static final Set<String> SPARSE_KEYS = Set.of(KEY_ITEMS);
+    public static final String KEY_SUMMON_EQUIPMENT = "equipment";
+    private static final String KEY_ATTRIBUTES = "attributes";
+    private static final Set<String> SPARSE_KEYS = Set.of(KEY_ITEMS, KEY_ATTRIBUTES,
+            KEY_SUMMON_EQUIPMENT);
     private static final Set<String> OPT_IN_KEYS = Set.of(ItemMatch.EMPTY);
     private static final String KEY_CAST_SPELLS = "cast_spells";
     private static final int DEFAULT_CHANNEL_DURATION = 40;
@@ -125,6 +133,13 @@ public final class EffectSchema {
     private static final float DEFAULT_VAULT_STRENGTH = 0.5F;
     private static final float DEFAULT_HASTEN_RATIO = 0.5F;
     private static final String DEFAULT_SUMMON_ENTITY = "minecraft:bee";
+    private static final String DEFAULT_SUMMON_ITEM = "minecraft:iron_sword";
+    private static final String KEY_COMPANION = "companion";
+    private static final String KEY_FOLLOW = "follow";
+    private static final String KEY_DAMAGE_SPEC = "damage_spec";
+    private static final String KEY_OWN_DAMAGE = "own_damage";
+    public static final List<String> SUMMON_SLOTS = List.of("mainhand", "offhand", "head",
+            "chest", "legs", "feet", "body");
     private static final String DEFAULT_PROJECTILE_ENTITY = "minecraft:arrow";
     private static final String DEFAULT_COMMAND = "say hello";
     private static final int DEFAULT_ECHO_DELAY = 10;
@@ -136,7 +151,6 @@ public final class EffectSchema {
     public static final String ROOT_EFFECT = "";
     public static final String ROOT_TRIGGER = "@trigger";
     public static final String ROOT_SUBSTITUTION = "@substitution";
-    public static final String ROOT_SUMMON_REPLACE = "@summon_replace";
     public static final String ROOT_SUMMON_PROFILE = "@summon_profile";
     public static final String ROOT_ATTRIBUTE_MAP = "@attribute_map";
     public static final String ROOT_CONDITIONAL_ATTRIBUTES = "@conditional_attributes";
@@ -191,6 +205,10 @@ public final class EffectSchema {
     private static final String DEFAULT_TAKEN_DAMAGE_TAG = "#minecraft:is_fire";
     private static final DamageSpec.Share SAMPLE_SHARE =
             new DamageSpec.Share(DEFAULT_DAMAGE_TYPE, 0.5F);
+    private static final SummonFollow SAMPLE_FOLLOW = new SummonFollow(
+            Optional.of(SummonTuning.get().followStartDistance),
+            Optional.of(SummonTuning.get().followStopDistance),
+            Optional.of(SummonTuning.get().teleportDistance));
     private static final DamageSpec SAMPLE_DAMAGE_SPEC = new DamageSpec(
             4.0F, 0.5F, DamageSpec.NO_HEALTH_RATIO, DamageSpec.NO_HEALTH_RATIO,
             DamageSpec.NO_HEALTH_RATIO, Optional.empty(), Optional.empty(),
@@ -761,7 +779,8 @@ public final class EffectSchema {
         register("mechanics/spawn", "summons", AffixEffects.Summon.CODEC.listOf(),
                 List.of(new AffixEffects.Summon(DEFAULT_SUMMON_ENTITY, 1, 200, 2.0F,
                         true, 0.0F, Optional.empty(), Optional.empty(), 1.0F,
-                        Optional.empty())));
+                        Optional.empty(), Optional.empty(), SummonEquipment.NONE,
+                        SummonStats.NONE, false, false, false)));
         attachDamageSpec("mechanics/spawn", "summons");
         attachSpawn(join("mechanics/spawn", "summons"));
 
@@ -774,6 +793,11 @@ public final class EffectSchema {
         register(summons, "damage_ratio", Codec.FLOAT, 0.0F);
         register(summons, "ability", Codec.STRING, "");
         register(summons, "chance", Codec.FLOAT, 1.0F);
+        register(summons, "max_active", Codec.INT, 1);
+        register(summons, "spectral", Codec.BOOL, true);
+        register(summons, "keep_gear", Codec.BOOL, true);
+        register(summons, KEY_OWN_DAMAGE, Codec.BOOL, true);
+        registerSummonLoadout(summons);
         register("mechanics/spawn", "commands", AffixEffects.Command.CODEC.listOf(),
                 List.of(new AffixEffects.Command(DEFAULT_COMMAND, true)));
         register("mechanics/spawn", "delay_ticks", Codec.INT, 0);
@@ -849,7 +873,7 @@ public final class EffectSchema {
 
     private static void adoptRegistered() {
         for (String scope : List.of(ROOT_EFFECT, ROOT_TRIGGER, ROOT_SUBSTITUTION,
-                ROOT_SUMMON_REPLACE, ROOT_SUMMON_PROFILE, ROOT_SUMMON_DIVE,
+                ROOT_SUMMON_PROFILE, ROOT_SUMMON_DIVE,
                 ROOT_BEHAVIOUR, ROOT_TUNING, ROOT_ECHO, ROOT_COOLDOWN)) {
             for (SchemaRegistry.Entry entry : SchemaRegistry.fieldsFor(scope)) {
                 registerTemplate(scope, entry.key(), entry.sample());
@@ -865,7 +889,6 @@ public final class EffectSchema {
         audit(ROOT_EFFECT, AffixEffects.OnHit.CODEC);
         audit(ROOT_TRIGGER, EquipmentTrigger.CODEC);
         audit(ROOT_SUBSTITUTION, StyleSubstitution.CODEC);
-        audit(ROOT_SUMMON_REPLACE, SummonReplacement.CODEC);
         audit(ROOT_SUMMON_PROFILE, SummonProfile.CODEC);
         audit(ROOT_SUMMON_DIVE, SummonDive.CODEC);
         audit(ROOT_BEHAVIOUR, AttackBehaviour.CODEC);
@@ -910,6 +933,11 @@ public final class EffectSchema {
         register(root, "on_miss", Codec.BOOL, true);
         register(root, "on_kill", Codec.BOOL, true);
         register(root, "on_summon_hit", Codec.BOOL, true);
+        register(root, SummonGate.ON_SPAWN, Codec.BOOL, true);
+        register(root, SummonGate.ON_DEATH, Codec.BOOL, true);
+        register(root, SummonGate.ON_KILL, Codec.BOOL, true);
+        register(root, SummonGate.ENTITIES, Codec.STRING.listOf(), List.of(DEFAULT_SUMMON_ENTITY));
+        register(root, StateGate.SUMMONS_ACTIVE, Codec.INT, 1);
         register(root, "on_hurt", HurtGate.CODEC, HurtGate.ANY);
         String hurtRoot = join(root, "on_hurt");
         register(hurtRoot, "taken_damage_type", Codec.STRING.listOf(),
@@ -1056,8 +1084,27 @@ public final class EffectSchema {
                 Codec.unboundedMap(Codec.STRING, AttackOverride.CODEC), Map.of());
     }
 
+    private static void registerSummonLoadout(String root) {
+        register(root, KEY_SUMMON_EQUIPMENT, SummonEquipment.CODEC, SummonEquipment.NONE);
+        String equipment = join(root, KEY_SUMMON_EQUIPMENT);
+        for (String slot : SUMMON_SLOTS) {
+            register(equipment, slot, Codec.STRING, DEFAULT_SUMMON_ITEM);
+        }
+        register(root, KEY_ATTRIBUTES, SummonStats.CODEC, SummonStats.NONE);
+        String stats = join(root, KEY_ATTRIBUTES);
+        for (String attribute : EffectChoices.attributeIds()) {
+            register(stats, attribute, AttributeBonus.EXPANDED,
+                    new AttributeBonus(1.0D, AttributeModifier.Operation.ADD_VALUE,
+                            true, false, Optional.empty()));
+            String entry = join(stats, attribute);
+            register(entry, "amount", Codec.DOUBLE, 1.0D);
+            register(entry, "operation", AttackAttribute.OPERATION_CODEC,
+                    AttributeModifier.Operation.ADD_VALUE);
+        }
+    }
+
     private static void registerSummons() {
-        for (String root : List.of(ROOT_SUMMON_REPLACE, ROOT_SUMMON_PROFILE)) {
+        for (String root : List.of(ROOT_SUMMON_PROFILE)) {
             register(root, "replaced_summoned_entities", Codec.STRING.listOf(),
                     List.of(DEFAULT_SUMMON_ENTITY));
             register(root, "abilities", Codec.STRING.listOf(), List.of(""));
@@ -1069,11 +1116,25 @@ public final class EffectSchema {
                             Optional.empty(), false));
             register(root, "exempt", Codec.STRING.listOf(), List.of(""));
         }
-        register(ROOT_SUMMON_REPLACE, "become_entity", Codec.STRING, DEFAULT_SUMMON_ENTITY);
         register(ROOT_SUMMON_PROFILE, "entity", Codec.STRING, DEFAULT_SUMMON_ENTITY);
         register(ROOT_SUMMON_PROFILE, "anchored", Codec.INT, 1);
         register(ROOT_SUMMON_PROFILE, "finale", Codec.STRING, "");
         register(ROOT_SUMMON_PROFILE, "replaces_summons", Codec.BOOL, true);
+        register(ROOT_SUMMON_PROFILE, KEY_DAMAGE_SPEC, DamageSpec.CODEC, SAMPLE_DAMAGE_SPEC);
+        register(ROOT_SUMMON_PROFILE, KEY_OWN_DAMAGE, Codec.BOOL, true);
+        registerDamageSpec(join(ROOT_SUMMON_PROFILE, KEY_DAMAGE_SPEC));
+        register(ROOT_SUMMON_PROFILE, KEY_COMPANION, SummonCompanion.CODEC,
+                SummonCompanion.ofCount(SummonCompanion.DEFAULT_COUNT));
+        String companion = join(ROOT_SUMMON_PROFILE, KEY_COMPANION);
+        register(companion, "count", Codec.INT, SummonCompanion.DEFAULT_COUNT);
+        register(companion, "respawn_ticks", Codec.INT, SummonCompanion.DEFAULT_RESPAWN_TICKS);
+        register(companion, "spectral", Codec.BOOL, true);
+        register(companion, KEY_FOLLOW, SummonFollow.CODEC, SAMPLE_FOLLOW);
+        String follow = join(companion, KEY_FOLLOW);
+        register(follow, "start_distance", Codec.DOUBLE, SummonTuning.get().followStartDistance);
+        register(follow, "stop_distance", Codec.DOUBLE, SummonTuning.get().followStopDistance);
+        register(follow, "teleport_distance", Codec.DOUBLE, SummonTuning.get().teleportDistance);
+        registerSummonLoadout(companion);
         register(ROOT_SUMMON_PROFILE, "tuning",
                 Codec.unboundedMap(Codec.STRING, AbilityTuning.CODEC), Map.of());
         register(ROOT_SUMMON_PROFILE, "variants", ProfileVariant.CODEC.listOf(),
@@ -1318,7 +1379,8 @@ public final class EffectSchema {
 
     private static final List<List<String>> EXCLUSIVE = List.of(
             List.of("on_miss", "on_kill", "on_summon_hit", "on_swing", "on_player_hit",
-                    "on_projectile_hit"),
+                    "on_projectile_hit", SummonGate.ON_SPAWN, SummonGate.ON_DEATH,
+                    SummonGate.ON_KILL),
             List.of("slot_index", "slots", "slot_band", "last_slot"),
             List.of("style_id", "affix_id"),
             List.of("any_of", "all_of"));
