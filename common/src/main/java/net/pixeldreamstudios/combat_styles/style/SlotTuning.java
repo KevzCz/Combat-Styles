@@ -125,7 +125,8 @@ public record SlotTuning(List<Integer> slots, List<String> affixes,
                 extra.hastensNext().or(base::hastensNext),
                 extra.drag().or(base::drag),
                 extra.behaviour().or(base::behaviour),
-                extra.damageType().or(base::damageType));
+                extra.damageType().or(base::damageType))
+                .withScaleAnimation(extra.scaleAnimation().or(base::scaleAnimation));
     }
 
 }

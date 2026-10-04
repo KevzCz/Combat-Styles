@@ -41,7 +41,8 @@ public record AttackOverride(Optional<Double> damageMultiplier,
                              Optional<AttackBehaviour> behaviour,
                              Optional<String> damageType,
                              List<String> affixes,
-                             Map<String, AffixTuning> affixTuning) {
+                             Map<String, AffixTuning> affixTuning,
+                             Optional<Boolean> scaleAnimation) {
 
     private record Shape(Optional<Double> damageMultiplier, Optional<Double> angle,
                           Optional<Double> upswing, Optional<Float> rangeMultiplier,
@@ -67,7 +68,8 @@ public record AttackOverride(Optional<Double> damageMultiplier,
 
     private record Timing(Optional<AttackAttribute> cooldownScale,
                           Optional<AttackAttribute> hastensNext,
-                          Optional<AttackDrag> drag) {
+                          Optional<AttackDrag> drag,
+                          Optional<Boolean> scaleAnimation) {
     }
 
     private static final MapCodec<Shape> SHAPE_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
@@ -100,7 +102,8 @@ public record AttackOverride(Optional<Double> damageMultiplier,
     private static final MapCodec<Timing> TIMING_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             AttackAttribute.CODEC.optionalFieldOf("cooldown_scale").forGetter(Timing::cooldownScale),
             AttackAttribute.CODEC.optionalFieldOf("hastens_next").forGetter(Timing::hastensNext),
-            AttackDrag.CODEC.optionalFieldOf("drag").forGetter(Timing::drag)
+            AttackDrag.CODEC.optionalFieldOf("drag").forGetter(Timing::drag),
+            Codec.BOOL.optionalFieldOf("scale_animation").forGetter(Timing::scaleAnimation)
     ).apply(instance, Timing::new));
 
     public static final Codec<AttackOverride> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -112,7 +115,7 @@ public record AttackOverride(Optional<Double> damageMultiplier,
                     override.ignoreAffinity(), override.damageType(),
                     override.affixes(), override.affixTuning())),
             TIMING_CODEC.forGetter(override -> new Timing(override.cooldownScale(),
-                    override.hastensNext(), override.drag())),
+                    override.hastensNext(), override.drag(), override.scaleAnimation())),
             AttackBehaviour.CODEC.optionalFieldOf("behaviour")
                     .forGetter(AttackOverride::behaviour)
     ).apply(instance, (shape, meta, timing, behaviour) -> new AttackOverride(
@@ -121,12 +124,33 @@ public record AttackOverride(Optional<Double> damageMultiplier,
             meta.swingSound(), meta.rarity(), meta.costOverride(), meta.disabled(),
             meta.attributes(), meta.ignoreAffinity(),
             timing.cooldownScale(), timing.hastensNext(), timing.drag(), behaviour,
-            meta.damageType(), meta.affixes(), meta.affixTuning())));
+            meta.damageType(), meta.affixes(), meta.affixTuning(),
+            timing.scaleAnimation())));
 
     public AttackOverride {
         attributes = attributes == null ? Map.of() : Map.copyOf(attributes);
         affixes = affixes == null ? List.of() : List.copyOf(affixes);
         affixTuning = affixTuning == null ? Map.of() : Map.copyOf(affixTuning);
+        scaleAnimation = scaleAnimation == null ? Optional.empty() : scaleAnimation;
+    }
+
+    public AttackOverride(Optional<Double> damageMultiplier, Optional<Double> angle,
+                          Optional<Double> upswing, Optional<Float> rangeMultiplier,
+                          Optional<Float> movementSpeedMultiplier, Optional<String> hitbox,
+                          Optional<String> animation, Optional<String> swingSound,
+                          Optional<String> rarity, Optional<Double> costOverride,
+                          Optional<Boolean> disabled, Map<String, AttackAttribute> attributes,
+                          Optional<Boolean> ignoreAffinity,
+                          Optional<AttackAttribute> cooldownScale,
+                          Optional<AttackAttribute> hastensNext,
+                          Optional<AttackDrag> drag,
+                          Optional<AttackBehaviour> behaviour,
+                          Optional<String> damageType, List<String> affixes,
+                          Map<String, AffixTuning> affixTuning) {
+        this(damageMultiplier, angle, upswing, rangeMultiplier, movementSpeedMultiplier,
+                hitbox, animation, swingSound, rarity, costOverride, disabled, attributes,
+                ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType,
+                affixes, affixTuning, Optional.empty());
     }
 
     public AttackOverride(Optional<Double> damageMultiplier, Optional<Double> angle,
@@ -205,6 +229,7 @@ public record AttackOverride(Optional<Double> damageMultiplier,
                 + cooldownScale.map(v -> "s" + Math.round(v.amount() * 1000)).orElse("")
                 + hastensNext.map(v -> "h" + Math.round(v.amount() * 1000)).orElse("")
                 + drag.map(v -> "g" + v.signature()).orElse("")
+                + scaleAnimation.map(v -> "z" + v).orElse("")
                 + behaviour.map(AttackBehaviour::signature).orElse("");
     }
 
@@ -240,7 +265,8 @@ public record AttackOverride(Optional<Double> damageMultiplier,
                 timing.hastensNext().or(other::hastensNext),
                 timing.drag().or(other::drag),
                 mergedBehaviour(behaviourMode, behaviour(), other.behaviour()),
-                meta.damageType().or(other::damageType));
+                meta.damageType().or(other::damageType))
+                .withScaleAnimation(timing.scaleAnimation().or(other::scaleAnimation));
     }
 
     public AttackOverride mergedWith(AttackOverride other, MergeMode mode) {
@@ -276,7 +302,8 @@ public record AttackOverride(Optional<Double> damageMultiplier,
                 other.hastensNext().or(this::hastensNext),
                 other.drag().or(this::drag),
                 mergedBehaviour(other, mode),
-                other.damageType().or(this::damageType));
+                other.damageType().or(this::damageType))
+                .withScaleAnimation(other.scaleAnimation().or(this::scaleAnimation));
     }
 
     private Optional<AttackBehaviour> mergedBehaviour(AttackOverride other, MergeMode mode) {
@@ -420,7 +447,8 @@ public record AttackOverride(Optional<Double> damageMultiplier,
                 other.hastensNext().or(this::hastensNext),
                 other.drag().or(this::drag),
                 other.behaviour().or(this::behaviour),
-                other.damageType().or(this::damageType));
+                other.damageType().or(this::damageType))
+                .withScaleAnimation(other.scaleAnimation().or(this::scaleAnimation));
     }
 
     public AttackOverride withBehaviour(AttackBehaviour value) {
@@ -428,7 +456,7 @@ public record AttackOverride(Optional<Double> damageMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride,
                 disabled, attributes, ignoreAffinity, cooldownScale, hastensNext, drag,
                 value == null || value.isEmpty() ? Optional.empty() : Optional.of(value),
-                damageType);
+                damageType).withScaleAnimation(scaleAnimation);
     }
 
     public AttackBehaviour behaviourOrDefault() {
@@ -441,33 +469,33 @@ public record AttackOverride(Optional<Double> damageMultiplier,
                 disabled, attributes, ignoreAffinity, cooldownScale, hastensNext, drag,
                 behaviour, damageType,
                 ids == null ? List.of() : List.copyOf(ids),
-                tuning == null ? Map.of() : Map.copyOf(tuning));
+                tuning == null ? Map.of() : Map.copyOf(tuning), scaleAnimation);
     }
 
     public AttackOverride withAttributes(Map<String, AttackAttribute> value) {
         return new AttackOverride(damageMultiplier, angle, upswing, rangeMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride,
                 disabled, value == null ? Map.of() : Map.copyOf(value), ignoreAffinity,
-                cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning);
+                cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withIgnoreAffinity(boolean value) {
         return new AttackOverride(damageMultiplier, angle, upswing, rangeMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride,
-                disabled, attributes, Optional.of(value), cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning);
+                disabled, attributes, Optional.of(value), cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withDamageMultiplier(double value) {
         return new AttackOverride(Optional.of(value), angle, upswing, rangeMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride, disabled,
-                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning);
+                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withHitbox(String value) {
         return new AttackOverride(damageMultiplier, angle, upswing, rangeMultiplier,
                 movementSpeedMultiplier, Optional.ofNullable(value), animation, swingSound,
                 rarity, costOverride, disabled,
-                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning);
+                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withSwingSound(String value) {
@@ -475,7 +503,7 @@ public record AttackOverride(Optional<Double> damageMultiplier,
                 movementSpeedMultiplier, hitbox, animation, Optional.ofNullable(value),
                 rarity, costOverride, disabled,
                 attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour,
-                damageType);
+                damageType).withScaleAnimation(scaleAnimation);
     }
 
     public AttackOverride withDamageType(String value) {
@@ -483,58 +511,70 @@ public record AttackOverride(Optional<Double> damageMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound,
                 rarity, costOverride, disabled,
                 attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour,
-                value == null || value.isEmpty() ? Optional.empty() : Optional.of(value));
+                value == null || value.isEmpty() ? Optional.empty() : Optional.of(value))
+                .withScaleAnimation(scaleAnimation);
     }
 
     public AttackOverride withAngle(double value) {
         return new AttackOverride(damageMultiplier, Optional.of(value), upswing, rangeMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride, disabled,
-                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning);
+                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withUpswing(double value) {
         return new AttackOverride(damageMultiplier, angle, Optional.of(value), rangeMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride, disabled,
-                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning);
+                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withRangeMultiplier(float value) {
         return new AttackOverride(damageMultiplier, angle, upswing, Optional.of(value),
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride, disabled,
-                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning);
+                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withMovementSpeedMultiplier(float value) {
         return new AttackOverride(damageMultiplier, angle, upswing, rangeMultiplier,
                 Optional.of(value), hitbox, animation, swingSound, rarity, costOverride, disabled,
-                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning);
+                attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withCooldownScale(AttackAttribute value) {
         return new AttackOverride(damageMultiplier, angle, upswing, rangeMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride,
-                disabled, attributes, ignoreAffinity, Optional.ofNullable(value), hastensNext, drag, behaviour, damageType, affixes, affixTuning);
+                disabled, attributes, ignoreAffinity, Optional.ofNullable(value), hastensNext, drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withCostOverride(Double value) {
         return new AttackOverride(damageMultiplier, angle, upswing, rangeMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity,
                 Optional.ofNullable(value),
-                disabled, attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning);
+                disabled, attributes, ignoreAffinity, cooldownScale, hastensNext, drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withHastensNext(AttackAttribute value) {
         return new AttackOverride(damageMultiplier, angle, upswing, rangeMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride,
                 disabled, attributes, ignoreAffinity, cooldownScale, Optional.ofNullable(value),
-                drag, behaviour, damageType, affixes, affixTuning);
+                drag, behaviour, damageType, affixes, affixTuning, scaleAnimation);
     }
 
     public AttackOverride withDrag(AttackDrag value) {
         return new AttackOverride(damageMultiplier, angle, upswing, rangeMultiplier,
                 movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride,
                 disabled, attributes, ignoreAffinity, cooldownScale, hastensNext,
-                Optional.of(value), behaviour, damageType, affixes, affixTuning);
+                Optional.of(value), behaviour, damageType, affixes, affixTuning, scaleAnimation);
+    }
+
+    public AttackOverride withScaleAnimation(Optional<Boolean> value) {
+        return new AttackOverride(damageMultiplier, angle, upswing, rangeMultiplier,
+                movementSpeedMultiplier, hitbox, animation, swingSound, rarity, costOverride,
+                disabled, attributes, ignoreAffinity, cooldownScale, hastensNext, drag,
+                behaviour, damageType, affixes, affixTuning, value);
+    }
+
+    public boolean scalesAnimation() {
+        return scaleAnimation.orElse(Boolean.FALSE);
     }
 
     public AttackDrag dragOrDefault() {

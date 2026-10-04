@@ -19,7 +19,7 @@ public final class SwingScales {
         if (player == null) {
             return SwingHaste.NEUTRAL_MULTIPLIER;
         }
-        AttackOverride override = AffixDamageDealer.attackOverrideFor(player, comboCount);
+        AttackOverride override = AffixDamageDealer.plannedAttackOverrideFor(player, comboCount);
         return override == null
                 ? SwingHaste.NEUTRAL_MULTIPLIER
                 : override.cooldownScale()
@@ -31,12 +31,20 @@ public final class SwingScales {
         if (player == null || comboCount <= 0) {
             return SwingHaste.NEUTRAL_MULTIPLIER;
         }
-        AttackOverride previous = AffixDamageDealer.attackOverrideFor(player, comboCount - 1);
+        AttackOverride previous = AffixDamageDealer.plannedAttackOverrideFor(player, comboCount - 1);
         return previous == null
                 ? SwingHaste.NEUTRAL_MULTIPLIER
                 : previous.hastensNext()
                         .map(value -> (float) value.amount())
                         .orElse(SwingHaste.NEUTRAL_MULTIPLIER);
+    }
+
+    public static boolean scalesAnimation(Player player, int comboCount) {
+        if (player == null) {
+            return false;
+        }
+        AttackOverride override = AffixDamageDealer.plannedAttackOverrideFor(player, comboCount);
+        return override != null && override.scalesAnimation();
     }
 
     public static float upcomingTimingScaleFor(Player player, int comboCount) {
@@ -51,7 +59,7 @@ public final class SwingScales {
         if (player == null) {
             return SwingHaste.NEUTRAL_MULTIPLIER;
         }
-        AttackOverride override = AffixDamageDealer.attackOverrideFor(player, comboCount);
+        AttackOverride override = AffixDamageDealer.plannedAttackOverrideFor(player, comboCount);
         float own = ownCooldownScaleFor(player, comboCount);
         float inherited = inheritedHasteFor(player, comboCount);
         float scale = own;
@@ -74,7 +82,7 @@ public final class SwingScales {
         }
         float own = ownCooldownScaleFor(player, comboCount);
         float next = ownCooldownScaleFor(player, comboCount + 1);
-        AttackOverride override = AffixDamageDealer.attackOverrideFor(player, comboCount);
+        AttackOverride override = AffixDamageDealer.plannedAttackOverrideFor(player, comboCount);
         float hastens = override == null
                 ? SwingHaste.NEUTRAL_MULTIPLIER
                 : override.hastensNext()

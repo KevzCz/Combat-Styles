@@ -1275,6 +1275,7 @@ public final class EffectSchema {
                 AttackAttribute.flat(1.0D));
         register(override, "hastens_next", AttackAttribute.CODEC,
                 AttackAttribute.flat(1.0D));
+        register(override, "scale_animation", Codec.BOOL, true);
 
         String slashes = join(ROOT_BEHAVIOUR, "slashes");
         register(slashes, "particle_type", Codec.STRING, DEFAULT_PARTICLE);

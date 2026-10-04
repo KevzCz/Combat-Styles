@@ -68,13 +68,41 @@ public class SwingHasteMixin {
             require = 1)
     private float combat_styles$beginHastenedSwing(Player target,
                                                    Operation<Float> original) {
+        float duration;
         SwingHaste.beginReadingSwingDuration();
         try {
-            return original.call(target);
+            duration = original.call(target);
         } finally {
             SwingHaste.endReadingSwingDuration();
         }
+        Player player = Minecraft.getInstance().player;
+        if (player == null) {
+            return duration;
+        }
+        MinecraftClient_BetterCombat client =
+                (MinecraftClient_BetterCombat) Minecraft.getInstance();
+        int raw = client.getComboCount();
+        combat_styles$scalingAnimation = SwingScales.scalesAnimation(player, raw);
+        combat_styles$animationScale = combat_styles$scalingAnimation
+                ? SwingScales.cooldownScaleFor(player, raw)
+                : SwingHaste.NEUTRAL_MULTIPLIER;
+        if (!combat_styles$scalingAnimation) {
+            return duration;
+        }
+        float scaled = Math.max(SwingHaste.MIN_SWING_TICKS,
+                duration * combat_styles$animationScale);
+        if (CombatStylesConfig.get().debugLogging()) {
+            CombatStyles.LOGGER.info("[CD] scale_animation combo={} duration {} -> {}",
+                    raw, duration, scaled);
+        }
+        return scaled;
     }
+
+    @Unique
+    private static boolean combat_styles$scalingAnimation;
+
+    @Unique
+    private static float combat_styles$animationScale = SwingHaste.NEUTRAL_MULTIPLIER;
 
     @ModifyVariable(
             method = "startUpswing",
@@ -86,6 +114,16 @@ public class SwingHasteMixin {
         Player player = Minecraft.getInstance().player;
         if (player == null) {
             return attackCooldownTicks;
+        }
+        if (combat_styles$scalingAnimation) {
+            if (combat_styles$animationScale <= 0.0F) {
+                return attackCooldownTicks;
+            }
+            float extra = Math.min(combat_styles$animationScale, SwingHaste.clamped(player))
+                    / combat_styles$animationScale;
+            return extra >= SwingHaste.NEUTRAL_MULTIPLIER
+                    ? attackCooldownTicks
+                    : Math.max(1, Math.round(attackCooldownTicks * extra));
         }
         MinecraftClient_BetterCombat client =
                 (MinecraftClient_BetterCombat) Minecraft.getInstance();
@@ -119,6 +157,12 @@ public class SwingHasteMixin {
         Player player = Minecraft.getInstance().player;
         if (player == null) {
             return original.call(ticks);
+        }
+        if (combat_styles$scalingAnimation) {
+            float scale = combat_styles$animationScale;
+            return original.call(scale > 0.0F && scale < SwingHaste.NEUTRAL_MULTIPLIER
+                    ? ticks / scale
+                    : ticks);
         }
         MinecraftClient_BetterCombat client =
                 (MinecraftClient_BetterCombat) Minecraft.getInstance();

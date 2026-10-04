@@ -83,6 +83,10 @@ public class AttackEditorScreen extends PanelScreen {
     private static final String KEY_AFFINITY_OFF = "screen.combat_styles.affinity_off";
     private static final String KEY_DRAG_ON = "screen.combat_styles.drag_on";
     private static final String KEY_DRAG_OFF = "screen.combat_styles.drag_off";
+    private static final String KEY_SCALE_ANIMATION_ON = "screen.combat_styles.scale_animation_on";
+    private static final String KEY_SCALE_ANIMATION_OFF = "screen.combat_styles.scale_animation_off";
+    private static final int SCALE_ANIMATION_EXTRA_WIDTH = 50;
+    private static final int TRAIL_SWATCH_SIZE = 12;
     private static final String KEY_RESET = "screen.combat_styles.reset";
     private static final String KEY_BORROW = "screen.combat_styles.borrow_attack";
     private static final String KEY_NAME = "screen.combat_styles.attack_name";
@@ -178,6 +182,7 @@ public class AttackEditorScreen extends PanelScreen {
     private EditBox nameBox;
     private boolean ignoreAffinity;
     private boolean dragEnabled;
+    private boolean scaleAnimation;
     private boolean combat_styles$draggingBar;
     private String hitboxChoice = "";
     private String soundChoice = "";
@@ -287,6 +292,7 @@ public class AttackEditorScreen extends PanelScreen {
 
         AttackOverride override = current == null ? AttackOverride.EMPTY : current;
         ignoreAffinity = override.ignoreAffinity().orElse(false);
+        scaleAnimation = override.scalesAnimation();
         hitboxChoice = override.hitbox().orElse("");
         soundChoice = override.swingSound().orElse("");
         damageTypeChoice = override.damageType().orElse("");
@@ -528,6 +534,13 @@ public class AttackEditorScreen extends PanelScreen {
         }).bounds(left + PADDING + 84, top + PANEL_HEIGHT - FOOTER + 2,
                 BUTTON_WIDTH + 30, 16).build());
 
+        combat_styles$footer(PanelButton.of(scaleAnimationLabel(), button -> {
+            scaleAnimation = !scaleAnimation;
+            button.setMessage(scaleAnimationLabel());
+        }).bounds(left + PADDING + 86 + BUTTON_WIDTH + 30 + TRAIL_SWATCH_SIZE + BUTTON_GAP,
+                top + PANEL_HEIGHT - FOOTER + 2,
+                BUTTON_WIDTH + SCALE_ANIMATION_EXTRA_WIDTH, 16).build());
+
         valueBox = new FieldBox(font, left + PADDING, top + NAME_BOX_Y, 60, 12, Component.empty());
         valueBox.setMaxLength(12);
         valueBox.setVisible(false);
@@ -667,6 +680,10 @@ public class AttackEditorScreen extends PanelScreen {
 
     private Component affinityLabel() {
         return Component.translatable(ignoreAffinity ? KEY_AFFINITY_OFF : KEY_AFFINITY_ON);
+    }
+
+    private Component scaleAnimationLabel() {
+        return Component.translatable(scaleAnimation ? KEY_SCALE_ANIMATION_ON : KEY_SCALE_ANIMATION_OFF);
     }
 
     private Component dragLabel() {
@@ -826,6 +843,10 @@ public class AttackEditorScreen extends PanelScreen {
         }
         if (ignoreAffinity) {
             override = override.withIgnoreAffinity(true);
+            any = true;
+        }
+        if (scaleAnimation) {
+            override = override.withScaleAnimation(Optional.of(Boolean.TRUE));
             any = true;
         }
         onApply.accept(any ? override : null);

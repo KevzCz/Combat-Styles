@@ -118,7 +118,8 @@ public final class EquipmentComposer {
                 augment.hastensNext(),
                 augment.drag(),
                 augment.behaviour(),
-                augment.damageType());
+                augment.damageType())
+                .withScaleAnimation(augment.scaleAnimation());
     }
 
     public static AttackOverride mergeAugments(AttackOverride base, AttackOverride extra) {

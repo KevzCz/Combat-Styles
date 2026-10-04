@@ -519,13 +519,13 @@ public final class AffixDamageDealer {
         }
         AttackOverride previous = combo <= 0
                 ? null
-                : attackOverrideFor(player, rawCombo - 1);
+                : plannedAttackOverrideFor(player, rawCombo - 1);
         float inherited = previous == null
                 ? SwingHaste.NEUTRAL_MULTIPLIER
                 : previous.hastensNext()
                         .map(haste -> (float) haste.amount())
                         .orElse(SwingHaste.NEUTRAL_MULTIPLIER);
-        AttackOverride override = attackOverrideFor(player, rawCombo);
+        AttackOverride override = plannedAttackOverrideFor(player, rawCombo);
         float own = override == null
                 ? SwingHaste.NEUTRAL_MULTIPLIER
                 : override.cooldownScale()
@@ -1472,6 +1472,15 @@ public final class AffixDamageDealer {
     }
 
     public static AttackOverride attackOverrideFor(Player player, int comboCount) {
+        return attackOverrideFor(player, comboCount, true);
+    }
+
+    public static AttackOverride plannedAttackOverrideFor(Player player, int comboCount) {
+        return attackOverrideFor(player, comboCount, false);
+    }
+
+    private static AttackOverride attackOverrideFor(Player player, int comboCount,
+                                                    boolean followSwung) {
         ItemStack weapon = swingingWeapon(player, comboCount);
         StyleSequence sequence;
         SwingHolder.push(player);
@@ -1490,7 +1499,7 @@ public final class AffixDamageDealer {
             return SequenceService.attackOverridesOf(weapon).get(String.valueOf(nativeSlot));
         }
         int slot = SequenceSlots.slotFor(SequenceSlots.sequenceComboOf(player, comboCount), entries.size());
-        WeaponAttributes.Attack swungAttack = CombatState.swungAttack(player);
+        WeaponAttributes.Attack swungAttack = followSwung ? CombatState.swungAttack(player) : null;
         if (swungAttack != null) {
             StylePage at = pageOf(entries.get(slot));
             if (at == null || !matches(at.attack(), swungAttack)) {
