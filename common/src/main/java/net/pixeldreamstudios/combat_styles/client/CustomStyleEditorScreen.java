@@ -34,7 +34,7 @@ import java.util.function.Consumer;
 public class CustomStyleEditorScreen extends PanelScreen {
 
     private static final int PANEL_WIDTH = 320;
-    private static final int PANEL_HEIGHT = 236;
+    private static final int PANEL_HEIGHT = 256;
     private static final int ROW_HEIGHT = 20;
     private static final int BUTTON_WIDTH = 84;
     private static final int LABEL_WIDTH = 92;
@@ -53,6 +53,9 @@ public class CustomStyleEditorScreen extends PanelScreen {
     private static final String KEY_CATEGORY = "screen.combat_styles.custom_style_category";
     private static final String KEY_RARITY = "screen.combat_styles.custom_style_rarity";
     private static final String KEY_COST = "screen.combat_styles.custom_style_cost";
+    private static final String KEY_STYLE_PAGE = "screen.combat_styles.custom_style_page";
+    private static final String KEY_NATURAL = "screen.combat_styles.style_page_natural";
+    private static final String KEY_NOT_NATURAL = "screen.combat_styles.style_page_hidden";
     private static final String KEY_DETAILS = "screen.combat_styles.custom_style_details";
     private static final String KEY_INHERIT = "screen.combat_styles.custom_style_inherit";
     private static final String KEY_NO_BASE = "screen.combat_styles.custom_style_no_base";
@@ -76,6 +79,8 @@ public class CustomStyleEditorScreen extends PanelScreen {
     private Button categoryButton;
     private Button rarityButton;
     private Button detailsButton;
+    private Button stylePageButton;
+    private boolean natural;
 
     private String baseStyleId;
     private Optional<String> category;
@@ -101,6 +106,7 @@ public class CustomStyleEditorScreen extends PanelScreen {
         this.baseStyleId = start.styleId();
         this.category = existing == null ? Optional.empty() : existing.category();
         this.rarity = existing == null ? Optional.empty() : existing.rarity();
+        this.natural = existing == null || existing.stylePage().orElse(Boolean.TRUE);
         this.attackOverride = start.attackOverride();
         this.affixIds = new ArrayList<>(start.affixIds());
         this.affixTuning = new LinkedHashMap<>(start.affixTuning());
@@ -160,6 +166,11 @@ public class CustomStyleEditorScreen extends PanelScreen {
         costBox = field(fieldX, y, fieldWidth, costBox == null
                 ? (existing == null ? "" : existing.costOverride().map(StyleText::formatDecimal).orElse(""))
                 : costBox.getValue(), KEY_COST);
+        y += ROW_HEIGHT;
+
+        stylePageButton = addRenderableWidget(tipped(PanelButton.of(stylePageLabel(),
+                button -> natural = !natural), KEY_STYLE_PAGE)
+                .bounds(fieldX, y, fieldWidth, ScreenTheme.BUTTON_HEIGHT).build());
         y += ROW_HEIGHT + GAP;
 
         detailsButton = addRenderableWidget(tipped(PanelButton.of(
@@ -220,6 +231,10 @@ public class CustomStyleEditorScreen extends PanelScreen {
         return category.isEmpty()
                 ? Component.translatable(KEY_INHERIT).withStyle(ChatFormatting.DARK_GRAY)
                 : Component.literal(StyleText.prettify(category.get()));
+    }
+
+    private Component stylePageLabel() {
+        return Component.translatable(natural ? KEY_NATURAL : KEY_NOT_NATURAL);
     }
 
     private Component rarityLabel() {
@@ -300,7 +315,8 @@ public class CustomStyleEditorScreen extends PanelScreen {
         StyleEntry entry = new StyleEntry(baseStyleId, soundId, List.copyOf(affixIds),
                 attackOverride, name, nameKey, Map.copyOf(affixTuning));
         CustomStyle style = new CustomStyle(id, group.isEmpty() ? CustomStyle.DEFAULT_GROUP : group,
-                entry, category, rarity, parseCost());
+                entry, category, rarity, parseCost(),
+                natural ? Optional.empty() : Optional.of(Boolean.FALSE));
         if (!ConfigEdits.save(EditConfigPayload.Kind.CUSTOM_STYLE, id, CustomStyle.CODEC, style)) {
             error = Component.translatable(KEY_SAVE_FAILED).getString();
             return;
@@ -323,12 +339,14 @@ public class CustomStyleEditorScreen extends PanelScreen {
         baseButton.setMessage(baseLabel());
         categoryButton.setMessage(categoryLabel());
         rarityButton.setMessage(rarityLabel());
+        stylePageButton.setMessage(stylePageLabel());
         detailsButton.active = basePage() != null;
 
         graphics.drawString(font, title, left + ScreenTheme.PADDING, top + TITLE_Y,
                 ScreenTheme.HEADING, false);
         int y = top + FORM_TOP + (FIELD_HEIGHT - font.lineHeight) / 2 + 1;
-        for (String key : List.of(KEY_ID, KEY_GROUP, KEY_BASE, KEY_CATEGORY, KEY_RARITY, KEY_COST)) {
+        for (String key : List.of(KEY_ID, KEY_GROUP, KEY_BASE, KEY_CATEGORY, KEY_RARITY, KEY_COST,
+                KEY_STYLE_PAGE)) {
             graphics.drawString(font, Component.translatable(key),
                     left + ScreenTheme.PADDING, y, ScreenTheme.TEXT, false);
             y += ROW_HEIGHT;

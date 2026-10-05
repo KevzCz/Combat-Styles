@@ -14,7 +14,8 @@ public record CustomAttack(String id, DeclaredAttack attack,
                            Optional<String> category,
                            Optional<StyleRarity> rarity,
                            Optional<Double> costOverride,
-                           Optional<String> nameKey) {
+                           Optional<String> nameKey,
+                           Optional<Boolean> stylePage) {
 
     public static final String DEFAULT_CATEGORY = "custom";
 
@@ -24,7 +25,8 @@ public record CustomAttack(String id, DeclaredAttack attack,
             Codec.STRING.optionalFieldOf("category").forGetter(CustomAttack::category),
             StyleRarity.CODEC.optionalFieldOf("rarity").forGetter(CustomAttack::rarity),
             Codec.DOUBLE.optionalFieldOf("cost").forGetter(CustomAttack::costOverride),
-            Codec.STRING.optionalFieldOf("name_key").forGetter(CustomAttack::nameKey)
+            Codec.STRING.optionalFieldOf("name_key").forGetter(CustomAttack::nameKey),
+            Codec.BOOL.optionalFieldOf(StylePool.KEY_STYLE_PAGE).forGetter(CustomAttack::stylePage)
     ).apply(instance, CustomAttack::new));
 
     public static final StreamCodec<ByteBuf, CustomAttack> STREAM_CODEC =

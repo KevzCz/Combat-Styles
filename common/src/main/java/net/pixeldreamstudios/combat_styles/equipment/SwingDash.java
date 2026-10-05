@@ -352,8 +352,7 @@ public final class SwingDash {
             }
             int slots = seq.entries().size();
             if (slots > 0) {
-                int slot = SequenceSlots.slotFor(
-                        SequenceSlots.sequenceComboOf(player, comboCount), slots);
+                int slot = SequenceSlots.liveSlot(player, weapon, comboCount, slots);
                 AttackOverride bySlot = seq.entries().get(slot).attackOverride().orElse(null);
                 if (bySlot == null || !bySlot.dragOrDefault().enabled()) {
                     bySlot = SequenceService.attackOverridesOf(weapon)
@@ -371,7 +370,7 @@ public final class SwingDash {
             int seqCombo = SequenceSlots.sequenceComboOf(player, comboCount);
             if (CombatDebug.enabled(player)) {
                 CombatDebug.skipped(player, "drag", "no drag on slot "
-                        + CombatDebug.slot(SequenceSlots.slotFor(seqCombo, slots), slots)
+                        + CombatDebug.slot(SequenceSlots.liveSlot(player, weapon, comboCount, slots), slots)
                         + " (combo=" + comboCount + " seqCombo=" + seqCombo
                         + " slots=" + slots
                         + " keys=" + SequenceService.attackOverridesOf(weapon).keySet() + ")");
@@ -415,8 +414,7 @@ public final class SwingDash {
                 SwingHolder.pop();
             }
             int slots = seq.entries().size();
-            int slot = slots <= 0 ? -1 : SequenceSlots.slotFor(
-                    SequenceSlots.sequenceComboOf(player, comboCount), slots);
+            int slot = slots <= 0 ? -1 : SequenceSlots.liveSlot(player, weapon, comboCount, slots);
             if (CombatDebug.enabled(player)) {
                 CombatDebug.note(player, "dragFor — combo " + comboCount
                         + " slot " + slot + "/" + slots

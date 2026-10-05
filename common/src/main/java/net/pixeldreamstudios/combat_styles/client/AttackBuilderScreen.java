@@ -27,7 +27,7 @@ import java.util.function.Consumer;
 public class AttackBuilderScreen extends PanelScreen {
 
     private static final int PANEL_WIDTH = 340;
-    private static final int PANEL_HEIGHT = 200;
+    private static final int PANEL_HEIGHT = 218;
     private static final int PADDING = ScreenTheme.PADDING;
     private static final int HEADER = 70;
     private static final int FOOTER = 40;
@@ -49,6 +49,10 @@ public class AttackBuilderScreen extends PanelScreen {
     private static final String KEY_CATEGORY = "tooltip.combat_styles.category";
     private static final String KEY_RARITY = "screen.combat_styles.field_rarity";
     private static final String KEY_SOUND = "tooltip.combat_styles.sound";
+    private static final String KEY_STYLE_PAGE = "screen.combat_styles.field_style_page";
+    private static final String KEY_STYLE_PAGE_HINT = "hint.combat_styles.style_page";
+    private static final String KEY_NATURAL = "screen.combat_styles.style_page_natural";
+    private static final String KEY_NOT_NATURAL = "screen.combat_styles.style_page_hidden";
     private static final String KEY_SOUND_NONE = "screen.combat_styles.builder_sound_none";
     private static final String KEY_SAVE = "screen.combat_styles.builder_save";
     private static final String KEY_UPDATE = "screen.combat_styles.builder_update";
@@ -82,6 +86,7 @@ public class AttackBuilderScreen extends PanelScreen {
     private float baseRange = 1.0F;
     private float baseMovement = 1.0F;
     private String swingSound = "";
+    private boolean natural = true;
     private String error;
 
     public AttackBuilderScreen(Screen parent, String defaultCategory,
@@ -108,6 +113,7 @@ public class AttackBuilderScreen extends PanelScreen {
             animationText = source.animation();
             hitbox = Math.max(0, indexOf(HITBOXES, source.hitbox()));
             rarity = existing.rarityOrDefault().ordinal();
+            natural = existing.stylePage().orElse(Boolean.TRUE);
             category = Math.max(0, categories.indexOf(existing.categoryOrDefault()));
             baseDamage = source.damageMultiplier();
             baseAngle = source.angle();
@@ -260,7 +266,10 @@ public class AttackBuilderScreen extends PanelScreen {
                 soundOf(), trailOf(), delayedSlashes());
         CustomAttack created = new CustomAttack(id, attack,
                 categories.isEmpty() ? Optional.empty() : Optional.of(categories.get(category)),
-                Optional.of(StyleRarity.values()[rarity]), Optional.empty(), Optional.empty());
+                Optional.of(StyleRarity.values()[rarity]),
+                editing == null ? Optional.empty() : editing.costOverride(),
+                editing == null ? Optional.empty() : editing.nameKey(),
+                natural ? Optional.empty() : Optional.of(Boolean.FALSE));
         onCreated.accept(created);
         minecraft.setScreen(parent);
     }
@@ -330,13 +339,18 @@ public class AttackBuilderScreen extends PanelScreen {
                 Component.translatable(StyleRarity.values()[rarity].translationKey()).getString(),
                 x, y, listWidth, mouseX, mouseY);
         y = cycleRow(graphics, KEY_SOUND, soundLabel(), x, y, listWidth, mouseX, mouseY);
+        boolean pageHovered = ScreenDraw.isWithin(mouseX, mouseY, x, y, listWidth, ROW_HEIGHT);
+        y = cycleRow(graphics, KEY_STYLE_PAGE,
+                Component.translatable(natural ? KEY_NATURAL : KEY_NOT_NATURAL).getString(),
+                x, y, listWidth, mouseX, mouseY);
 
         graphics.disableScissor();
 
         int noticeY = top + PANEL_HEIGHT - FOOTER + 2;
-        graphics.drawString(font,
-                error == null ? Component.translatable(KEY_HINT) : Component.literal(error),
-                x, noticeY, error == null ? ScreenTheme.DIM : ScreenTheme.BAD, false);
+        Component notice = error != null ? Component.literal(error)
+                : Component.translatable(pageHovered ? KEY_STYLE_PAGE_HINT : KEY_HINT);
+        graphics.drawString(font, notice, x, noticeY,
+                error == null ? ScreenTheme.DIM : ScreenTheme.BAD, false);
         drawWidgets(graphics, mouseX, mouseY, partialTick);
     }
 
@@ -406,6 +420,11 @@ public class AttackBuilderScreen extends PanelScreen {
         if (ScreenDraw.isWithin(mouseX, mouseY, x, y, listWidth, ROW_HEIGHT)) {
             minecraft.setScreen(new SoundPickerScreen(this, draftPage(), swingSound,
                     picked -> swingSound = picked));
+            return true;
+        }
+        y += ROW_HEIGHT;
+        if (ScreenDraw.isWithin(mouseX, mouseY, x, y, listWidth, ROW_HEIGHT)) {
+            natural = !natural;
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);

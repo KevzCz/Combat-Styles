@@ -9,6 +9,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.sounds.SoundEvents;
 
+import net.pixeldreamstudios.combat_styles.equipment.AttackConditions;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.CastSpell;
@@ -110,6 +111,8 @@ public final class EffectSchema {
     private static final String KEY_TUNE = "tune";
     private static final String KEY_ITEMS = "items";
     static final String KEY_SLOT = AccessoryMatch.SLOT;
+    public static final String KEY_OVERRIDE = "override";
+    public static final String KEY_CONDITIONS = "conditions";
     public static final String KEY_SUMMON_EQUIPMENT = "equipment";
     private static final String KEY_ATTRIBUTES = "attributes";
     private static final Set<String> SPARSE_KEYS = Set.of(KEY_ITEMS, KEY_ATTRIBUTES,
@@ -1143,7 +1146,7 @@ public final class EffectSchema {
                         Optional.empty(), Map.of())));
 
         String variants = join(ROOT_SUMMON_PROFILE, "variants");
-        register(variants, "conditions", ProfileCondition.LIST_CODEC, List.of());
+        register(variants, KEY_CONDITIONS, ProfileCondition.LIST_CODEC, List.of());
         register(variants, "finale", Codec.STRING, "");
         register(variants, "swaps", Codec.unboundedMap(Codec.STRING, Codec.STRING), Map.of());
         register(variants, "abilities", Codec.STRING.listOf(), List.of(""));
@@ -1254,9 +1257,9 @@ public final class EffectSchema {
         register(extras, "anchor", Codec.STRING, SlashAnchor.HITBOX.getSerializedName());
         register(extras, "inherit", InheritGroups.CODEC, InheritGroups.ALL);
         register(extras, "affixes", Codec.STRING.listOf(), List.of(""));
-        register(extras, "override", AttackOverride.CODEC, AttackOverride.EMPTY);
+        register(extras, KEY_OVERRIDE, AttackOverride.CODEC, AttackOverride.EMPTY);
 
-        String override = join(extras, "override");
+        String override = join(extras, KEY_OVERRIDE);
         register(override, "damage_multiplier", Codec.DOUBLE, 1.0D);
         register(override, "angle", Codec.DOUBLE, 90.0D);
         register(override, "upswing", Codec.DOUBLE, 0.5D);
@@ -1276,6 +1279,8 @@ public final class EffectSchema {
         register(override, "hastens_next", AttackAttribute.CODEC,
                 AttackAttribute.flat(1.0D));
         register(override, "scale_animation", Codec.BOOL, true);
+        register(override, KEY_CONDITIONS, Codec.STRING.listOf(),
+                List.of(AttackConditions.names().getFirst()));
 
         String slashes = join(ROOT_BEHAVIOUR, "slashes");
         register(slashes, "particle_type", Codec.STRING, DEFAULT_PARTICLE);

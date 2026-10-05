@@ -1,6 +1,7 @@
 package net.pixeldreamstudios.combat_styles.style;
 
 import com.google.common.collect.MapMaker;
+import net.bettercombat.api.AttributesContainer;
 import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.resources.ResourceLocation;
 
@@ -27,11 +28,30 @@ public final class StyleRegistry {
     private static final Map<String, StylePage> PAGES = new ConcurrentHashMap<>();
     private static final Map<String, StylePage> RAW_PAGES = new ConcurrentHashMap<>();
     private static final Map<String, List<StylePage>> BY_CATEGORY = new ConcurrentHashMap<>();
+    private static volatile Map<String, String> aliases = Map.of();
+    private static volatile Map<String, StylePage> firstByAnimation = Map.of();
+    private static volatile List<StylePage> ordered = List.of();
+    private static volatile Map<String, String> signatures = Map.of();
     private static volatile Map<String, Map<String, StylePage>> bySignature = Map.of();
     private static final Map<WeaponAttributes, List<StylePage>> NODES = new MapMaker().weakKeys().makeMap();
     private static volatile List<String> categories = List.of();
     private static volatile List<WeaponAttributes.Sound> swingSounds = List.of();
     private static final double BASELINE_ARC = 120.0D;
+    private static final String KEY_SEPARATOR = "|";
+    private static final int SELF_CHECK_EXAMPLES = 5;
+
+    private static final class Draft {
+        private final String category;
+        private final WeaponAttributes.Attack attack;
+        private final StyleRarity rarity;
+        private final List<StyleIdRule.Candidate> candidates = new ArrayList<>();
+
+        private Draft(String category, WeaponAttributes.Attack attack, StyleRarity rarity) {
+            this.category = category;
+            this.attack = attack;
+            this.rarity = rarity;
+        }
+    }
 
     private StyleRegistry() {
     }
@@ -48,24 +68,26 @@ public final class StyleRegistry {
             RAW_PAGES.clear();
             BY_CATEGORY.clear();
             categories = List.of();
+            aliases = Map.of();
+            firstByAnimation = Map.of();
+            ordered = List.of();
+            signatures = Map.of();
             bySignature = Map.of();
             NODES.clear();
             swingSounds = List.of();
             return;
         }
 
-        Map<String, StylePage> pages = new LinkedHashMap<>();
-        Map<String, StylePage> raw = new LinkedHashMap<>();
-        Map<String, List<StylePage>> byCategory = new TreeMap<>();
-        Map<String, Set<String>> seenSignatures = new HashMap<>();
-        Map<String, Integer> nextIndex = new HashMap<>();
+        Map<ResourceLocation, AttributesContainer> containers = WeaponRegistryAccess.containers();
+        Set<String> presets = presetsOf(containers);
+        Map<String, Draft> drafts = new LinkedHashMap<>();
         Map<String, WeaponAttributes.Sound> sounds = new TreeMap<>();
         Set<String> indexedAnimations = new HashSet<>();
 
-        List<Map.Entry<ResourceLocation, WeaponAttributes>> ordered = new ArrayList<>(source.entrySet());
-        ordered.sort(Comparator.comparing(entry -> entry.getKey().toString()));
+        List<Map.Entry<ResourceLocation, WeaponAttributes>> sorted = new ArrayList<>(source.entrySet());
+        sorted.sort(Comparator.comparing(entry -> entry.getKey().toString()));
 
-        for (Map.Entry<ResourceLocation, WeaponAttributes> entry : ordered) {
+        for (Map.Entry<ResourceLocation, WeaponAttributes> entry : sorted) {
             WeaponAttributes attributes = entry.getValue();
             if (attributes == null || attributes.attacks() == null) {
                 continue;
@@ -75,13 +97,16 @@ public final class StyleRegistry {
                 CombatStyles.LOGGER.warn("Skipping {}: no category", entry.getKey());
                 continue;
             }
+            String sourceId = entry.getKey().toString();
+            boolean preset = presets.contains(sourceId);
+            WeaponAttributes.Attack[] own = ownAttacksOf(containers.get(entry.getKey()));
 
             WeaponAttributes.Attack[] attacks = attributes.attacks();
             double baselineDamage = averageDamage(attacks);
             double baselineUpswing = averageUpswing(attacks);
-            Set<String> signatures = seenSignatures.computeIfAbsent(category, key -> new HashSet<>());
 
-            for (WeaponAttributes.Attack attack : attacks) {
+            for (int slot = 0; slot < attacks.length; slot++) {
+                WeaponAttributes.Attack attack = attacks[slot];
                 if (attack == null || attack.animation() == null || attack.animation().isBlank()) {
                     CombatStyles.LOGGER.warn("Skipping an attack in {}: no animation", entry.getKey());
                     continue;
@@ -90,31 +115,62 @@ public final class StyleRegistry {
                 if (swing != null && swing.id() != null && !swing.id().isBlank()) {
                     sounds.putIfAbsent(swing.id(), swing);
                 }
-                String signature = signatureOf(attack);
-                boolean fresh = signatures.add(signature);
-                if (!fresh && indexedAnimations.contains(attack.animation())) {
+                String key = category + KEY_SEPARATOR + signatureOf(attack);
+                boolean defines = own != null && slot < own.length && own[slot] != null;
+                Draft draft = drafts.get(key);
+                if (draft == null) {
+                    draft = new Draft(category, attack,
+                            StyleRarity.fromDeviation(deviation(attack, baselineDamage, baselineUpswing)));
+                    drafts.put(key, draft);
+                    indexedAnimations.add(attack.animation());
+                } else {
                     deduped++;
-                    continue;
                 }
-                indexedAnimations.add(attack.animation());
-                int index = nextIndex.merge(category, 1, Integer::sum) - 1;
-                String styleId = StylePage.idFor(category, index);
-                StyleRarity rarity = StyleRarity.fromDeviation(deviation(attack, baselineDamage, baselineUpswing));
-                StylePage page = new StylePage(styleId, category, index, attack, entry.getKey(), rarity);
-                if (AttackOverrides.isDisabled(styleId)) {
-                    disabled++;
-                    continue;
+                draft.candidates.add(new StyleIdRule.Candidate(sourceId, slot, defines, preset));
+            }
+        }
+
+        Map<String, StylePage> pages = new LinkedHashMap<>();
+        Map<String, StylePage> raw = new LinkedHashMap<>();
+        Map<String, List<StylePage>> byCategory = new TreeMap<>();
+        Map<String, Integer> nextIndex = new HashMap<>();
+        Map<String, String> aliasMap = new HashMap<>();
+        Map<String, String> signatureMap = new LinkedHashMap<>();
+
+        for (Draft draft : drafts.values()) {
+            StyleIdRule.Candidate chosen = StyleIdRule.canonical(draft.candidates);
+            if (chosen == null) {
+                continue;
+            }
+            String styleId = chosen.id();
+            int index = nextIndex.merge(draft.category, 1, Integer::sum) - 1;
+            if (pages.containsKey(styleId)) {
+                CombatStyles.LOGGER.error("Two combat styles resolved to the same id {}", styleId);
+                continue;
+            }
+            if (AttackOverrides.isDisabled(styleId)) {
+                disabled++;
+                continue;
+            }
+            ResourceLocation sourceWeapon = ResourceLocation.tryParse(chosen.source());
+            StylePage page = new StylePage(styleId, draft.category, index, draft.attack,
+                    sourceWeapon, draft.rarity);
+            raw.put(styleId, page);
+            page = AttackOverrides.apply(page);
+            pages.put(styleId, page);
+            byCategory.computeIfAbsent(draft.category, key -> new ArrayList<>()).add(page);
+            signatureMap.put(styleId, signatureOf(draft.attack));
+            for (StyleIdRule.Candidate candidate : draft.candidates) {
+                String alias = candidate.id();
+                if (!alias.equals(styleId)) {
+                    aliasMap.putIfAbsent(alias, styleId);
                 }
-                raw.put(styleId, page);
-                page = AttackOverrides.apply(page);
-                pages.put(styleId, page);
-                byCategory.computeIfAbsent(category, key -> new ArrayList<>()).add(page);
             }
         }
 
         for (CustomAttack custom : CustomAttacks.all()) {
             String styleId = custom.id();
-            if (pages.containsKey(styleId)) {
+            if (pages.containsKey(styleId) || aliasMap.containsKey(styleId)) {
                 CombatStyles.LOGGER.warn("Custom attack {} collides with an existing style", styleId);
                 continue;
             }
@@ -131,17 +187,19 @@ public final class StyleRegistry {
             byCategory.computeIfAbsent(category, key -> new ArrayList<>()).add(page);
         }
 
+        Map<String, StylePage> animationIndex = animationIndexOf(pages);
         for (CustomStyle custom : CustomStyles.all()) {
             String styleId = custom.id();
-            if (pages.containsKey(styleId)) {
+            if (pages.containsKey(styleId) || aliasMap.containsKey(styleId)) {
                 CombatStyles.LOGGER.warn("Custom style {} collides with an existing style",
                         styleId);
                 continue;
             }
-            StylePage base = baseOf(pages, custom.entry().styleId());
+            String baseId = custom.entry().rawStyleId();
+            StylePage base = lookup(pages, aliasMap, animationIndex, baseId);
             if (base == null) {
                 CombatStyles.LOGGER.warn("Custom style {} references unknown style {}",
-                        styleId, custom.entry().styleId());
+                        styleId, baseId);
                 continue;
             }
             String category = custom.category().orElse(base.category());
@@ -164,22 +222,62 @@ public final class StyleRegistry {
         RAW_PAGES.putAll(raw);
         BY_CATEGORY.clear();
         BY_CATEGORY.putAll(byCategory);
+        aliases = Map.copyOf(aliasMap);
+        ordered = List.copyOf(pages.values());
+        firstByAnimation = Map.copyOf(animationIndexOf(pages));
+        signatures = Collections.unmodifiableMap(signatureMap);
         bySignature = signaturesOf(byCategory);
         NODES.clear();
         categories = List.copyOf(byCategory.keySet());
         swingSounds = List.copyOf(sounds.values());
 
+        selfCheck();
         if (debug) {
             CombatStyles.LOGGER.info("Indexed {} combat styles across {} weapon categories "
                             + "with {} swing sounds in {}ms",
                     PAGES.size(), categories.size(), swingSounds.size(),
                     (System.nanoTime() - startedAt) / 1_000_000L);
-            CombatStyles.LOGGER.info("Indexed {} distinct animations ({} deduped, {} disabled)",
-                    indexedAnimations.size(), deduped, disabled);
+            CombatStyles.LOGGER.info("Indexed {} distinct animations ({} deduped, {} disabled, {} aliases)",
+                    indexedAnimations.size(), deduped, disabled, aliases.size());
         }
     }
 
-    private static StylePage baseOf(Map<String, StylePage> pages, String styleId) {
+    private static Set<String> presetsOf(Map<ResourceLocation, AttributesContainer> containers) {
+        Set<String> presets = new HashSet<>();
+        if (containers == null) {
+            return presets;
+        }
+        for (AttributesContainer container : containers.values()) {
+            String parent = container == null ? null : container.parent();
+            if (parent == null || parent.isBlank()) {
+                continue;
+            }
+            ResourceLocation parsed = ResourceLocation.tryParse(parent);
+            presets.add(parsed == null ? parent : parsed.toString());
+        }
+        return presets;
+    }
+
+    private static WeaponAttributes.Attack[] ownAttacksOf(AttributesContainer container) {
+        if (container == null || container.attributes() == null) {
+            return null;
+        }
+        return container.attributes().attacks();
+    }
+
+    private static Map<String, StylePage> animationIndexOf(Map<String, StylePage> pages) {
+        Map<String, StylePage> index = new HashMap<>();
+        for (StylePage page : pages.values()) {
+            String animation = page.animation();
+            if (animation != null && !animation.isBlank()) {
+                index.putIfAbsent(animation, page);
+            }
+        }
+        return index;
+    }
+
+    private static StylePage lookup(Map<String, StylePage> pages, Map<String, String> aliasMap,
+                                    Map<String, StylePage> animationIndex, String styleId) {
         if (styleId == null || styleId.isBlank()) {
             return null;
         }
@@ -187,15 +285,34 @@ public final class StyleRegistry {
         if (direct != null) {
             return direct;
         }
-        if (styleId.indexOf(':') < 0) {
-            return null;
+        String canonical = aliasMap.get(styleId);
+        if (canonical != null) {
+            return pages.get(canonical);
         }
-        for (StylePage page : pages.values()) {
-            if (styleId.equals(page.animation())) {
-                return page;
+        return styleId.indexOf(':') < 0 ? null : animationIndex.get(styleId);
+    }
+
+    private static void selfCheck() {
+        List<String> problems = new ArrayList<>();
+        for (Map.Entry<String, StylePage> entry : PAGES.entrySet()) {
+            StylePage resolved = get(entry.getKey());
+            if (resolved == null || !resolved.styleId().equals(entry.getKey())) {
+                problems.add(entry.getKey() + " does not resolve to itself");
             }
         }
-        return null;
+        for (Map.Entry<String, String> entry : aliases.entrySet()) {
+            StylePage resolved = get(entry.getKey());
+            if (resolved == null || !resolved.styleId().equals(entry.getValue())) {
+                problems.add("alias " + entry.getKey() + " does not resolve to " + entry.getValue());
+            }
+        }
+        if (!problems.isEmpty()) {
+            CombatStyles.LOGGER.error("Style id self-check found {} problems, for example {}",
+                    problems.size(), problems.subList(0, Math.min(SELF_CHECK_EXAMPLES, problems.size())));
+        } else if (CombatStylesConfig.get().debugLogging()) {
+            CombatStyles.LOGGER.info("Style id self-check passed: {} styles, {} aliases",
+                    PAGES.size(), aliases.size());
+        }
     }
 
     private static Map<String, Map<String, StylePage>> signaturesOf(Map<String, List<StylePage>> byCategory) {
@@ -226,6 +343,10 @@ public final class StyleRegistry {
             }
         }
         return builder.toString();
+    }
+
+    public static Map<String, String> nativeSignatures() {
+        return signatures;
     }
 
     public static List<WeaponAttributes.Sound> swingSounds() {
@@ -329,7 +450,15 @@ public final class StyleRegistry {
     }
 
     public static StylePage raw(String styleId) {
-        return styleId == null ? null : RAW_PAGES.get(styleId);
+        if (styleId == null) {
+            return null;
+        }
+        StylePage direct = RAW_PAGES.get(styleId);
+        if (direct != null) {
+            return direct;
+        }
+        String canonical = aliases.get(styleId);
+        return canonical == null ? null : RAW_PAGES.get(canonical);
     }
 
     public static StylePage get(String styleId) {
@@ -340,16 +469,40 @@ public final class StyleRegistry {
         if (direct != null) {
             return direct;
         }
+        String canonical = aliases.get(styleId);
+        if (canonical != null) {
+            return PAGES.get(canonical);
+        }
         return byAnimation(styleId, null);
+    }
+
+    public static String canonicalOf(String styleId) {
+        if (styleId == null || styleId.isBlank()) {
+            return styleId;
+        }
+        if (PAGES.containsKey(styleId)) {
+            return styleId;
+        }
+        StylePage page = get(styleId);
+        return page == null ? styleId : page.styleId();
+    }
+
+    public static boolean sameStyle(String first, String second) {
+        if (first == null || second == null) {
+            return false;
+        }
+        return first.equals(second) || canonicalOf(first).equals(canonicalOf(second));
     }
 
     public static StylePage byAnimation(String animation, String category) {
         if (animation == null || !animation.contains(":")) {
             return null;
         }
-        for (StylePage page : PAGES.values()) {
-            if (animation.equals(page.animation())
-                    && (category == null || category.equals(page.category()))) {
+        if (category == null) {
+            return firstByAnimation.get(animation);
+        }
+        for (StylePage page : ordered) {
+            if (animation.equals(page.animation()) && category.equals(page.category())) {
                 return page;
             }
         }

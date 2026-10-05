@@ -16,6 +16,7 @@ import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.entity.AbilityRegistry;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
+import net.pixeldreamstudios.combat_styles.equipment.AttackConditions;
 import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
 import net.pixeldreamstudios.combat_styles.equipment.CastGate;
 import net.pixeldreamstudios.combat_styles.equipment.CastPhase;
@@ -146,6 +147,9 @@ public final class EffectChoices {
         }
         return switch (key) {
             case "hitbox" -> EffectSchema.HITBOX_SHAPES;
+            case EffectSchema.KEY_CONDITIONS -> EffectSchema.KEY_OVERRIDE.equals(keyOf(scope))
+                    ? AttackConditions.names()
+                    : List.of();
             case "phase" -> scope.contains(CastGate.KEY)
                     ? names(CastPhase.values())
                     : names(UsePhase.values());

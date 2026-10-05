@@ -24,6 +24,8 @@ import net.pixeldreamstudios.combat_styles.component.ModComponents;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 import net.pixeldreamstudios.combat_styles.progression.StyleProgression;
 import net.pixeldreamstudios.combat_styles.style.AttackOverrides;
+import net.pixeldreamstudios.combat_styles.style.CustomStyles;
+import net.pixeldreamstudios.combat_styles.style.SequenceService;
 import net.pixeldreamstudios.combat_styles.style.StyleCost;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
@@ -150,7 +152,7 @@ public class StylePageItem extends Item {
         if (level.isClientSide()) {
             return InteractionResultHolder.success(stack);
         }
-        if (!StyleProgression.learn(player, keyOf(page, stack))) {
+        if (!learn(player, page, stack)) {
             player.displayClientMessage(Component.translatable(KEY_ALREADY_KNOWN, getName(stack))
                     .withStyle(ChatFormatting.GRAY), true);
             return InteractionResultHolder.fail(stack);
@@ -166,6 +168,19 @@ public class StylePageItem extends Item {
             NetworkManager.syncLearned(serverPlayer);
         }
         return InteractionResultHolder.success(stack);
+    }
+
+    private static boolean learn(Player player, StylePage page, ItemStack stack) {
+        if (CustomStyles.get(page.styleId()) == null) {
+            return StyleProgression.learn(player, keyOf(page, stack));
+        }
+        StyleEntry entry = SequenceService.entryFor(page.styleId());
+        if (entry == null) {
+            return StyleProgression.learn(player, keyOf(page, stack));
+        }
+        List<String> affixIds = affixIdsOf(stack);
+        return StyleProgression.learn(player,
+                affixIds.isEmpty() ? entry : entry.withAffixes(affixIds));
     }
 
     @Override

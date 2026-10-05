@@ -15,6 +15,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -196,7 +197,7 @@ public final class CombatStylesCommand {
                         .executes(CombatStylesCommand::giveBook)));
         root.then(Commands.literal("give")
                 .then(Commands.argument(ARG_TARGETS, EntityArgument.players())
-                        .then(Commands.argument(ARG_STYLE, StringArgumentType.string())
+                        .then(Commands.argument(ARG_STYLE, ResourceLocationArgument.id())
                                 .suggests(STYLE_SUGGESTIONS)
                                 .executes(context -> give(context, 1))
                                 .then(Commands.argument(ARG_COUNT,
@@ -709,7 +710,8 @@ public final class CombatStylesCommand {
 
     private static int give(CommandContext<CommandSourceStack> context, int copies)
             throws CommandSyntaxException {
-        String styleId = StringArgumentType.getString(context, ARG_STYLE);
+        String styleId = StyleRegistry.canonicalOf(
+                ResourceLocationArgument.getId(context, ARG_STYLE).toString());
         if (!StyleRegistry.contains(styleId)) {
             context.getSource().sendFailure(Component.translatable("command.combat_styles.unknown_style", styleId));
             return 0;

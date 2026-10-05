@@ -12,6 +12,7 @@ import net.minecraft.world.item.Item;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentContext;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRuntime;
+import net.pixeldreamstudios.combat_styles.style.AttackOverrides;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
@@ -145,7 +146,11 @@ public final class EquipmentHints {
         if (index < 0 || index >= entries.size()) {
             return false;
         }
-        StylePage page = StyleRegistry.get(CustomStyles.resolve(entries.get(index)).styleId());
+        StyleEntry resolved = CustomStyles.resolve(entries.get(index));
+        StylePage page = StyleRegistry.get(resolved.styleId());
+        if (page != null && resolved.attackOverride().isPresent()) {
+            page = AttackOverrides.applyTo(page, resolved.attackOverride().get());
+        }
         if (page == null || !page.isConditional()) {
             return true;
         }
@@ -161,6 +166,11 @@ public final class EquipmentHints {
                 }
                 case MAIN_HAND_ONLY -> {
                     if (stance == Stance.DUAL_OFF) {
+                        return false;
+                    }
+                }
+                case NO_OFFHAND_ITEM -> {
+                    if (dualWielding) {
                         return false;
                     }
                 }

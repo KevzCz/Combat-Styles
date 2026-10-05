@@ -64,8 +64,8 @@ public class AffixSwingMixin {
             return;
         }
         PendingExtraHit.push(SwingDrag.NO_EXTRA);
-        SwingDrag.begin(player, combo);
         if (sweep) {
+            SwingDrag.begin(player, combo);
             SwingDrag.beginSweep(player);
             if (CombatStylesConfig.get().debugLogging()) {
                 CombatStyles.LOGGER.info("[DRAG-SERVER] raw={} combo={} slot={} drag={}",
@@ -78,6 +78,7 @@ public class AffixSwingMixin {
         }
         SwingDrag.endSweep(player);
         AffixDamageDealer.captureSwungAttack(player, combo);
+        SwingDrag.begin(player, combo);
         AffixDamageDealer.latchSwingCharges(player, combo);
         AffixDamageDealer.armSwing(player, combo);
         server.execute(() -> AffixDamageDealer.onPlayerSwing(player, combo));

@@ -17,6 +17,7 @@ public final class ConfigPaths {
     public static final String STYLE_BOOKS = "style_books";
     public static final String WEAPON_ROLLS = "weapon_rolls";
     public static final String AFFIXES = "custom_affixes";
+    public static final String STYLE_ID_LEDGER = "style_ids.json";
 
     private ConfigPaths() {
     }

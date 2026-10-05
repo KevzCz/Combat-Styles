@@ -40,6 +40,7 @@ import net.pixeldreamstudios.combat_styles.equipment.CombatState;
 import net.pixeldreamstudios.combat_styles.equipment.DodgeState;
 import net.pixeldreamstudios.combat_styles.equipment.IFrameState;
 import net.pixeldreamstudios.combat_styles.equipment.DashGlide;
+import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -103,8 +104,10 @@ public final class AffixMechanics {
         if (!rule.slots().isEmpty()) {
             boolean matched = false;
             for (int slot : rule.slots()) {
-                int resolved = slot < 0 ? context.slotCount() + slot : slot;
-                if (resolved == context.slotIndex()) {
+                boolean hit = slot < 0
+                        ? context.slotCount() + slot == context.livePosition()
+                        : slot == context.slotIndex();
+                if (hit) {
                     matched = true;
                     break;
                 }
@@ -120,7 +123,7 @@ public final class AffixMechanics {
             return false;
         }
         if (rule.afterStyle().isPresent()
-                && !rule.afterStyle().get().equals(context.previousStyleId())) {
+                && !StyleRegistry.sameStyle(rule.afterStyle().get(), context.previousStyleId())) {
             return false;
         }
         if (rule.afterCategory().isPresent()
@@ -141,7 +144,8 @@ public final class AffixMechanics {
         }
 
         if (!requires.styles().isEmpty()
-                && preceding.stream().noneMatch(requires.styles()::contains)) {
+                && preceding.stream().noneMatch(styleId -> requires.styles().stream()
+                        .anyMatch(required -> StyleRegistry.sameStyle(required, styleId)))) {
             return false;
         }
 

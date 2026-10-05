@@ -12,10 +12,6 @@ public record StylePage(String styleId,
                         ResourceLocation sourceWeapon,
                         StyleRarity rarity) implements StyleInfo {
 
-    public static String idFor(String category, int attackIndex) {
-        return category + StyleIds.SEPARATOR + attackIndex;
-    }
-
     public double damageMultiplier() {
         return attack.damageMultiplier();
     }

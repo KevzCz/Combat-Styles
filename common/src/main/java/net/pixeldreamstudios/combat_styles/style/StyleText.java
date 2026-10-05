@@ -23,6 +23,7 @@ public final class StyleText {
     private static final ChatFormatting GOOD = ChatFormatting.GREEN;
     private static final ChatFormatting BAD = ChatFormatting.RED;
     private static final String SPELL_NAME_KEY = "spell.%s.%s.name";
+    public static final String CONDITION_JOINER = " + ";
 
     private StyleText() {
     }
@@ -189,6 +190,25 @@ public final class StyleText {
         }
         String key = condition.name().toLowerCase(Locale.ROOT);
         return Component.translatableWithFallback(StyleIds.CONDITION_PREFIX + key, prettify(key));
+    }
+
+    public static Component conditionNames(WeaponAttributes.Condition[] conditions) {
+        MutableComponent joined = Component.empty();
+        if (conditions == null) {
+            return joined;
+        }
+        boolean first = true;
+        for (WeaponAttributes.Condition condition : conditions) {
+            if (condition == null) {
+                continue;
+            }
+            if (!first) {
+                joined.append(CONDITION_JOINER);
+            }
+            joined.append(conditionName(condition));
+            first = false;
+        }
+        return joined;
     }
 
     public static MutableComponent multiplier(String labelKey, double value, boolean higherIsBetter) {

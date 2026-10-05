@@ -18,6 +18,7 @@ import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
 import net.pixeldreamstudios.combat_styles.style.SequenceService;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
+import net.pixeldreamstudios.combat_styles.style.StylePool;
 import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 import net.pixeldreamstudios.combat_styles.style.StyleSequence;
 import net.pixeldreamstudios.combat_styles.style.SyntheticAttributes;
@@ -451,11 +452,14 @@ public final class WeaponRolls {
             }
             return pool;
         }
-        List<StylePage> pages = category == null
+        List<StylePage> pages = StylePool.natural(category == null
                 ? StyleRegistry.all()
-                : StyleRegistry.forCategory(category);
+                : StyleRegistry.forCategory(category));
         for (StylePage page : pages) {
-            pool.add(StyleEntry.of(page.styleId()));
+            StyleEntry entry = SequenceService.entryFor(page.styleId());
+            if (entry != null) {
+                pool.add(entry);
+            }
         }
         return pool;
     }

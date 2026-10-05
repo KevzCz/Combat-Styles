@@ -3,6 +3,8 @@ package net.pixeldreamstudios.combat_styles.client;
 import net.pixeldreamstudios.combat_styles.progression.ClientLearnedView;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
+import net.pixeldreamstudios.combat_styles.style.StyleKeys;
+import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -46,12 +48,12 @@ public final class ClientStyleData {
         if (styleId == null) {
             return false;
         }
-        if (copies(styleId) > 0) {
+        if (copies(styleId) > 0 || copies(StyleKeys.CUSTOM_PREFIX + styleId) > 0) {
             return true;
         }
         for (Map.Entry<String, Integer> entry : COPIES.entrySet()) {
             if (entry.getValue() > 0
-                    && StyleEntry.styleIdOfKey(entry.getKey()).equals(styleId)) {
+                    && StyleRegistry.sameStyle(StyleEntry.styleIdOfKey(entry.getKey()), styleId)) {
                 return true;
             }
         }

@@ -255,11 +255,13 @@ public final class AffixDamageDealer {
                         + " resolved empty for " + stack.getItem()
                         + ", no slot context");
             }
-            SWING_ATTACK.set(nativeAttack(stack, SequenceSlots.sequenceComboOf(player, comboCount)));
+            SWING_ATTACK.set(nativeAttack(player, stack, comboCount));
             SWING_CONTEXT.set(SwingContext.UNKNOWN);
             return ResolvedAffixes.EMPTY;
         }
-        int index = SequenceSlots.slotFor(SequenceSlots.sequenceComboOf(player, comboCount), entries.size());
+        int[] live = SequenceSlots.liveSlots(player, stack, comboCount, entries.size());
+        int index = SequenceSlots.liveSlotOf(live,
+                SequenceSlots.sequenceComboOf(player, comboCount), entries.size());
         WeaponAttributes.Attack swung = CombatState.swungAttack(player);
         if (swung != null) {
             StylePage chosen = pageOf(entries.get(index));
@@ -280,7 +282,7 @@ public final class AffixDamageDealer {
         StyleEntry entry = entries.get(index);
         StylePage page = pageOf(entry);
         SWING_ATTACK.set(page == null ? null : page.attack());
-        SWING_CONTEXT.set(SwingContext.of(entries, index, SequenceSlots.usableSlotCount(player, entries.size())));
+        SWING_CONTEXT.set(SwingContext.of(entries, index, live));
         ResolvedAffixes resolved = withEquipmentTuning(player,
                 entry.resolveAffixes(page).restrictedTo(page), entry, index, entries.size());
         SWING_AFFIXES.set(new SwingAffixes(CombatState.currentSwingId(player), resolved));
@@ -305,7 +307,7 @@ public final class AffixDamageDealer {
         if (entries.isEmpty()) {
             return false;
         }
-        int index = SequenceSlots.slotFor(SequenceSlots.sequenceComboOf(player, comboCount), entries.size());
+        int index = SequenceSlots.liveSlot(player, stack, comboCount, entries.size());
         AttackOverride override = attackOverrideFor(player, comboCount);
         if (override != null
                 && grantsDrag(override.behaviourOrDefault().motionOrNone())) {
@@ -392,7 +394,8 @@ public final class AffixDamageDealer {
             StyleEntry entry = entries.get(i);
             StylePage page = pageOf(entry);
             if (page != null && matches(page.attack(), current)) {
-                SWING_CONTEXT.set(SwingContext.of(entries, i, SequenceSlots.usableSlotCount(player, entries.size())));
+                SWING_CONTEXT.set(SwingContext.of(entries, i,
+                        SequenceSlots.liveSlotsFor(player, stack, entries.size())));
                 return withEquipmentTuning(player, entry.resolveAffixes(page).restrictedTo(page),
                         entry, i, entries.size());
             }
@@ -633,14 +636,14 @@ public final class AffixDamageDealer {
     }
 
     private static int upswingTicks(Player player, int comboCount) {
-        WeaponAttributes attributes = WeaponRegistry.getAttributes(
-                swingingWeapon(player, comboCount));
+        ItemStack upswingWeapon = swingingWeapon(player, comboCount);
+        WeaponAttributes attributes = WeaponRegistry.getAttributes(upswingWeapon);
         if (attributes == null || attributes.attacks() == null
                 || attributes.attacks().length == 0) {
             return 0;
         }
         WeaponAttributes.Attack attack =
-                attributes.attacks()[SequenceSlots.slotFor(SequenceSlots.sequenceComboOf(player, comboCount),
+                attributes.attacks()[SequenceSlots.liveSlot(player, upswingWeapon, comboCount,
                         attributes.attacks().length)];
         if (attack == null) {
             return 0;
@@ -1028,6 +1031,14 @@ public final class AffixDamageDealer {
         List<String> granted = null;
         int usableIndex = slotIndex;
         int usableSize = size;
+        if (usableSize > 0) {
+            int[] live = SequenceSlots.liveSlotsFor(player, swingingWeapon(player), usableSize);
+            int position = SequenceSlots.positionIn(live, slotIndex);
+            if (position >= 0) {
+                usableIndex = position;
+                usableSize = live.length;
+            }
+        }
         if (usableSize <= 0) {
             ComboState usable = usableCombo(player);
             if (usable != null && usable.total() > 0) {
@@ -1495,11 +1506,13 @@ public final class AffixDamageDealer {
             if (substituted) {
                 return null;
             }
-            int nativeSlot = SequenceSlots.slotFor(SequenceSlots.sequenceComboOf(player, comboCount), nativeAttackCount(weapon));
+            int nativeSlot = SequenceSlots.liveSlot(player, weapon, comboCount, nativeAttackCount(weapon));
             return SequenceService.attackOverridesOf(weapon).get(String.valueOf(nativeSlot));
         }
-        int slot = SequenceSlots.slotFor(SequenceSlots.sequenceComboOf(player, comboCount), entries.size());
-        WeaponAttributes.Attack swungAttack = followSwung ? CombatState.swungAttack(player) : null;
+        int slot = SequenceSlots.liveSlot(player, weapon, comboCount, entries.size());
+        WeaponAttributes.Attack swungAttack = followSwung && !player.level().isClientSide()
+                ? CombatState.swungAttack(player)
+                : null;
         if (swungAttack != null) {
             StylePage at = pageOf(entries.get(slot));
             if (at == null || !matches(at.attack(), swungAttack)) {
@@ -1540,29 +1553,31 @@ public final class AffixDamageDealer {
         StyleSequence sequence = SequenceService.sequenceOf(weapon, player.getUUID());
         List<StyleEntry> entries = sequence.entries();
         int size = entries.isEmpty() ? nativeAttackCount(weapon) : entries.size();
-        int index = SequenceSlots.slotFor(SequenceSlots.sequenceComboOf(player, comboCount), size);
-        AttackHand hand = PlayerAttackHelper.isDualWielding(player)
+        int[] live = SequenceSlots.liveSlots(player, weapon, comboCount, size);
+        int slot = SequenceSlots.liveSlotOf(live, SequenceSlots.sequenceComboOf(player, comboCount),
+                size);
+        return equipmentContextAt(player, entries, slot, live, size, killed);
+    }
+
+    private static EquipmentContext equipmentContextAt(Player player, List<StyleEntry> entries,
+                                                       int slot, int[] live, int size,
+                                                       boolean killed) {
+        StyleEntry entry = entries.isEmpty() || slot < 0 || slot >= entries.size()
                 ? null
-                : PlayerAttackHelper.getCurrentAttack(player, comboCount);
-        ComboState combo = hand == null ? null : hand.combo();
-        if (combo != null && combo.total() > 0) {
-            index = combo.current() - 1;
-            size = combo.total();
-        }
-        StyleEntry entry = entries.isEmpty() || index < 0 || index >= entries.size()
-                ? null
-                : entries.get(index);
+                : entries.get(slot);
+        int position = SequenceSlots.positionIn(live, slot);
         StyleEntry swung = CombatState.swungEntry(player);
         return new EquipmentContext(player, swung == null ? entry : swung,
-                attackOf(player), index, size,
+                attackOf(player), position < 0 ? slot : position,
+                position < 0 ? size : live.length,
                 EquipmentRuntime.swingCount(player), killed);
     }
 
     private static int swungSlotOf(Player player, int comboCount) {
         List<StyleEntry> entries = SequenceService.sequenceOf(
                 swingingWeapon(player, comboCount), player.getUUID()).entries();
-        int bySlot = SequenceSlots.slotFor(SequenceSlots.sequenceComboOf(player, comboCount),
-                entries.size());
+        int bySlot = SequenceSlots.liveSlot(player,
+                swingingWeapon(player, comboCount), comboCount, entries.size());
         return SequenceSlots.slotOf(entries, CombatState.swungAttack(player), bySlot);
     }
 
@@ -1576,17 +1591,17 @@ public final class AffixDamageDealer {
         if (declared >= 0 && declared < entries.size()) {
             return entries.get(declared);
         }
-        return entries.get(SequenceSlots.slotFor(SequenceSlots.sequenceComboOf(player, comboCount), entries.size()));
+        return entries.get(SequenceSlots.liveSlot(player, weapon, comboCount, entries.size()));
     }
 
-    private static WeaponAttributes.Attack nativeAttack(ItemStack stack, int comboCount) {
+    private static WeaponAttributes.Attack nativeAttack(Player player, ItemStack stack, int comboCount) {
         WeaponAttributes attributes = WeaponRegistryAccess.rawAttributesFor(stack);
         if (attributes == null || attributes.attacks() == null
                 || attributes.attacks().length == 0) {
             return null;
         }
         WeaponAttributes.Attack[] attacks = attributes.attacks();
-        return attacks[SequenceSlots.slotFor(comboCount, attacks.length)];
+        return attacks[SequenceSlots.liveSlot(player, stack, comboCount, attacks.length)];
     }
 
     private static int nativeAttackCount(ItemStack stack) {
@@ -1939,7 +1954,11 @@ public final class AffixDamageDealer {
     private static EquipmentContext previewContext(Player player, LivingEntity target,
                                                    boolean onHit, float dealt) {
         SwingContext context = SWING_CONTEXT.get();
-        return equipmentContext(player, context == null ? 0 : context.slotIndex(), false)
+        ItemStack weapon = swingingWeapon(player);
+        List<StyleEntry> entries = SequenceService.sequenceOf(weapon, player.getUUID()).entries();
+        int size = entries.isEmpty() ? nativeAttackCount(weapon) : entries.size();
+        return equipmentContextAt(player, entries, context == null ? 0 : context.slotIndex(),
+                SequenceSlots.liveSlotsFor(player, weapon, size), size, false)
                 .withTarget(target)
                 .onHitPass(onHit, onHit ? dealt : 0.0F);
     }

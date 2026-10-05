@@ -38,6 +38,8 @@ public final class AttackOverrides {
     private static final String UNSAFE_CHARACTERS = "[^A-Za-z0-9._-]";
     private static final String SAFE_REPLACEMENT = "_";
     private static final int OWNED_DEPTH = 3;
+    private static final int NATIVE_MIN_DEPTH = 3;
+    private static final String PATH_SEPARATOR = "/";
     private static final DateTimeFormatter BACKUP_STAMP =
             DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
@@ -94,6 +96,14 @@ public final class AttackOverrides {
         String stem = fileName.substring(0, fileName.length() - EXTENSION.length());
         if (isOwnerFolder(relative)) {
             return relative.getName(1) + NAMESPACE_SEPARATOR + stem;
+        }
+        if (relative.getNameCount() >= NATIVE_MIN_DEPTH
+                && !UNSOURCED.equals(relative.getName(0).toString())) {
+            StringBuilder path = new StringBuilder();
+            for (int part = 1; part < relative.getNameCount() - 1; part++) {
+                path.append(relative.getName(part)).append(PATH_SEPARATOR);
+            }
+            return relative.getName(0) + NAMESPACE_SEPARATOR + path + stem;
         }
         return styleIdForFile(stem);
     }
@@ -187,6 +197,17 @@ public final class AttackOverrides {
                     .resolve(sanitize(styleId.substring(split + 1)) + EXTENSION);
         }
         StylePage page = StyleRegistry.get(styleId);
+        String canonical = page == null ? styleId : page.styleId();
+        int namespaceEnd = canonical.indexOf(NAMESPACE_SEPARATOR);
+        if (page != null && page.sourceWeapon() != null && namespaceEnd > 0
+                && canonical.contains(PATH_SEPARATOR)) {
+            Path file = directory.resolve(sanitize(canonical.substring(0, namespaceEnd)));
+            String[] parts = canonical.substring(namespaceEnd + 1).split(PATH_SEPARATOR);
+            for (int part = 0; part < parts.length - 1; part++) {
+                file = file.resolve(sanitize(parts[part]));
+            }
+            return file.resolve(sanitize(parts[parts.length - 1]) + EXTENSION);
+        }
         String folder = page == null ? UNSOURCED : namespaceOf(page);
         return directory.resolve(folder).resolve(sanitize(styleId) + EXTENSION);
     }
@@ -236,10 +257,11 @@ public final class AttackOverrides {
         }
     }
 
-    public static boolean save(String styleId, AttackOverride override) {
-        if (styleId == null || styleId.isBlank() || override == null) {
+    public static boolean save(String requestedId, AttackOverride override) {
+        if (requestedId == null || requestedId.isBlank() || override == null) {
             return false;
         }
+        String styleId = StyleRegistry.canonicalOf(requestedId);
         StylePage base = StyleRegistry.raw(styleId);
         AttackOverride trimmed = base == null
                 ? override
@@ -261,7 +283,8 @@ public final class AttackOverrides {
         return true;
     }
 
-    public static boolean clear(String styleId) {
+    public static boolean clear(String requestedId) {
+        String styleId = StyleRegistry.canonicalOf(requestedId);
         Path file = styleId == null ? null : FILES.remove(styleId);
         OVERRIDES.remove(styleId);
         boolean removed = file != null && delete(file);
@@ -354,7 +377,10 @@ public final class AttackOverrides {
     }
 
     public static AttackOverride get(String styleId) {
-        return remote ? SYNCED.get(styleId) : OVERRIDES.get(styleId);
+        String canonical = StyleRegistry.canonicalOf(styleId);
+        Map<String, AttackOverride> source = remote ? SYNCED : OVERRIDES;
+        AttackOverride found = canonical == null ? null : source.get(canonical);
+        return found != null || styleId == null ? found : source.get(styleId);
     }
 
     public static boolean isDisabled(String styleId) {
@@ -385,7 +411,7 @@ public final class AttackOverrides {
                 .orElse(source.hitbox());
 
         WeaponAttributes.Attack patched = new WeaponAttributes.Attack(
-                source.conditions(),
+                override.parsedConditions().orElse(source.conditions()),
                 hitbox == null ? source.hitbox() : hitbox,
                 scaling
                         ? source.damageMultiplier() * override.damageMultiplier().orElse(1.0D)

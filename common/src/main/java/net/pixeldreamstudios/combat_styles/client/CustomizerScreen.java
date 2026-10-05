@@ -738,6 +738,7 @@ public class CustomizerScreen extends PanelScreen {
                     }
                     minecraft.setScreen(this);
                 })
+                .withStylePage()
                 .withAffixes(defaultAffixes, picked -> {
                     defaultAffixes.clear();
                     defaultAffixes.addAll(picked);

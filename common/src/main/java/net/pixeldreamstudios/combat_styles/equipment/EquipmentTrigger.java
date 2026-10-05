@@ -7,6 +7,7 @@ import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
+import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 
 import java.util.List;
 import java.util.Optional;
@@ -526,7 +527,7 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
     }
 
     private static boolean namesStyle(StyleEntry entry, String styleId) {
-        return styleId.equals(entry.styleId())
+        return StyleRegistry.sameStyle(styleId, entry.styleId())
                 || styleId.equals(entry.rawStyleId())
                 || entry.customStyleId().map(styleId::equals).orElse(false);
     }

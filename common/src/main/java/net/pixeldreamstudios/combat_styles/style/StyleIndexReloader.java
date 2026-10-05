@@ -23,6 +23,7 @@ public class StyleIndexReloader implements PreparableReloadListener {
                 .thenRunAsync(() -> {
                     StyleConfigs.reloadAll();
                     DataIntegrity.verify();
+                    StyleIdLedger.check();
                 }, applyExecutor);
     }
 }

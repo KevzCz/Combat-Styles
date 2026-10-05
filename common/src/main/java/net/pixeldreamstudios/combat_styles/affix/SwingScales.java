@@ -70,7 +70,7 @@ public final class SwingScales {
             CombatStyles.LOGGER.info(
                     "[CD-resolve] combo={} seqCombo={} slots={} slot={} override={} own={} inherited={} scale={}",
                     comboCount, SequenceSlots.sequenceComboOf(player, comboCount), slots,
-                    slots <= 0 ? -1 : SequenceSlots.slotFor(SequenceSlots.sequenceComboOf(player, comboCount), slots),
+                    slots <= 0 ? -1 : SequenceSlots.liveSlot(player, weapon, comboCount, slots),
                     override == null ? "none" : "found", own, inherited, scale);
         }
         return scale;

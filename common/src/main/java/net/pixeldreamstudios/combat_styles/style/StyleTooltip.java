@@ -61,9 +61,9 @@ public final class StyleTooltip {
                     StyleText.formatDecimal(cost)));
         }
         WeaponAttributes.Condition[] conditions = page.attack().conditions();
-        if (conditions != null && conditions.length > 0 && conditions[0] != null) {
-            line.append(SEPARATOR).append(StyleText.conditionName(conditions[0]).copy()
-                    .withStyle(ChatFormatting.AQUA));
+        Component named = StyleText.conditionNames(conditions);
+        if (!named.getString().isEmpty()) {
+            line.append(SEPARATOR).append(named.copy().withStyle(ChatFormatting.AQUA));
         }
         return line.withStyle(DIM);
     }

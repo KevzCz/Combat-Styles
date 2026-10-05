@@ -11,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class MultiChoiceScreen extends PickerScreen<String> {
 
@@ -25,6 +26,8 @@ public class MultiChoiceScreen extends PickerScreen<String> {
     private static final String KEY_EMPTY = "screen.combat_styles.multi_empty";
     private static final String KEY_CLEAR = "screen.combat_styles.multi_clear";
     private static final String KEY_DONE = "screen.combat_styles.apply";
+    private static final String KEY_RESET = "screen.combat_styles.multi_reset";
+    private static final String KEY_ORIGINAL = "screen.combat_styles.multi_original";
     private static final String MARK_ON = "✔";
     private static final String MARK_OFF = "•";
 
@@ -32,6 +35,10 @@ public class MultiChoiceScreen extends PickerScreen<String> {
     private final List<String> options = new ArrayList<>();
     private final Set<String> picked = new LinkedHashSet<>();
     private final Consumer<List<String>> onApply;
+    private final Set<String> defaults = new LinkedHashSet<>();
+    private boolean hasDefaults;
+    private Function<String, Component> labeler = StyleText::choiceName;
+    private Function<String, List<Component>> hinter = RefTooltip::forChoice;
 
     public MultiChoiceScreen(Screen parent, Component subtitle, List<String> choices,
                              List<String> current, Consumer<List<String>> onApply) {
@@ -42,6 +49,25 @@ public class MultiChoiceScreen extends PickerScreen<String> {
         if (current != null) {
             this.picked.addAll(current);
         }
+    }
+
+    public MultiChoiceScreen withDefaults(List<String> original) {
+        this.defaults.clear();
+        if (original != null) {
+            this.defaults.addAll(original);
+        }
+        this.hasDefaults = true;
+        return this;
+    }
+
+    public MultiChoiceScreen withLabels(Function<String, Component> labels) {
+        this.labeler = labels;
+        return this;
+    }
+
+    public MultiChoiceScreen withHints(Function<String, List<Component>> hints) {
+        this.hinter = hints;
+        return this;
     }
 
     @Override
@@ -66,12 +92,12 @@ public class MultiChoiceScreen extends PickerScreen<String> {
 
     @Override
     protected String searchTextOf(String row) {
-        return StyleText.choiceName(row).getString() + " " + row;
+        return labeler.apply(row).getString() + " " + row;
     }
 
     @Override
     protected List<Component> tooltipFor(String row) {
-        return RefTooltip.forChoice(row);
+        return hinter.apply(row);
     }
 
     @Override
@@ -107,6 +133,13 @@ public class MultiChoiceScreen extends PickerScreen<String> {
                         button -> picked.clear())
                 .bounds(contentLeft(), buttonY,
                         BUTTON_WIDTH, ScreenTheme.BUTTON_HEIGHT).build());
+        if (hasDefaults) {
+            addRenderableWidget(PanelButton.of(Component.translatable(KEY_RESET), button -> {
+                picked.clear();
+                picked.addAll(defaults);
+            }).bounds(contentLeft() + BUTTON_WIDTH + BUTTON_GAP, buttonY,
+                    BUTTON_WIDTH, ScreenTheme.BUTTON_HEIGHT).build());
+        }
         addRenderableWidget(PanelButton.of(Component.translatable(KEY_DONE), button -> {
             onApply.accept(List.copyOf(picked));
             minecraft.setScreen(parent);
@@ -122,9 +155,16 @@ public class MultiChoiceScreen extends PickerScreen<String> {
                 index, hovered, on);
         graphics.drawString(font, on ? MARK_ON : MARK_OFF, x + TEXT_INSET, y + TEXT_INSET,
                 on ? ScreenTheme.GOOD : ScreenTheme.DIM, false);
+        int tagWidth = 0;
+        if (defaults.contains(row)) {
+            Component tag = Component.translatable(KEY_ORIGINAL);
+            tagWidth = font.width(tag) + TEXT_INSET;
+            graphics.drawString(font, tag, x + width - tagWidth, y + TEXT_INSET,
+                    ScreenTheme.DIM, false);
+        }
         graphics.drawString(font,
-                ScreenDraw.trim(font, StyleText.choiceName(row).getString(),
-                        width - MARK_WIDTH - 8),
+                ScreenDraw.trim(font, labeler.apply(row).getString(),
+                        width - MARK_WIDTH - 8 - tagWidth),
                 x + MARK_WIDTH, y + TEXT_INSET,
                 on ? ScreenTheme.TEXT : ScreenTheme.MUTED, false);
     }

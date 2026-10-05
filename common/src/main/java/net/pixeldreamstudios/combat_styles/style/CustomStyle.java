@@ -16,7 +16,8 @@ import java.util.Optional;
 
 public record CustomStyle(String id, String group, StyleEntry entry,
                           Optional<String> category, Optional<StyleRarity> rarity,
-                          Optional<Double> costOverride) {
+                          Optional<Double> costOverride,
+                          Optional<Boolean> stylePage) {
 
     public static final String DEFAULT_GROUP = "custom";
 
@@ -26,7 +27,8 @@ public record CustomStyle(String id, String group, StyleEntry entry,
             StyleEntry.CODEC.fieldOf("style").forGetter(CustomStyle::entry),
             Codec.STRING.optionalFieldOf("category").forGetter(CustomStyle::category),
             StyleRarity.CODEC.optionalFieldOf("rarity").forGetter(CustomStyle::rarity),
-            Codec.DOUBLE.optionalFieldOf("cost").forGetter(CustomStyle::costOverride)
+            Codec.DOUBLE.optionalFieldOf("cost").forGetter(CustomStyle::costOverride),
+            Codec.BOOL.optionalFieldOf(StylePool.KEY_STYLE_PAGE).forGetter(CustomStyle::stylePage)
     ).apply(instance, CustomStyle::new));
 
     public static final StreamCodec<ByteBuf, CustomStyle> STREAM_CODEC = new StreamCodec<>() {
@@ -39,8 +41,9 @@ public record CustomStyle(String id, String group, StyleEntry entry,
             Optional<String> category = ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buffer);
             Optional<String> rarityKey = ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buffer);
             Optional<Double> cost = ByteBufCodecs.optional(ByteBufCodecs.DOUBLE).decode(buffer);
+            Optional<Boolean> stylePage = ByteBufCodecs.optional(ByteBufCodecs.BOOL).decode(buffer);
             return new CustomStyle(id, group, entry, category,
-                    rarityKey.map(CustomStyle::rarityOf), cost);
+                    rarityKey.map(CustomStyle::rarityOf), cost, stylePage);
         }
 
         @Override
@@ -52,6 +55,7 @@ public record CustomStyle(String id, String group, StyleEntry entry,
             ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8)
                     .encode(buffer, style.rarity().map(StyleRarity::key));
             ByteBufCodecs.optional(ByteBufCodecs.DOUBLE).encode(buffer, style.costOverride());
+            ByteBufCodecs.optional(ByteBufCodecs.BOOL).encode(buffer, style.stylePage());
         }
     };
 

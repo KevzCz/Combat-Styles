@@ -125,8 +125,12 @@ public record SlotTuning(List<Integer> slots, List<String> affixes,
                 extra.hastensNext().or(base::hastensNext),
                 extra.drag().or(base::drag),
                 extra.behaviour().or(base::behaviour),
-                extra.damageType().or(base::damageType))
-                .withScaleAnimation(extra.scaleAnimation().or(base::scaleAnimation));
+                extra.damageType().or(base::damageType),
+                extra.affixes().isEmpty() ? base.affixes() : extra.affixes(),
+                extra.affixTuning().isEmpty() ? base.affixTuning() : extra.affixTuning(),
+                extra.scaleAnimation().or(base::scaleAnimation),
+                extra.conditions().or(base::conditions),
+                extra.stylePage().or(base::stylePage));
     }
 
 }

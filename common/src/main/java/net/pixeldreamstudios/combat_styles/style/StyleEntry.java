@@ -27,8 +27,8 @@ public record StyleEntry(String styleId, Optional<String> soundId, List<String> 
     public static final StyleEntry EMPTY = new StyleEntry("", Optional.empty(), List.of(),
             Optional.empty(), Optional.empty(), Optional.empty(), Map.of(), Optional.empty());
 
-    public static final String KEY_SEPARATOR = "@";
-    public static final String AFFIX_SEPARATOR = "+";
+    public static final String KEY_SEPARATOR = StyleKeys.KEY_SEPARATOR;
+    public static final String AFFIX_SEPARATOR = StyleKeys.AFFIX_SEPARATOR;
 
     private static final Codec<List<String>> AFFIX_LIST_CODEC = Codec.either(
                     Codec.STRING, Codec.STRING.listOf())
@@ -97,9 +97,9 @@ public record StyleEntry(String styleId, Optional<String> soundId, List<String> 
 
     public String styleId() {
         if (!styleId.isBlank() || customStyleId.isEmpty()) {
-            return styleId;
+            return StyleRegistry.canonicalOf(styleId);
         }
-        return CustomStyles.styleIdOf(customStyleId.get());
+        return StyleRegistry.canonicalOf(CustomStyles.styleIdOf(customStyleId.get()));
     }
 
     public String rawStyleId() {
@@ -194,26 +194,23 @@ public record StyleEntry(String styleId, Optional<String> soundId, List<String> 
     }
 
     public static String key(String styleId, String affixId) {
-        return affixId == null || affixId.isBlank() ? styleId : styleId + KEY_SEPARATOR + affixId;
+        return StyleKeys.key(styleId, affixId);
     }
 
-    public static final String NAME_SEPARATOR = "#";
+    public static final String NAME_SEPARATOR = StyleKeys.NAME_SEPARATOR;
 
     public static String key(String styleId, List<String> affixIds) {
-        if (affixIds == null || affixIds.isEmpty()) {
-            return styleId;
-        }
-        return styleId + KEY_SEPARATOR + String.join(AFFIX_SEPARATOR, sorted(affixIds));
+        return StyleKeys.key(styleId, affixIds);
     }
 
-    public static final String CUSTOM_PREFIX = "custom:";
+    public static final String CUSTOM_PREFIX = StyleKeys.CUSTOM_PREFIX;
 
     public boolean isNamed() {
         return name.isPresent() || nameKey.isPresent() || customStyleId.isPresent();
     }
 
     public boolean isSameNamed(StyleEntry other) {
-        return other != null && isNamed() && styleId.equals(other.styleId())
+        return other != null && isNamed() && styleId().equals(other.styleId())
                 && name.equals(other.name()) && nameKey.equals(other.nameKey())
                 && customStyleId.equals(other.customStyleId());
     }
@@ -245,35 +242,18 @@ public record StyleEntry(String styleId, Optional<String> soundId, List<String> 
     }
 
     public static List<String> sorted(List<String> affixIds) {
-        List<String> copy = new ArrayList<>(affixIds);
-        copy.sort(String::compareTo);
-        return List.copyOf(copy);
+        return StyleKeys.sorted(affixIds);
     }
 
     public static String styleIdOfKey(String key) {
         if (key.startsWith(CUSTOM_PREFIX)) {
             return CustomStyles.styleIdOf(key.substring(CUSTOM_PREFIX.length()));
         }
-        String base = key;
-        int named = base.indexOf(NAME_SEPARATOR);
-        if (named >= 0) {
-            base = base.substring(0, named);
-        }
-        int split = base.indexOf(KEY_SEPARATOR);
-        return split < 0 ? base : base.substring(0, split);
+        return StyleKeys.styleIdOf(key);
     }
 
     public static List<String> affixIdsOfKey(String key) {
-        String base = key;
-        int named = base.indexOf(NAME_SEPARATOR);
-        if (named >= 0) {
-            base = base.substring(0, named);
-        }
-        int split = base.indexOf(KEY_SEPARATOR);
-        if (split < 0 || split == base.length() - 1) {
-            return List.of();
-        }
-        return List.of(base.substring(split + 1).split("\\" + AFFIX_SEPARATOR));
+        return StyleKeys.affixIdsOf(key);
     }
 
     public String key() {

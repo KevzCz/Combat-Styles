@@ -31,11 +31,15 @@ import net.pixeldreamstudios.combat_styles.style.HitboxSet;
 import net.pixeldreamstudios.combat_styles.style.SlashPlacement;
 import net.pixeldreamstudios.combat_styles.style.StyleCost;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
+import net.pixeldreamstudios.combat_styles.style.StylePool;
+import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
+import net.pixeldreamstudios.combat_styles.equipment.AttackConditions;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -113,7 +117,15 @@ public class AttackEditorScreen extends PanelScreen {
             Set.of(SECTION_DRAG, SECTION_MOTION, SECTION_HITBOX);
     private static final String KEY_HITBOX_TYPE = "screen.combat_styles.field_hitbox_type";
     private static final String KEY_SWING_SOUND = "screen.combat_styles.field_swing_sound";
-    private static final int IDENTITY_ROWS = 3;
+    private static final int IDENTITY_ROWS = 4;
+    private static final String KEY_STYLE_PAGE = "screen.combat_styles.field_style_page";
+    private static final String KEY_STYLE_PAGE_HINT = "hint.combat_styles.style_page";
+    private static final String KEY_NATURAL = "screen.combat_styles.style_page_natural";
+    private static final String KEY_NOT_NATURAL = "screen.combat_styles.style_page_hidden";
+    private static final String KEY_CONDITIONS = "screen.combat_styles.field_conditions";
+    private static final String KEY_NO_CONDITIONS = "screen.combat_styles.conditions_none";
+    private static final String KEY_CONDITIONS_CHANGED = "screen.combat_styles.conditions_changed";
+    private static final String CONDITION_HINT_PREFIX = "hint.combat_styles.attack_condition.";
     private static final String KEY_DAMAGE_TYPE = "screen.combat_styles.field_damage_type";
     private static final String KEY_PHYSICAL = "screen.combat_styles.damage_type_physical";
     private static final String KEY_INHERITED = "screen.combat_styles.value_inherited";
@@ -187,6 +199,11 @@ public class AttackEditorScreen extends PanelScreen {
     private String hitboxChoice = "";
     private String soundChoice = "";
     private String damageTypeChoice = "";
+    private final List<String> inheritedConditions;
+    private List<String> conditionChoice;
+    private boolean stylePageShown;
+    private Boolean stylePageChoice;
+    private boolean stylePageHovered;
     private boolean dragTrail;
     private EditBox trailBox;
     private final List<AbstractWidget> footerButtons = new ArrayList<>();
@@ -215,6 +232,11 @@ public class AttackEditorScreen extends PanelScreen {
                               Consumer<AttackOverride> onApply) {
         this(parent, page, current, onApply, "", name -> {
         });
+    }
+
+    public AttackEditorScreen withStylePage() {
+        this.stylePageShown = true;
+        return this;
     }
 
     public AttackEditorScreen withSubtitle(Component value) {
@@ -296,6 +318,13 @@ public class AttackEditorScreen extends PanelScreen {
         hitboxChoice = override.hitbox().orElse("");
         soundChoice = override.swingSound().orElse("");
         damageTypeChoice = override.damageType().orElse("");
+        StylePage original = StyleRegistry.raw(page.styleId());
+        inheritedConditions = AttackOverride.namesOf(
+                (original == null ? page : original).attack().conditions());
+        stylePageChoice = override.stylePage().orElse(null);
+        conditionChoice = override.conditions()
+                .filter(chosen -> !AttackOverride.sameConditions(chosen, inheritedConditions))
+                .orElse(null);
         addField(FIELD_DAMAGE, page.damageMultiplier(),
                 override.damageMultiplier().orElse(page.damageMultiplier()), 0.1D, 0.0D, 100.0D);
         addField(FIELD_ANGLE, page.angle(),
@@ -672,6 +701,7 @@ public class AttackEditorScreen extends PanelScreen {
         for (int i = 0; i < fields.size(); i++) {
             values.set(i, fields.get(i).base());
         }
+        conditionChoice = null;
     }
 
     private Component slashesLabel() {
@@ -849,6 +879,15 @@ public class AttackEditorScreen extends PanelScreen {
             override = override.withScaleAnimation(Optional.of(Boolean.TRUE));
             any = true;
         }
+        if (conditionChoice != null) {
+            override = override.withConditions(Optional.of(List.copyOf(conditionChoice)));
+            any = true;
+        }
+        if (stylePageShown && stylePageChoice != null
+                && stylePageChoice != StylePool.definedNatural(page.styleId())) {
+            override = override.withStylePage(Optional.of(stylePageChoice));
+            any = true;
+        }
         onApply.accept(any ? override : null);
         onRename.accept(nameBox == null ? currentName : nameBox.getValue().trim());
         minecraft.setScreen(parent);
@@ -932,6 +971,24 @@ public class AttackEditorScreen extends PanelScreen {
         }
         y += ROW_HEIGHT;
 
+        if (y + ROW_HEIGHT > listTop - 2 && y < listBottom) {
+            combat_styles$identityRow(graphics, KEY_CONDITIONS,
+                    combat_styles$conditionsLabel(), x, y, listWidth, mouseX, mouseY);
+        }
+        y += ROW_HEIGHT;
+
+        stylePageHovered = false;
+        if (stylePageShown) {
+            if (y + ROW_HEIGHT > listTop - 2 && y < listBottom) {
+                stylePageHovered = ScreenDraw.isWithin(mouseX, mouseY, x, y,
+                        listWidth - SCROLLBAR_WIDTH - 2, ROW_HEIGHT);
+                combat_styles$identityRow(graphics, KEY_STYLE_PAGE,
+                        Component.translatable(combat_styles$natural() ? KEY_NATURAL : KEY_NOT_NATURAL)
+                                .getString(), x, y, listWidth, mouseX, mouseY);
+            }
+            y += ROW_HEIGHT;
+        }
+
         if (combat_styles$hasAffixSection()) {
             if (y + SECTION_HEIGHT > listTop - 2 && y < listBottom) {
                 graphics.drawString(font, Component.translatable(SECTION_AFFIXES),
@@ -959,7 +1016,8 @@ public class AttackEditorScreen extends PanelScreen {
         ScreenDraw.scrollbar(graphics, x + listWidth - SCROLLBAR_WIDTH - 1, listTop,
                 viewport, viewport, contentHeight(), scroll);
 
-        graphics.drawString(font, Component.translatable(KEY_HINT),
+        graphics.drawString(font,
+                Component.translatable(stylePageHovered ? KEY_STYLE_PAGE_HINT : KEY_HINT),
                 left + PADDING, top + PANEL_HEIGHT - FOOTER - 10, COLOR_MUTED, false);
 
         int trailY = top + PANEL_HEIGHT - FOOTER + 3;
@@ -1008,7 +1066,7 @@ public class AttackEditorScreen extends PanelScreen {
             height += ROW_HEIGHT;
         }
         height += ROW_HEIGHT;
-        height += SECTION_HEIGHT + ROW_HEIGHT * IDENTITY_ROWS;
+        height += SECTION_HEIGHT + ROW_HEIGHT * combat_styles$identityRows();
         if (combat_styles$hasAffixSection()) {
             height += SECTION_HEIGHT;
         }
@@ -1263,6 +1321,38 @@ public class AttackEditorScreen extends PanelScreen {
                 : StyleText.prettify(damageTypeChoice);
     }
 
+    private int combat_styles$identityRows() {
+        return stylePageShown ? IDENTITY_ROWS + 1 : IDENTITY_ROWS;
+    }
+
+    private boolean combat_styles$natural() {
+        return stylePageChoice != null
+                ? stylePageChoice
+                : StylePool.definedNatural(page.styleId());
+    }
+
+    private String combat_styles$conditionsLabel() {
+        List<String> shown = conditionChoice == null ? inheritedConditions : conditionChoice;
+        String names = shown.isEmpty()
+                ? Component.translatable(KEY_NO_CONDITIONS).getString()
+                : StyleText.conditionNames(AttackOverride.conditionsOf(shown)).getString();
+        return conditionChoice == null
+                ? names
+                : Component.translatable(KEY_CONDITIONS_CHANGED, names).getString();
+    }
+
+    private void combat_styles$openConditions() {
+        List<String> current = conditionChoice == null ? inheritedConditions : conditionChoice;
+        minecraft.setScreen(new MultiChoiceScreen(this, Component.translatable(KEY_CONDITIONS),
+                AttackConditions.names(), current,
+                picked -> conditionChoice = AttackOverride.sameConditions(picked,
+                        inheritedConditions) ? null : List.copyOf(picked))
+                .withDefaults(inheritedConditions)
+                .withLabels(name -> StyleText.conditionName(AttackOverride.conditionNamed(name)))
+                .withHints(name -> List.of(Component.translatable(
+                        CONDITION_HINT_PREFIX + name.toLowerCase(Locale.ROOT)))));
+    }
+
     private void combat_styles$identityRow(GuiGraphics graphics, String labelKey, String value,
                                            int x, int y, int listWidth,
                                            int mouseX, int mouseY) {
@@ -1315,7 +1405,7 @@ public class AttackEditorScreen extends PanelScreen {
     }
 
     private int combat_styles$affixTop() {
-        int y = combat_styles$identityTop() + ROW_HEIGHT * IDENTITY_ROWS;
+        int y = combat_styles$identityTop() + ROW_HEIGHT * combat_styles$identityRows();
         if (combat_styles$hasAffixSection()) {
             y += SECTION_HEIGHT;
         }
@@ -1455,6 +1545,15 @@ public class AttackEditorScreen extends PanelScreen {
                     picked -> damageTypeChoice = picked == null ? "" : picked));
             return true;
         }
+        if (ScreenDraw.isWithin(mouseX, mouseY, x, y + ROW_HEIGHT * 3, width, ROW_HEIGHT)) {
+            combat_styles$openConditions();
+            return true;
+        }
+        if (stylePageShown
+                && ScreenDraw.isWithin(mouseX, mouseY, x, y + ROW_HEIGHT * IDENTITY_ROWS, width, ROW_HEIGHT)) {
+            stylePageChoice = !combat_styles$natural();
+            return true;
+        }
         return false;
     }
 
@@ -1499,7 +1598,7 @@ public class AttackEditorScreen extends PanelScreen {
         if (combat_styles$clickSection(mouseX, mouseY, SECTION_IDENTITY, x, listWidth, y)) {
             return true;
         }
-        y += SECTION_HEIGHT + ROW_HEIGHT * IDENTITY_ROWS;
+        y += SECTION_HEIGHT + ROW_HEIGHT * combat_styles$identityRows();
         return combat_styles$clickSection(mouseX, mouseY, SECTION_AFFIXES, x, listWidth, y);
     }
 

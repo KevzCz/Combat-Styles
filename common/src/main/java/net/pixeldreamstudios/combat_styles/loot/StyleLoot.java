@@ -6,7 +6,10 @@ import net.minecraft.util.RandomSource;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
+import net.pixeldreamstudios.combat_styles.style.CustomStyle;
+import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
+import net.pixeldreamstudios.combat_styles.style.StylePool;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 
@@ -25,6 +28,10 @@ public final class StyleLoot {
     }
 
     public static List<String> rollAffixes(StylePage page, RandomSource random) {
+        CustomStyle custom = CustomStyles.get(page.styleId());
+        if (custom != null) {
+            return custom.entry().affixIds();
+        }
         CombatStylesConfig config = CombatStylesConfig.get();
         if (AffixRegistry.isEmpty() || random.nextDouble() >= config.affixChance()) {
             return List.of();
@@ -93,7 +100,7 @@ public final class StyleLoot {
     }
 
     public static StylePage weightedPick(RandomSource random) {
-        List<StylePage> pages = StyleRegistry.all();
+        List<StylePage> pages = StylePool.natural(StyleRegistry.all());
         if (pages.isEmpty()) {
             return null;
         }

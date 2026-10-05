@@ -16,6 +16,7 @@ public abstract class PickerScreen<T> extends PanelScreen {
     protected static final int SEARCH_HEIGHT = 14;
     protected static final int SEARCH_MAX = 64;
     protected static final int BUTTON_WIDTH = 74;
+    protected static final int BUTTON_GAP = 4;
     protected static final int TEXT_INSET = 4;
 
     private static final String KEY_CANCEL = "gui.cancel";

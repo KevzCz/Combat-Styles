@@ -9,8 +9,10 @@ import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.config.ConfigPaths;
 import net.pixeldreamstudios.combat_styles.config.DefinitionLayer;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
+import net.pixeldreamstudios.combat_styles.style.SequenceService;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
+import net.pixeldreamstudios.combat_styles.style.StylePool;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 
@@ -348,19 +350,20 @@ public final class BookRolls {
     private static StyleEntry fromRegistry(BookRoll roll, RandomSource random) {
         List<StylePage> pages = new ArrayList<>();
         if (roll.categories().isEmpty()) {
-            pages.addAll(StyleRegistry.all());
+            pages.addAll(StylePool.natural(StyleRegistry.all()));
         } else {
             for (String category : roll.categories()) {
-                pages.addAll(StyleRegistry.forCategory(category));
+                pages.addAll(StylePool.natural(StyleRegistry.forCategory(category)));
             }
         }
         if (pages.isEmpty()) {
             return null;
         }
-        StyleEntry entry = StyleEntry.of(pages.get(random.nextInt(pages.size())).styleId());
-        if (roll.roll().isEmpty()) {
+        StyleEntry entry = SequenceService.entryFor(pages.get(random.nextInt(pages.size())).styleId());
+        if (entry == null || roll.roll().isEmpty()) {
             return entry;
         }
-        return entry.withAttackOverride(roll.roll().applyTo(null, random));
+        return entry.withAttackOverride(
+                roll.roll().applyTo(entry.attackOverride().orElse(null), random));
     }
 }

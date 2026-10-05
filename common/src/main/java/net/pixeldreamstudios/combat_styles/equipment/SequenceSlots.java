@@ -2,16 +2,19 @@ package net.pixeldreamstudios.combat_styles.equipment;
 
 import net.bettercombat.api.AttackHand;
 import net.bettercombat.api.WeaponAttributes;
-import net.bettercombat.api.ComboState;
 import net.bettercombat.logic.PlayerAttackHelper;
+import net.bettercombat.logic.WeaponRegistry;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
+import net.pixeldreamstudios.combat_styles.platform.WeaponRegistryAccess;
 import net.pixeldreamstudios.combat_styles.style.AttackOverrides;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
 import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 
+import java.util.Arrays;
 import java.util.List;
 
 public final class SequenceSlots {
@@ -31,7 +34,7 @@ public final class SequenceSlots {
     }
 
     public static int slotFor(int comboCount, int size) {
-        return size <= 0 ? 0 : Math.floorMod(comboCount, size);
+        return ComboCycle.slotFor(comboCount, size);
     }
 
     public static int sequenceComboOf(Player player, int comboCount) {
@@ -99,13 +102,53 @@ public final class SequenceSlots {
         return AttackOverrides.applyTo(page, entry.attackOverride().get());
     }
 
-    public static int usableSlotCount(Player player, int fallback) {
-        if (player == null || PlayerAttackHelper.isDualWielding(player)) {
-            return fallback;
+    public static int liveSlot(Player player, ItemStack weapon, int comboCount, int size) {
+        int combo = sequenceComboOf(player, comboCount);
+        return liveSlotOf(liveSlots(player, weapon, comboCount, size), combo, size);
+    }
+
+    public static int liveSlotOf(int[] live, int sequenceCombo, int size) {
+        return ComboCycle.slotOf(live, sequenceCombo, size);
+    }
+
+    public static int[] liveSlots(Player player, ItemStack weapon, int comboCount, int size) {
+        return liveSlots(player, weapon, size, swungWithOffHand(player, comboCount));
+    }
+
+    public static int[] liveSlotsFor(Player player, ItemStack weapon, int size) {
+        boolean offHand = player != null && weapon != null
+                && weapon == player.getOffhandItem()
+                && PlayerAttackHelper.isDualWielding(player);
+        return liveSlots(player, weapon, size, offHand);
+    }
+
+    public static int[] liveSlots(Player player, ItemStack weapon, int size, boolean offHand) {
+        int[] all = ComboCycle.all(size);
+        WeaponAttributes.Attack[] attacks = composedAttacks(weapon);
+        if (player == null || attacks == null || attacks.length != size) {
+            return all;
         }
-        AttackHand hand = CombatState.swungHand(player);
-        ComboState combo = hand == null ? null : hand.combo();
-        return combo != null && combo.total() > 0 ? combo.total() : fallback;
+        int[] live = new int[size];
+        int count = 0;
+        for (int index = 0; index < size; index++) {
+            WeaponAttributes.Attack attack = attacks[index];
+            if (attack == null || AttackConditions.passes(attack.conditions(), player, offHand)) {
+                live[count++] = index;
+            }
+        }
+        return count == 0 ? all : Arrays.copyOf(live, count);
+    }
+
+    public static int positionIn(int[] live, int slot) {
+        return ComboCycle.positionOf(live, slot);
+    }
+
+    private static WeaponAttributes.Attack[] composedAttacks(ItemStack weapon) {
+        if (weapon == null || weapon.isEmpty() || WeaponRegistryAccess.bypassSequence()) {
+            return null;
+        }
+        WeaponAttributes attributes = WeaponRegistry.getAttributes(weapon);
+        return attributes == null ? null : attributes.attacks();
     }
 
     public static boolean swungWithOffHand(Player player, int comboCount) {
