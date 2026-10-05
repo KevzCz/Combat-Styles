@@ -18,6 +18,11 @@ public abstract class PickerScreen<T> extends PanelScreen {
     protected static final int BUTTON_WIDTH = 74;
     protected static final int BUTTON_GAP = 4;
     protected static final int TEXT_INSET = 4;
+    protected static final int ID_CAP = 140;
+    private static final int MAX_PANEL_WIDTH = 440;
+    private static final int SCREEN_MARGIN = 24;
+    private static final int ROW_SLACK = 12;
+    private static final int UNSIZED = -1;
 
     private static final String KEY_CANCEL = "gui.cancel";
 
@@ -25,6 +30,8 @@ public abstract class PickerScreen<T> extends PanelScreen {
     private final List<T> shown = new ArrayList<>();
 
     private EditBox searchBox;
+    private int fitted = UNSIZED;
+    private int fittedFor = UNSIZED;
 
     protected PickerScreen(Component title, Screen parent) {
         super(title, parent);
@@ -72,6 +79,37 @@ public abstract class PickerScreen<T> extends PanelScreen {
 
     protected List<Component> tooltipFor(T row) {
         return null;
+    }
+
+    protected int rowWidth(T row) {
+        return 0;
+    }
+
+    protected final int fittedWidth(int baseWidth) {
+        if (fittedFor != width) {
+            int widest = 0;
+            for (T row : choices()) {
+                widest = Math.max(widest, rowWidth(row));
+            }
+            int wanted = widest + ROW_SLACK + ScreenTheme.PADDING * 2;
+            int cap = Math.min(MAX_PANEL_WIDTH, width - SCREEN_MARGIN * 2);
+            fitted = Math.max(baseWidth, Math.min(wanted, cap));
+            fittedFor = width;
+        }
+        return fitted;
+    }
+
+    protected int idWidth(String id) {
+        return Math.min(font.width(id), ID_CAP);
+    }
+
+    protected int splitRowWidth(int labelWidth, String id, int margin) {
+        int idWidth = idWidth(id);
+        return Math.max(labelWidth + idWidth + margin, idWidth * 2);
+    }
+
+    protected String shortId(String id, int rowWidth) {
+        return ScreenDraw.trim(font, id, Math.min(ID_CAP, rowWidth / 2));
     }
 
     protected void addFooterButtons(int buttonY) {

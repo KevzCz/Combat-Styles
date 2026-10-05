@@ -298,19 +298,15 @@ public final class SequenceService {
         if (stack == null || stack.isEmpty()) {
             return false;
         }
-        return Boolean.TRUE.equals(stack.get(ModComponents.LOCKED.get()))
-                || DefaultStyles.isLockedByDefault(stack);
+        Boolean flag = stack.get(ModComponents.LOCKED.get());
+        return flag != null ? flag : DefaultStyles.isLockedByDefault(stack);
     }
 
     public static void setLocked(ItemStack stack, boolean locked) {
         if (stack == null || stack.isEmpty()) {
             return;
         }
-        if (locked) {
-            stack.set(ModComponents.LOCKED.get(), Boolean.TRUE);
-        } else {
-            stack.remove(ModComponents.LOCKED.get());
-        }
+        stack.set(ModComponents.LOCKED.get(), locked);
     }
 
     public static boolean hasSequence(ItemStack stack) {

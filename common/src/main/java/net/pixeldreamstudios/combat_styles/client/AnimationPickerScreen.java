@@ -40,7 +40,12 @@ public class AnimationPickerScreen extends PickerScreen<String> {
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(String row) {
+        return font.width(rowText(row)) + 16;
     }
 
     @Override

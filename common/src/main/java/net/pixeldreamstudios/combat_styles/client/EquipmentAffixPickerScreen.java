@@ -44,7 +44,12 @@ public class EquipmentAffixPickerScreen extends PickerScreen<StyleAffix> {
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(StyleAffix row) {
+        return font.width(StyleText.prettify(row.serializedId())) + NAME_MARGIN;
     }
 
     @Override

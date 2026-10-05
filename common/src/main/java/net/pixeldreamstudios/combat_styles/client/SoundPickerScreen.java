@@ -59,7 +59,12 @@ public class SoundPickerScreen extends PickerScreen<SoundPickerScreen.Row> {
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(Row row) {
+        return font.width(row.label()) + (row.header() ? TEXT_INSET * 2 : NAME_MARGIN);
     }
 
     @Override

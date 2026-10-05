@@ -39,7 +39,16 @@ public class EffectFieldPickerScreen extends PickerScreen<EffectSchema.Template>
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(EffectSchema.Template row) {
+        int width = TEXT_INSET * 2 + font.width(EffectLabels.labelFor(pathOf(row), row.key()));
+        for (FieldDependency.Marker marker : FieldDependency.markers(pathOf(row), row.key())) {
+            width += font.width(marker.glyph()) + MARKER_GAP;
+        }
+        return width;
     }
 
     @Override

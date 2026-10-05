@@ -72,7 +72,15 @@ public class MultiChoiceScreen extends PickerScreen<String> {
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(String row) {
+        int tag = defaults.contains(row)
+                ? font.width(Component.translatable(KEY_ORIGINAL)) + TEXT_INSET
+                : 0;
+        return font.width(labeler.apply(row).getString()) + MARK_WIDTH + 8 + tag;
     }
 
     @Override

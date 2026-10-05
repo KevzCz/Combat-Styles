@@ -22,7 +22,6 @@ public class AttackPickerScreen extends PickerScreen<StylePage> {
     private static final int ROW_HEIGHT = 14;
     private static final int TAG_GAP = 6;
     private static final int NAME_MARGIN = 16;
-    private static final int ID_WIDTH = 84;
 
     private static final String KEY_TITLE = "screen.combat_styles.attack_picker";
     private static final String KEY_SEARCH = "screen.combat_styles.search_attacks";
@@ -47,7 +46,16 @@ public class AttackPickerScreen extends PickerScreen<StylePage> {
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(StylePage row) {
+        int tag = AttackOverrides.get(row.styleId()) == null
+                ? 0
+                : font.width(Component.translatable(KEY_TUNED)) + TAG_GAP;
+        return splitRowWidth(font.width(StyleText.name(row).getString()) + tag,
+                row.styleId(), NAME_MARGIN + TAG_GAP);
     }
 
     @Override
@@ -108,7 +116,7 @@ public class AttackPickerScreen extends PickerScreen<StylePage> {
             graphics.drawString(font, tuned, x + width - font.width(tuned) - TAG_GAP,
                     y + TEXT_INSET, ScreenTheme.ACCENT, false);
         }
-        String id = ScreenDraw.trim(font, row.styleId(), ID_WIDTH);
+        String id = shortId(row.styleId(), width);
         int idWidth = font.width(id);
         graphics.drawString(font, id,
                 x + width - tagWidth - idWidth - TAG_GAP, y + TEXT_INSET,

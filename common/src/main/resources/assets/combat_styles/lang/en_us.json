@@ -522,7 +522,6 @@
   "tooltip.combat_styles.equip_window_full": "%1$s, %2$ss cooldown",
   "tooltip.combat_styles.equip_window_refresh": "Window refreshes on each use",
   "tooltip.combat_styles.equip_echo": "Repeats %s× after %ss at %s%% power",
-  "tooltip.combat_styles.equip_empowers": "Empowers:",
   "tooltip.combat_styles.equip_spell_grant": "Grants the spell %s",
   "tooltip.combat_styles.equip_spell_tune": "Empowers %s",
   "tooltip.combat_styles.equip_spell_block": "Blocks casting %s",

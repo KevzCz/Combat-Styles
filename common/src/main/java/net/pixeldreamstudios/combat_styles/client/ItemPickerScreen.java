@@ -75,7 +75,12 @@ public class ItemPickerScreen extends PickerScreen<ItemStack> {
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(ItemStack row) {
+        return splitRowWidth(font.width(row.getHoverName().getString()) + ICON_SIZE, idOf(row), 18);
     }
 
     @Override
@@ -154,7 +159,7 @@ public class ItemPickerScreen extends PickerScreen<ItemStack> {
         graphics.renderItem(row, x + 2, y);
         graphics.drawString(font, row.getHoverName(), x + ICON_SIZE + 6, y + TEXT_INSET,
                 selected ? ScreenTheme.GOOD : ScreenTheme.TEXT, false);
-        String shortId = ScreenDraw.trim(font, id, width / 2);
+        String shortId = shortId(id, width);
         graphics.drawString(font, shortId, x + width - font.width(shortId) - 4,
                 y + TEXT_INSET, ScreenTheme.MUTED, false);
     }

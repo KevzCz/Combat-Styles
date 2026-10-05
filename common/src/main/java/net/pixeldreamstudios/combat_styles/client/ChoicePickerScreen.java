@@ -18,7 +18,6 @@ public class ChoicePickerScreen extends PickerScreen<String> {
     private static final int PANEL_HEIGHT = 220;
     private static final int ROW_HEIGHT = 14;
     private static final int TRIM_MARGIN = 40;
-    private static final int ID_WIDTH = 84;
 
     private static final String KEY_TITLE = "screen.combat_styles.choice_picker";
     private static final String KEY_SEARCH = "screen.combat_styles.choice_search";
@@ -104,7 +103,19 @@ public class ChoicePickerScreen extends PickerScreen<String> {
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(String row) {
+        if (ANY_ROW.equals(row)) {
+            return font.width(Component.translatable(KEY_ANY)) + TEXT_INSET * 2;
+        }
+        String name = StyleText.choiceName(row).getString();
+        if (name.isBlank() || name.equals(row)) {
+            return font.width(StyleText.prettify(row)) + TRIM_MARGIN;
+        }
+        return splitRowWidth(font.width(name), row, TRIM_MARGIN);
     }
 
     @Override
@@ -244,7 +255,7 @@ public class ChoicePickerScreen extends PickerScreen<String> {
                     selected ? ScreenTheme.GOOD : ScreenTheme.TEXT, false);
             return;
         }
-        String shortId = ScreenDraw.trim(font, row, Math.min(ID_WIDTH, width / 2));
+        String shortId = shortId(row, width);
         int idWidth = font.width(shortId);
         graphics.drawString(font,
                 ScreenDraw.trim(font, name, width - idWidth - TRIM_MARGIN),

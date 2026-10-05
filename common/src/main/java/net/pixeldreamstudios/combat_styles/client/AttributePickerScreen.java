@@ -43,7 +43,12 @@ public class AttributePickerScreen extends PickerScreen<String> {
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(String row) {
+        return splitRowWidth(font.width(labelOf(row).getString()), row, 22);
     }
 
     @Override
@@ -116,7 +121,7 @@ public class AttributePickerScreen extends PickerScreen<String> {
                              int x, int y, int width, boolean hovered) {
         ScreenDraw.rowBackground(graphics, x + 1, y, width - 2, ROW_HEIGHT - 1,
                 index, hovered, false);
-        String idShown = ScreenDraw.trim(font, row, width / 2);
+        String idShown = shortId(row, width);
         int idWidth = font.width(idShown);
         graphics.drawString(font,
                 ScreenDraw.trim(font, labelOf(row).getString(), width - idWidth - 16),

@@ -48,7 +48,6 @@ public final class EquipmentTooltip {
     private static final String KEY_SPELL_REMOVE = "tooltip.combat_styles.equip_spell_remove";
     private static final String KEY_SCHOOL_BLOCK = "tooltip.combat_styles.equip_school_block";
     private static final String KEY_SCHOOL_REMOVE = "tooltip.combat_styles.equip_school_remove";
-    private static final String KEY_EMPOWERS = "tooltip.combat_styles.equip_empowers";
     private static final String KEY_REWRITES = "item.combat_styles.effect.rewrites";
     private static final String KEY_REWRITES_MORE = "item.combat_styles.effect.rewrites_more";
     private static final String KEY_KEEPS = "item.combat_styles.effect.keeps";
@@ -193,7 +192,7 @@ public final class EquipmentTooltip {
             List<Component> lines = new ArrayList<>();
             appendEffect(definition, named.getValue(),
                     !definition.isPermanent(named.getKey(), named.getValue()),
-                    granted(definition), lines,
+                    lines,
                     named.getValue().trigger().chance().orElse(EffectGroup.ALWAYS));
             if (lines.isEmpty()) {
                 continue;
@@ -219,7 +218,7 @@ public final class EquipmentTooltip {
             List<Component> lines = new ArrayList<>();
             boolean headed = appendEffect(definition, member,
                     !definition.isPermanent(entry.effect(), member),
-                    granted(definition), lines, odds.getOrDefault(entry.effect(), 0.0D));
+                    lines, odds.getOrDefault(entry.effect(), 0.0D));
             if (lines.isEmpty()) {
                 continue;
             }
@@ -375,16 +374,8 @@ public final class EquipmentTooltip {
         return false;
     }
 
-    private static Set<String> granted(EquipmentDefinition definition) {
-        Set<String> ids = new LinkedHashSet<>();
-        for (TriggeredEffect entry : definition.triggered()) {
-            ids.addAll(entry.effect().grantAffixes());
-        }
-        return ids;
-    }
-
     private static boolean appendEffect(EquipmentDefinition definition, TriggeredEffect entry,
-                                        boolean conditional, Set<String> granted,
+                                        boolean conditional,
                                         List<Component> tooltip, double odds) {
         EquipmentEffect effect = entry.effect();
         int start = tooltip.size();
@@ -424,7 +415,6 @@ public final class EquipmentTooltip {
             appendAugment(effect.augment().orElse(null), tooltip);
             appendEcho(echoOf(effect), tooltip);
             appendRepeat(effect, tooltip);
-            appendTuning(effect.tuneAffixes(), granted, tooltip);
             appendSummonReplacement(effect.summonProfile().orElse(null), tooltip);
             appendSummonDive(effect.summonDive().orElse(null), tooltip);
         }
@@ -1280,34 +1270,5 @@ public final class EquipmentTooltip {
                 .append(Component.literal(" " + was).withStyle(FRAME))
                 .append(Component.literal(" → ").withStyle(FRAME))
                 .append(Component.literal(now).withStyle(better ? GOOD : BAD));
-    }
-
-    private static void appendTuning(Map<String, AffixTuning> tuning, Set<String> granted,
-                                     List<Component> tooltip) {
-        List<Component> lines = new ArrayList<>();
-        for (Map.Entry<String, AffixTuning> entry : tuning.entrySet()) {
-            StyleAffix affix = AffixRegistry.get(entry.getKey());
-            AffixTuning tuned = entry.getValue();
-            if (affix == null || granted.contains(entry.getKey())) {
-                continue;
-            }
-            if (tuned.damageMultiplier().isEmpty() && tuned.costModifier().isEmpty()) {
-                continue;
-            }
-            MutableComponent line = TooltipGem.of(affix.rarity()).bullet(
-                    AffixText.name(affix).copy().withStyle(affix.rarity().color()));
-            tuned.damageMultiplier().ifPresent(value ->
-                    line.append(Component.literal(INDENT + StyleText.formatMultiplier(value))
-                            .withStyle(value >= 1.0D ? GOOD : BAD)));
-            tuned.costModifier().ifPresent(value ->
-                    line.append(Component.literal(INDENT + StyleText.formatMultiplier(value))
-                            .withStyle(value <= 1.0D ? GOOD : BAD)));
-            lines.add(TooltipGem.hang(line));
-        }
-        if (lines.isEmpty()) {
-            return;
-        }
-        tooltip.add(TooltipGem.EFFECT.bullet(Component.translatable(KEY_EMPOWERS).withStyle(BODY)));
-        tooltip.addAll(lines);
     }
 }

@@ -209,7 +209,13 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(Row row) {
+        int icon = row.icon().isEmpty() ? 2 : ICON_SIZE + 6;
+        return splitRowWidth(font.width(row.label().getString()) + icon, row.id(), 12);
     }
 
     @Override
@@ -345,7 +351,7 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
             graphics.renderItem(row.icon(), x + 2, y);
             textX = x + ICON_SIZE + 6;
         }
-        String shortId = ScreenDraw.trim(font, row.id(), width / 2);
+        String shortId = shortId(row.id(), width);
         int idWidth = font.width(shortId);
         graphics.drawString(font,
                 ScreenDraw.trim(font, row.label().getString(),

@@ -126,7 +126,12 @@ public class GiveItemScreen extends PickerScreen<ItemStack> {
 
     @Override
     protected int panelWidth() {
-        return PANEL_WIDTH;
+        return fittedWidth(PANEL_WIDTH);
+    }
+
+    @Override
+    protected int rowWidth(ItemStack row) {
+        return splitRowWidth(font.width(row.getHoverName().getString()) + ICON_SIZE, idOf(row), 18);
     }
 
     @Override
@@ -247,7 +252,7 @@ public class GiveItemScreen extends PickerScreen<ItemStack> {
         ScreenDraw.rowBackground(graphics, x + 1, y, width - 2, ROW_HEIGHT - 1,
                 index, hovered, selected);
         graphics.renderItem(row, x + 2, y);
-        String shortId = ScreenDraw.trim(font, idOf(row), width / 2);
+        String shortId = shortId(idOf(row), width);
         int idWidth = font.width(shortId);
         graphics.drawString(font,
                 ScreenDraw.trim(font, row.getHoverName().getString(),
