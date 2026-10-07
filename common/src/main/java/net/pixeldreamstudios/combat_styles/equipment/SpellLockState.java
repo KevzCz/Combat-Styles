@@ -76,6 +76,11 @@ public final class SpellLockState {
         return stateOf(player).tunes();
     }
 
+    public static float tunedChance(Player player, String spellId, float base) {
+        SpellTuning tuning = player == null || spellId == null ? null : tunesFor(player).get(spellId);
+        return tuning == null ? base : tuning.chanceFrom(base);
+    }
+
     public static Lock lockFor(Player player, String spellId, String school) {
         State state = stateOf(player);
         Lock bySpell = spellId == null ? null : state.spells().get(spellId);

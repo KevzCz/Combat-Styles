@@ -1,5 +1,6 @@
 package net.pixeldreamstudios.combat_styles.client;
 
+import com.google.gson.JsonElement;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 
@@ -25,9 +26,15 @@ public enum FieldDependency {
     private static final String LABEL_PREFIX = "dependency.combat_styles.";
     private static final String PROVIDES_PREFIX = "provides.combat_styles.";
     private static final String PROVIDES_MARKER = "▲";
+    private static final String KEY_SET_BY = "screen.combat_styles.field_set_by";
+    private static final String KEY_ENABLES = "screen.combat_styles.field_enables";
+    private static final String KEY_MORE = "screen.combat_styles.field_more";
+    private static final String RELATED_BULLET = "  • ";
+    private static final int MAX_UNSET_SHOWN = 6;
 
     private static final Map<String, Set<FieldDependency>> BY_KEY = new LinkedHashMap<>();
     private static final Map<String, Set<FieldDependency>> PROVIDED_BY = new LinkedHashMap<>();
+    private static final String PATH_SEPARATOR = "/";
     private static final Map<String, Set<String>> BLOCKED_UNDER = new LinkedHashMap<>();
     private static final Map<String, Map<FieldDependency, String>> SCOPED = new LinkedHashMap<>();
 
@@ -127,6 +134,72 @@ public enum FieldDependency {
         return found;
     }
 
+    public static List<Component> related(String path, String key, JsonElement root) {
+        List<Component> found = new ArrayList<>();
+        Set<String> present = new LinkedHashSet<>();
+        collectKeys(root, present);
+        for (FieldDependency dependency : of(path, key)) {
+            List<String> providers = new ArrayList<>();
+            for (Map.Entry<String, Set<FieldDependency>> entry : PROVIDED_BY.entrySet()) {
+                if (entry.getValue().contains(dependency)) {
+                    providers.add(entry.getKey());
+                }
+            }
+            appendRelated(found, Component.translatable(KEY_SET_BY), providers, present);
+        }
+        for (FieldDependency provided : providedBy(key)) {
+            List<String> users = new ArrayList<>();
+            for (Map.Entry<String, Set<FieldDependency>> entry : BY_KEY.entrySet()) {
+                if (entry.getValue().contains(provided)) {
+                    users.add(entry.getKey());
+                }
+            }
+            appendRelated(found, Component.translatable(KEY_ENABLES), users, present);
+        }
+        return found;
+    }
+
+    private static void appendRelated(List<Component> lines, Component header, List<String> keys,
+                                      Set<String> present) {
+        if (keys.isEmpty()) {
+            return;
+        }
+        lines.add(header.copy().withStyle(ChatFormatting.GOLD));
+        int hidden = 0;
+        int shownUnset = 0;
+        for (String key : keys) {
+            boolean set = present.contains(key);
+            if (!set && shownUnset >= MAX_UNSET_SHOWN) {
+                hidden++;
+                continue;
+            }
+            if (!set) {
+                shownUnset++;
+            }
+            lines.add(Component.literal(RELATED_BULLET).append(EffectLabels.labelFor(key).copy())
+                    .withStyle(set ? ChatFormatting.GREEN : ChatFormatting.DARK_GRAY));
+        }
+        if (hidden > 0) {
+            lines.add(Component.translatable(KEY_MORE, hidden).withStyle(ChatFormatting.DARK_GRAY));
+        }
+    }
+
+    private static void collectKeys(JsonElement node, Set<String> into) {
+        if (node == null) {
+            return;
+        }
+        if (node.isJsonObject()) {
+            for (Map.Entry<String, JsonElement> entry : node.getAsJsonObject().entrySet()) {
+                into.add(entry.getKey());
+                collectKeys(entry.getValue(), into);
+            }
+        } else if (node.isJsonArray()) {
+            for (JsonElement child : node.getAsJsonArray()) {
+                collectKeys(child, into);
+            }
+        }
+    }
+
     public String providesMarker() {
         return PROVIDES_MARKER;
     }
@@ -181,8 +254,8 @@ public enum FieldDependency {
         }
         Set<String> blocked = BLOCKED_UNDER.get(key);
         if (blocked != null && path != null) {
-            for (String segment : blocked) {
-                if (path.contains(segment)) {
+            for (String segment : path.split(PATH_SEPARATOR)) {
+                if (blocked.contains(segment)) {
                     return List.of();
                 }
             }

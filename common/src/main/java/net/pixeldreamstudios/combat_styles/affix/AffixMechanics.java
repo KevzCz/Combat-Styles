@@ -1,4 +1,5 @@
 package net.pixeldreamstudios.combat_styles.affix;
+import net.pixeldreamstudios.combat_styles.entity.AbilityHosts;
 
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.damage.DamageDealer;
@@ -453,6 +454,7 @@ public final class AffixMechanics {
 
         SummonSpawner.tickDespawns(gameTime);
         SummonLifecycle.tick(gameTime);
+        AbilityHosts.tick(gameTime);
     }
 
     private static Vec3 flatten(Vec3 aim) {
@@ -636,8 +638,11 @@ public final class AffixMechanics {
             return;
         }
         float damage = order.damageRatio() <= 0.0F ? 0.0F : dealtDamage * order.damageRatio();
+        LivingEntity aimed = order.aim()
+                .map(aim -> aim.resolve(player, player, target))
+                .orElse(target);
 
-        SummonOrders.command(player, target, order.ability(), damage, order.targets(),
+        SummonOrders.command(player, aimed, order.ability(), damage, order.targets(),
                 order.tuning().orElse(null));
     }
 

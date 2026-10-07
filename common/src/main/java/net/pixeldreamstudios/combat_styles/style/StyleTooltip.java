@@ -7,6 +7,7 @@ import net.minecraft.network.chat.MutableComponent;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.AffixText;
+import net.pixeldreamstudios.combat_styles.item.ItemTooltip;
 import net.pixeldreamstudios.combat_styles.item.TooltipGem;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
@@ -91,10 +92,15 @@ public final class StyleTooltip {
     private static void appendAffix(StyleAffix affix, List<Component> tooltip) {
         List<Component> effects = new ArrayList<>();
         AffixText.appendEffects(affix, effects);
-        tooltip.add(TooltipGem.of(affix.rarity()).bullet(
-                AffixText.name(affix).copy().withStyle(affix.rarity().color())));
+        MutableComponent name = TooltipGem.of(affix.rarity()).bullet(
+                AffixText.name(affix).copy().withStyle(affix.rarity().color()));
+        if (!ItemTooltip.detailed()) {
+            tooltip.add(effects.isEmpty() ? name : ItemTooltip.marked(name));
+            return;
+        }
+        tooltip.add(name);
         for (Component effect : effects) {
-            tooltip.add(TooltipGem.hang(effect));
+            tooltip.add(TooltipGem.hangPlace(effect));
         }
     }
 

@@ -24,6 +24,7 @@ import net.pixeldreamstudios.combat_styles.affix.ProjectileUpkeep;
 import net.pixeldreamstudios.combat_styles.attribute.AttackAttributes;
 import net.pixeldreamstudios.combat_styles.command.CombatStylesCommand;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
+import net.pixeldreamstudios.combat_styles.entity.AbilityGrants;
 import net.pixeldreamstudios.combat_styles.entity.SummonCaps;
 import net.pixeldreamstudios.combat_styles.entity.SummonCompanions;
 import net.pixeldreamstudios.combat_styles.entity.SummonHooks;
@@ -55,6 +56,7 @@ import net.pixeldreamstudios.combat_styles.equipment.MissTracker;
 import net.pixeldreamstudios.combat_styles.equipment.PendingGrants;
 import net.pixeldreamstudios.combat_styles.item.ModItems;
 import net.pixeldreamstudios.combat_styles.loot.BookRollLoader;
+import net.pixeldreamstudios.combat_styles.entity.ScriptedAbilityLoader;
 import net.pixeldreamstudios.combat_styles.loot.EquipmentTagLoader;
 import net.pixeldreamstudios.combat_styles.loot.RandomStyleFunction;
 import net.pixeldreamstudios.combat_styles.loot.StyleLoot;
@@ -97,6 +99,8 @@ public final class ModEvents {
                 CombatStyles.id(WeaponRollLoader.DIRECTORY));
         ReloadListenerRegistry.register(PackType.SERVER_DATA, new BookRollLoader(),
                 CombatStyles.id(BookRollLoader.DIRECTORY));
+        ReloadListenerRegistry.register(PackType.SERVER_DATA, new ScriptedAbilityLoader(),
+                CombatStyles.id(ScriptedAbilityLoader.DIRECTORY));
         ReloadListenerRegistry.register(PackType.SERVER_DATA, new EquipmentTagLoader(),
                 CombatStyles.id("equipment_tags"));
         ReloadListenerRegistry.register(PackType.SERVER_DATA, new StyleIndexReloader(),
@@ -145,6 +149,7 @@ public final class ModEvents {
             DamageBonuses.forget(player.getUUID());
             CombatDebug.forget(player.getUUID());
             BurstSequence.forget(player.getUUID());
+            AbilityGrants.forget(player.getUUID());
         });
 
         TickEvent.SERVER_POST.register(server -> {
@@ -155,6 +160,7 @@ public final class ModEvents {
             AffixDamageDealer.tickPending(gameTime);
             CombatScheduler.tick(gameTime, id -> server.getPlayerList().getPlayer(id));
             ProjectileUpkeep.tick();
+            AbilityGrants.tick(server);
             EquipmentRuntime.tickCooldowns(gameTime);
             MissTracker.tick(gameTime);
             DodgeState.tick(gameTime);

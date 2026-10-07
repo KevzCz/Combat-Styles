@@ -2,6 +2,7 @@ package net.pixeldreamstudios.combat_styles.entity;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
+import net.pixeldreamstudios.combat_styles.config.OptionField;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,34 +12,27 @@ import java.util.Set;
 
 public final class AbilityRegistry {
 
-    private static final Map<String, AbilityBehaviour> BEHAVIOURS = new LinkedHashMap<>();
-    private static final Map<String, List<String>> TUNABLES = new LinkedHashMap<>();
-    private static final Map<String, Set<String>> ENTITIES = new LinkedHashMap<>();
+    public static final String OPTION_SELECTOR = "ability";
+
+    private static final Map<String, SummonAbility> ABILITIES = new LinkedHashMap<>();
 
     private AbilityRegistry() {
     }
 
-    public static void register(String ability, AbilityBehaviour behaviour) {
+    public static void register(String ability, SummonAbility behaviour) {
         if (ability == null || behaviour == null) {
             return;
         }
-        AbilityBehaviour previous = BEHAVIOURS.put(AbilityConfig.key(ability), behaviour);
+        SummonAbility previous = ABILITIES.put(AbilityConfig.key(ability), behaviour);
         if (previous != null && previous != behaviour) {
             CombatStyles.LOGGER.warn("Ability {} was registered twice; the later one wins",
                     AbilityConfig.key(ability));
         }
     }
 
-    public static void register(String ability, List<String> entities, AbilityBehaviour behaviour) {
-        register(ability, behaviour);
-        if (ability != null && behaviour != null && entities != null && !entities.isEmpty()) {
-            ENTITIES.put(AbilityConfig.key(ability), Set.copyOf(entities));
-        }
-    }
-
     public static Set<String> entitiesFor(String ability) {
-        Set<String> bound = ENTITIES.get(AbilityConfig.key(ability));
-        return bound == null ? Set.of() : bound;
+        SummonAbility found = get(ability);
+        return found == null ? Set.of() : Set.copyOf(found.usedBy());
     }
 
     public static boolean usableBy(String ability, String entityId) {
@@ -48,7 +42,7 @@ public final class AbilityRegistry {
 
     public static List<String> usableBy(String entityId) {
         List<String> usable = new ArrayList<>();
-        for (String ability : BEHAVIOURS.keySet()) {
+        for (String ability : ABILITIES.keySet()) {
             if (usableBy(ability, entityId)) {
                 usable.add(ability);
             }
@@ -56,41 +50,37 @@ public final class AbilityRegistry {
         return usable;
     }
 
-    public static AbilityBehaviour get(String ability) {
-        return BEHAVIOURS.get(AbilityConfig.key(ability));
+    public static SummonAbility get(String ability) {
+        return ABILITIES.get(AbilityConfig.key(ability));
     }
 
     public static boolean has(String ability) {
         return get(ability) != null;
     }
 
+    public static boolean passive(String ability) {
+        return get(ability) instanceof PassiveAbility;
+    }
+
     public static void unregister(String ability) {
-        String key = AbilityConfig.key(ability);
-        BEHAVIOURS.remove(key);
-        TUNABLES.remove(key);
-        ENTITIES.remove(key);
+        ABILITIES.remove(AbilityConfig.key(ability));
     }
 
     public static void clear() {
-        BEHAVIOURS.clear();
-        TUNABLES.clear();
-        ENTITIES.clear();
+        ABILITIES.clear();
     }
 
     public static List<String> registered() {
-        return List.copyOf(BEHAVIOURS.keySet());
+        return List.copyOf(ABILITIES.keySet());
     }
 
-    public static void declareTunable(String ability, List<String> fields) {
-        if (ability == null || fields == null || fields.isEmpty()) {
-            return;
-        }
-        TUNABLES.put(AbilityConfig.key(ability), List.copyOf(fields));
+    public static List<OptionField> optionsFor(String ability) {
+        SummonAbility found = get(ability);
+        return found == null ? List.of() : found.options();
     }
 
     public static List<String> tunableFor(String ability) {
-        List<String> declared = TUNABLES.get(AbilityConfig.key(ability));
-        return declared == null ? List.of() : declared;
+        SummonAbility found = get(ability);
+        return found == null ? List.of() : found.tunable();
     }
-
 }

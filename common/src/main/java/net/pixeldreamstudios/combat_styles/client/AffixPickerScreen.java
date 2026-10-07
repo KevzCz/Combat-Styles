@@ -6,6 +6,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import net.pixeldreamstudios.combat_styles.item.TooltipGem;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.affix.AffixText;
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
@@ -464,7 +465,7 @@ public class AffixPickerScreen extends PanelScreen {
         List<Component> tuned = new ArrayList<>();
         AffixText.appendEffects(affix, tuned);
         if (applied == null) {
-            lines.addAll(tuned);
+            lines.addAll(TooltipGem.indentDetails(tuned));
             return;
         }
 

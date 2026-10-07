@@ -1,9 +1,11 @@
 package net.pixeldreamstudios.combat_styles.entity;
 
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 import net.pixeldreamstudios.combat_styles.equipment.AbilityTuning;
 import net.pixeldreamstudios.combat_styles.equipment.SummonProfile;
@@ -69,6 +71,44 @@ public interface ConfigurableSummon extends OwnableEntity {
     }
 
     default void retarget(LivingEntity target) {
+    }
+
+    default LivingEntity abilityTarget() {
+        return null;
+    }
+
+    default float abilityDamage() {
+        return 0.0F;
+    }
+
+    default AbilityCaster caster() {
+        return null;
+    }
+
+    default Vec3 abilityOrigin() {
+        return this instanceof Entity entity ? entity.getEyePosition() : Vec3.ZERO;
+    }
+
+    default Vec3 abilityStart() {
+        AbilityCaster caster = caster();
+        return caster == null ? null : caster.castStart();
+    }
+
+    default void holdAt(Vec3 point) {
+    }
+
+    default void showBeam(Vec3 end) {
+    }
+
+    default boolean drawsOwnBeam() {
+        return false;
+    }
+
+    default void bindProfile(String profileKey, int slot) {
+        AbilityCaster caster = caster();
+        if (caster != null) {
+            caster.bind(profileKey, slot);
+        }
     }
 
     default boolean acting() {

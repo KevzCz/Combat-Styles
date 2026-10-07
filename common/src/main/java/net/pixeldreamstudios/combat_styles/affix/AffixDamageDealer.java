@@ -16,6 +16,7 @@ import net.pixeldreamstudios.combat_styles.attribute.AttackAttributes;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.entity.ConfigurableSummon;
+import net.pixeldreamstudios.combat_styles.entity.RaiseDead;
 import net.pixeldreamstudios.combat_styles.entity.SummonHooks;
 import net.pixeldreamstudios.combat_styles.entity.SummonOrders;
 import net.pixeldreamstudios.combat_styles.entity.SummonRoster;
@@ -1178,6 +1179,9 @@ public final class AffixDamageDealer {
                                   String ability, float damage) {
         List<ConfigurableSummon> roster = SummonRoster.available(player, dive.targeting());
         int limit = dive.maxDiving() <= 0 ? Integer.MAX_VALUE : dive.maxDiving();
+        LivingEntity aimed = dive.aim()
+                .map(aim -> aim.resolve(player, player, target))
+                .orElse(target);
         int sent = 0;
         for (ConfigurableSummon summon : roster) {
             if (sent >= limit) {
@@ -1186,7 +1190,7 @@ public final class AffixDamageDealer {
             if (!dive.accepts(entityIdOf(summon))) {
                 continue;
             }
-            if (SummonOrders.commandOne(player, summon, target, ability, damage,
+            if (SummonOrders.commandOne(player, summon, aimed, ability, damage,
                     dive.tuning().orElse(null))) {
                 sent++;
             }
@@ -1860,6 +1864,7 @@ public final class AffixDamageDealer {
             return;
         }
         SummonSpawner.applySummons(level, player, target, spawn.summons(), dealtDamage);
+        spawn.raiseDead().ifPresent(rules -> RaiseDead.raise(level, player, target, rules));
         AffixMechanics.runCommands(level, player, spawn.commands());
     }
 

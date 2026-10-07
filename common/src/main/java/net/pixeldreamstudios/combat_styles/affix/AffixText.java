@@ -10,6 +10,9 @@ import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.item.ItemTooltip;
 import net.pixeldreamstudios.combat_styles.item.TooltipContextAccess;
+import net.pixeldreamstudios.combat_styles.item.TooltipGem;
+import net.pixeldreamstudios.combat_styles.entity.MobFilter;
+import net.pixeldreamstudios.combat_styles.entity.RaiseRules;
 import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
 import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
@@ -171,6 +174,10 @@ public final class AffixText {
     private static final String KEY_COST_CANCELS = "affix.combat_styles.effect.cost_cancels";
     private static final String KEY_COST_ANYWAY = "affix.combat_styles.effect.cost_anyway";
     private static final String KEY_SUMMON_DAMAGE = "affix.combat_styles.effect.summon_damage";
+    private static final String KEY_RAISE = "affix.combat_styles.effect.raise_dead";
+    private static final String KEY_RAISE_ONLY = "affix.combat_styles.effect.raise_dead_only";
+    private static final String KEY_RAISE_NEVER = "affix.combat_styles.effect.raise_dead_never";
+    private static final String KEY_RAISE_PROFILE = "tooltip.combat_styles.raise_dead_profile.";
     private static final String KEY_SUMMON = "affix.combat_styles.effect.summon";
     private static final int TICKS_PER_SECOND = 20;
     private static final String KEY_ON_SWING = "affix.combat_styles.trigger.on_swing";
@@ -641,14 +648,16 @@ public final class AffixText {
                         .withStyle(BAD));
             }
             Component mergedCosts = mergeGates(costs);
+            boolean noted = cost.health() > 0.0F || cost.experienceLevels() > 0;
             if (mergedCosts != null) {
-                lines.add(mergedCosts.copy().withStyle(BAD));
+                Component styled = mergedCosts.copy().withStyle(BAD);
+                lines.add(noted && !ItemTooltip.detailed() ? ItemTooltip.marked(styled) : styled);
             }
 
-            if (cost.health() > 0.0F || cost.experienceLevels() > 0) {
-                lines.add(Component.translatable(cost.cancelIfShort()
+            if (noted && ItemTooltip.detailed()) {
+                lines.add(TooltipGem.detail(Component.translatable(cost.cancelIfShort()
                                 ? KEY_COST_CANCELS : KEY_COST_ANYWAY)
-                        .withStyle(FRAME));
+                        .withStyle(FRAME)));
             }
         });
 
@@ -663,11 +672,50 @@ public final class AffixText {
                     .withStyle(COND));
             DamageSpec summonSpec = summon.damageSpec().orElse(null);
             if (summonSpec != null || summon.damageRatio() > 0.0F) {
-                lines.add(Component.translatable(KEY_SUMMON_DAMAGE,
+                lines.add(TooltipGem.detail(Component.translatable(KEY_SUMMON_DAMAGE,
                                 specAmount(summonSpec, summon.damageRatio()))
-                        .withStyle(COND));
+                        .withStyle(COND)));
             }
         }
+
+        scopeOf(lines, "raiseDead");
+        onHit.raiseDead().ifPresent(raise -> appendRaise(raise, lines));
+    }
+
+    private static void appendRaise(RaiseRules raise, List<Component> lines) {
+        lines.add(Component.translatable(KEY_RAISE).withStyle(COND));
+        appendFilter(raise.filter(), lines);
+        if (raise.profile() != RaiseRules.DEFAULT.profile()) {
+            lines.add(TooltipGem.detail(Component.translatable(KEY_RAISE_PROFILE
+                    + raise.profile().getSerializedName()).withStyle(FRAME)));
+        }
+    }
+
+    public static void appendFilter(MobFilter filter, List<Component> lines) {
+        List<String> only = new ArrayList<>(filter.entities());
+        filter.entityTags().forEach(tag -> only.add(TAG_MARK + tag));
+        if (!only.isEmpty()) {
+            lines.add(TooltipGem.detail(Component.translatable(KEY_RAISE_ONLY, mobNames(only))
+                    .withStyle(FRAME)));
+        }
+        List<String> never = new ArrayList<>(filter.exemptEntities());
+        filter.exemptTags().forEach(tag -> never.add(TAG_MARK + tag));
+        if (!never.isEmpty()) {
+            lines.add(TooltipGem.detail(Component.translatable(KEY_RAISE_NEVER, mobNames(never))
+                    .withStyle(FRAME)));
+        }
+    }
+
+    private static Component mobNames(List<String> ids) {
+        MutableComponent joined = Component.empty();
+        for (int index = 0; index < ids.size(); index++) {
+            if (index > 0) {
+                joined.append(Component.literal(", "));
+            }
+            String id = ids.get(index);
+            joined.append(id.startsWith(TAG_MARK) ? Component.literal(id) : StyleText.registryName(id));
+        }
+        return joined;
     }
 
     private static String abilitySchool(AffixEffects.Order order) {
@@ -679,7 +727,7 @@ public final class AffixText {
             return overridden;
         }
         AbilityConfig.Entry tuned = AbilityConfig.get(order.ability());
-        return tuned == null || tuned.damage == null ? null : tuned.damage.school;
+        return tuned == null ? null : tuned.school();
     }
 
     private static void appendSlotRule(AffixEffects.SlotRule rule, String multiplier,
@@ -894,31 +942,17 @@ public final class AffixText {
             Component line = damage.converts() || (!damage.amplifies() && school != null)
                     ? Component.translatable(damageKey, percent, StyleText.schoolName(school))
                     : Component.translatable(damageKey, percent);
-            lines.add(line.copy()
-                    .withStyle(damage.converts() ? COND : BAD));
-            if (damage.ignoresArmour()) {
-                lines.add(Component.translatable(KEY_ARMOUR).withStyle(FRAME));
+            Component styled = line.copy().withStyle(damage.converts() ? COND : BAD);
+            boolean hasDetail = damage.ignoresArmour() || damage.scaling().isPresent();
+            if (!ItemTooltip.detailed()) {
+                lines.add(hasDetail ? ItemTooltip.marked(styled) : styled);
+                continue;
             }
-            damage.scaling().ifPresent(scaling -> {
-                String perPoint = StyleText.formatDecimal(scaling.perPoint() * 100.0D) + "%";
-                if (scaling.strongest() && scaling.sources().size() > 1) {
-                    lines.add(Component.translatable(KEY_ATTUNED, perPoint)
-                            .withStyle(COND));
-                } else if (scaling.sources().isEmpty()) {
-                    lines.add(Component.translatable(KEY_SCALES, perPoint)
-                            .withStyle(COND));
-                } else {
-                    MutableComponent schools = Component.empty();
-                    for (int index = 0; index < scaling.sources().size(); index++) {
-                        if (index > 0) {
-                            schools.append(Component.literal(", "));
-                        }
-                        schools.append(StyleText.scalingSourceName(scaling.sources().get(index)));
-                    }
-                    lines.add(Component.translatable(KEY_SCALES_SCHOOL, perPoint, schools)
-                            .withStyle(COND));
-                }
-            });
+            lines.add(styled);
+            if (damage.ignoresArmour()) {
+                lines.add(TooltipGem.detail(Component.translatable(KEY_ARMOUR).withStyle(FRAME)));
+            }
+            damage.scaling().ifPresent(scaling -> lines.add(TooltipGem.detail(scalingLine(scaling))));
         }
 
         scopeOf(lines, "ignite");
@@ -968,9 +1002,9 @@ public final class AffixText {
                             StyleText.schoolName(abilitySchool(order)))
                     .withStyle(COND));
             if (order.targets() != SummonTargeting.ALL) {
-                lines.add(Component.translatable(KEY_ORDERS_TARGETS,
+                lines.add(TooltipGem.detail(Component.translatable(KEY_ORDERS_TARGETS,
                                 Component.translatable(KEY_TARGETING + order.targets().key()))
-                        .withStyle(COND));
+                        .withStyle(COND)));
             }
         }
 
@@ -994,12 +1028,12 @@ public final class AffixText {
                     .withStyle(COND));
             DamageSpec spec = projectile.damageSpec().orElse(null);
             if (spec != null || projectile.damage() > 0.0F) {
-                lines.add(Component.translatable(KEY_PROJECTILE_DAMAGE,
+                lines.add(TooltipGem.detail(Component.translatable(KEY_PROJECTILE_DAMAGE,
                                 spec == null
                                         ? Component.translatable(KEY_SPEC_FLAT,
                                                 StyleText.formatDecimal(projectile.damage()))
                                         : specAmount(spec, 0.0F))
-                        .withStyle(COND));
+                        .withStyle(COND)));
             }
         }
 
@@ -1013,9 +1047,9 @@ public final class AffixText {
                             ? KEY_CAST_SPELL_SELF
                             : KEY_CAST_SPELL, spell)
                     .withStyle(COND));
-            cast.damageSpec().ifPresent(spec -> lines.add(Component.translatable(
+            cast.damageSpec().ifPresent(spec -> lines.add(TooltipGem.detail(Component.translatable(
                             KEY_CAST_SPELL_DAMAGE, specAmount(spec, 0.0F))
-                    .withStyle(COND)));
+                    .withStyle(COND))));
         }
 
         scopeOf(lines, "splash");
@@ -1204,6 +1238,24 @@ public final class AffixText {
             }
         }
         return null;
+    }
+
+    public static Component scalingLine(AffixEffects.Scaling scaling) {
+        String perPoint = StyleText.formatDecimal(scaling.perPoint() * 100.0D) + "%";
+        if (scaling.strongest() && scaling.sources().size() > 1) {
+            return Component.translatable(KEY_ATTUNED, perPoint).withStyle(COND);
+        }
+        if (scaling.sources().isEmpty()) {
+            return Component.translatable(KEY_SCALES, perPoint).withStyle(COND);
+        }
+        MutableComponent schools = Component.empty();
+        for (int index = 0; index < scaling.sources().size(); index++) {
+            if (index > 0) {
+                schools.append(Component.literal(", "));
+            }
+            schools.append(StyleText.scalingSourceName(scaling.sources().get(index)));
+        }
+        return Component.translatable(KEY_SCALES_SCHOOL, perPoint, schools).withStyle(COND);
     }
 
     private static String attunedSchool(AffixEffects.Damage damage) {

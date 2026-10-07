@@ -1,15 +1,37 @@
 package net.pixeldreamstudios.combat_styles.equipment;
 
+import com.google.gson.JsonObject;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.util.ExtraCodecs;
 
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
+import net.pixeldreamstudios.combat_styles.config.OptionSources;
+import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentation fx,
-                            Map<String, Double> extra) {
+                            Map<String, Double> extra, Optional<JsonObject> options,
+                            List<StepTuning> steps) {
+
+    public static final String KEY_OPTIONS = OptionSources.KEY_OPTIONS;
+    public static final String KEY_STEPS = "steps";
+    public static final String KEY_DAMAGE = "damage";
+    public static final String KEY_TIMING = "timing";
+    public static final String KEY_SHAPE = "shape";
+    public static final String KEY_FX = "fx";
+    public static final String KEY_EXTRA = "extra";
+    private static final String NOT_AN_OBJECT = "Ability options must be an object";
+
+    public static final Codec<JsonObject> OPTIONS_CODEC = ExtraCodecs.JSON.comapFlatMap(
+            json -> json.isJsonObject()
+                    ? DataResult.success(json.getAsJsonObject())
+                    : DataResult.error(() -> NOT_AN_OBJECT),
+            json -> json);
 
     public record Damage(Optional<Float> baseDamage,
                          Optional<Float> weaponDamageRatio,
@@ -21,12 +43,14 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
                          Optional<Integer> appliesStacks,
                          Optional<Float> appliesChance,
                          Optional<Float> lifesteal,
-                         Optional<Boolean> detonates) {
+                         Optional<Boolean> detonates,
+                         Optional<DamageSpec> damageSpec,
+                         Optional<String> damageType) {
 
         public static final Damage NONE = new Damage(Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty());
 
         public static final Codec<Damage> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("base_damage").forGetter(Damage::baseDamage),
@@ -39,17 +63,22 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
                 Codec.INT.optionalFieldOf("applies_stacks").forGetter(Damage::appliesStacks),
                 Codec.FLOAT.optionalFieldOf("applies_chance").forGetter(Damage::appliesChance),
                 Codec.FLOAT.optionalFieldOf("lifesteal").forGetter(Damage::lifesteal),
-                Codec.BOOL.optionalFieldOf("detonates").forGetter(Damage::detonates)
+                Codec.BOOL.optionalFieldOf("detonates").forGetter(Damage::detonates),
+                DamageSpec.CODEC.optionalFieldOf("damage_spec").forGetter(Damage::damageSpec),
+                Codec.STRING.optionalFieldOf("damage_type").forGetter(Damage::damageType)
         ).apply(instance, Damage::new));
     }
 
-    public record Timing(Optional<Integer> durationTicks, Optional<Integer> windupTicks) {
+    public record Timing(Optional<Integer> durationTicks, Optional<Integer> windupTicks,
+                         Optional<Integer> cooldownTicks) {
 
-        public static final Timing NONE = new Timing(Optional.empty(), Optional.empty());
+        public static final Timing NONE = new Timing(Optional.empty(), Optional.empty(),
+                Optional.empty());
 
         public static final Codec<Timing> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.optionalFieldOf("duration_ticks").forGetter(Timing::durationTicks),
-                Codec.INT.optionalFieldOf("windup_ticks").forGetter(Timing::windupTicks)
+                Codec.INT.optionalFieldOf("windup_ticks").forGetter(Timing::windupTicks),
+                Codec.INT.optionalFieldOf("cooldown_ticks").forGetter(Timing::cooldownTicks)
         ).apply(instance, Timing::new));
     }
 
@@ -85,16 +114,23 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
     }
 
     public static final Codec<AbilityTuning> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Damage.CODEC.optionalFieldOf("damage", Damage.NONE).forGetter(AbilityTuning::damage),
-            Timing.CODEC.optionalFieldOf("timing", Timing.NONE).forGetter(AbilityTuning::timing),
-            Shape.CODEC.optionalFieldOf("shape", Shape.NONE).forGetter(AbilityTuning::shape),
-            Presentation.CODEC.optionalFieldOf("fx", Presentation.NONE).forGetter(AbilityTuning::fx),
-            Codec.unboundedMap(Codec.STRING, Codec.DOUBLE).optionalFieldOf("extra", Map.of())
-                    .forGetter(AbilityTuning::extra)
+            Damage.CODEC.optionalFieldOf(KEY_DAMAGE, Damage.NONE).forGetter(AbilityTuning::damage),
+            Timing.CODEC.optionalFieldOf(KEY_TIMING, Timing.NONE).forGetter(AbilityTuning::timing),
+            Shape.CODEC.optionalFieldOf(KEY_SHAPE, Shape.NONE).forGetter(AbilityTuning::shape),
+            Presentation.CODEC.optionalFieldOf(KEY_FX, Presentation.NONE).forGetter(AbilityTuning::fx),
+            Codec.unboundedMap(Codec.STRING, Codec.DOUBLE).optionalFieldOf(KEY_EXTRA, Map.of())
+                    .forGetter(AbilityTuning::extra),
+            OPTIONS_CODEC.optionalFieldOf(KEY_OPTIONS).forGetter(AbilityTuning::options),
+            StepTuning.CODEC.listOf().optionalFieldOf(KEY_STEPS, List.of()).forGetter(AbilityTuning::steps)
     ).apply(instance, AbilityTuning::new));
+
+    public static final AbilityTuning NONE = new AbilityTuning(Damage.NONE, Timing.NONE,
+            Shape.NONE, Presentation.NONE, Map.of(), Optional.empty(), List.of());
 
     public AbilityTuning {
         extra = extra == null ? Map.of() : Map.copyOf(extra);
+        options = options == null ? Optional.empty() : options;
+        steps = steps == null ? List.of() : List.copyOf(steps);
     }
 
     public AbilityConfig.Entry over(AbilityConfig.Entry base) {
@@ -111,9 +147,13 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
         damage.appliesStacks().ifPresent(value -> merged.damage.appliesStacks = value);
         damage.appliesChance().ifPresent(value -> merged.damage.appliesChance = value);
         damage.lifesteal().ifPresent(value -> merged.damage.lifesteal = value);
+        damage.damageSpec().ifPresent(merged.damage::mergeSpec);
+        damage.damageType().ifPresent(value -> merged.damage.damageType = value);
+        merged.damage.adoptSpec();
 
         timing.durationTicks().ifPresent(value -> merged.timing.durationTicks = value);
         timing.windupTicks().ifPresent(value -> merged.timing.windupTicks = value);
+        timing.cooldownTicks().ifPresent(value -> merged.timing.cooldownTicks = value);
 
         shape.radius().ifPresent(value -> merged.shape.radius = value);
         shape.range().ifPresent(value -> merged.shape.range = value);
@@ -129,6 +169,10 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
 
         for (Map.Entry<String, Double> option : extra.entrySet()) {
             merged.with(option.getKey(), option.getValue());
+        }
+        options.ifPresent(merged::mergeOptions);
+        for (StepTuning step : steps) {
+            step.damageSpec().ifPresent(spec -> merged.mergeStepSpec(step.step(), spec));
         }
 
         return merged.sane();

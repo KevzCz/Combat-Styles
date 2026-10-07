@@ -18,10 +18,12 @@ public final class ConfigOptions {
 
     public static final String GENERAL = "General";
     public static final String STATUS_EFFECTS = "Status Effects";
-    public static final String ABILITIES = "Abilities";
     public static final String EQUIPMENT = "Equipment Drops";
     public static final String SUMMONS = "Summons";
 
+    public static final String SUGGEST_SCHOOLS = "schools";
+    public static final String SUGGEST_SCALING_SOURCES = "scaling_sources";
+    public static final String SUGGEST_DAMAGE_TYPES = "damage_types";
     public static final String SUGGEST_LOOT_TABLES = "loot_tables";
     public static final String SUGGEST_TABLE_PATTERNS = "table_patterns";
     public static final String SUGGEST_ENTITIES = "entities";
@@ -29,8 +31,6 @@ public final class ConfigOptions {
     public static final String SUGGEST_STRUCTURES = "structures";
     public static final String SUGGEST_STRUCTURE_TAGS = "structure_tags";
     public static final String SUGGEST_DRAG_MOTIONS = "drag_motions";
-    public static final String SUGGEST_SCHOOLS = "schools";
-    public static final String SUGGEST_SCALING_SOURCES = "scaling_sources";
     public static final String KIND_BOOL = "bool";
     public static final String KIND_HUD_DENSITY = "hud_density";
     public static final String HUD_DENSITY_DEFAULT = "chips";
@@ -316,78 +316,6 @@ public final class ConfigOptions {
         return raw.replace(':', '_').replace('/', '_').replace('.', '_').replace('#', '_');
     }
 
-    public static List<Option> abilities() {
-        List<Option> options = new ArrayList<>();
-        for (String id : AbilityConfig.all().keySet()) {
-            AbilityConfig.Entry entry = AbilityConfig.get(id);
-            String group = ABILITIES;
-
-            options.add(decimal(id + ".damage.base_damage", "Base damage",
-                    () -> (double) entry.damage.baseDamage,
-                    value -> entry.damage.baseDamage = value.floatValue()).in(group));
-            options.add(decimal(id + ".damage.weapon_damage_ratio", "Weapon damage ratio",
-                    () -> (double) entry.damage.weaponDamageRatio,
-                    value -> entry.damage.weaponDamageRatio = value.floatValue()).in(group));
-            options.add(decimal(id + ".damage.per_point", "Bonus per power point",
-                    () -> entry.damage.perPoint, value -> entry.damage.perPoint = value).in(group));
-            options.add(text(id + ".damage.scales_with", "Scales with",
-                    () -> entry.damage.scalesWith,
-                    value -> entry.damage.scalesWith = value).in(group)
-                    .suggesting(SUGGEST_SCALING_SOURCES));
-            options.add(text(id + ".damage.school", "Damage school",
-                    () -> entry.damage.school, value -> entry.damage.school = value).in(group)
-                    .suggesting(SUGGEST_SCHOOLS));
-            options.add(integer(id + ".damage.hits", "Hits",
-                    () -> entry.damage.hits, value -> entry.damage.hits = value).in(group));
-            options.add(text(id + ".damage.applies", "Applies effect",
-                    () -> entry.damage.applies, value -> entry.damage.applies = value).in(group));
-            options.add(integer(id + ".damage.applies_stacks", "Stacks applied",
-                    () -> entry.damage.appliesStacks,
-                    value -> entry.damage.appliesStacks = value).in(group));
-            options.add(decimal(id + ".damage.applies_chance", "Apply chance",
-                    () -> (double) entry.damage.appliesChance,
-                    value -> entry.damage.appliesChance = value.floatValue()).in(group));
-            options.add(decimal(id + ".damage.lifesteal", "Lifesteal",
-                    () -> (double) entry.damage.lifesteal,
-                    value -> entry.damage.lifesteal = value.floatValue()).in(group));
-            options.add(bool(id + ".damage.detonates", "Detonates marks",
-                    () -> entry.damage.detonates,
-                    value -> entry.damage.detonates = value).in(group));
-
-            options.add(integer(id + ".timing.duration_ticks", "Duration (ticks)",
-                    () -> entry.timing.durationTicks,
-                    value -> entry.timing.durationTicks = value).in(group));
-            options.add(integer(id + ".timing.windup_ticks", "Windup (ticks)",
-                    () -> entry.timing.windupTicks, value -> entry.timing.windupTicks = value).in(group));
-
-            options.add(decimal(id + ".shape.radius", "Radius",
-                    () -> entry.shape.radius, value -> entry.shape.radius = value).in(group));
-            options.add(decimal(id + ".shape.range", "Range",
-                    () -> entry.shape.range, value -> entry.shape.range = value).in(group));
-            options.add(decimal(id + ".shape.rise", "Rise",
-                    () -> entry.shape.rise, value -> entry.shape.rise = value).in(group));
-            options.add(decimal(id + ".shape.pull", "Pull",
-                    () -> entry.shape.pull, value -> entry.shape.pull = value).in(group));
-            options.add(decimal(id + ".shape.lift", "Lift",
-                    () -> entry.shape.lift, value -> entry.shape.lift = value).in(group));
-            options.add(integer(id + ".shape.max_targets", "Max targets",
-                    () -> entry.shape.maxTargets,
-                    value -> entry.shape.maxTargets = value).in(group));
-
-            options.add(integer(id + ".fx.particles", "Particles",
-                    () -> entry.fx.particles, value -> entry.fx.particles = value).in(group));
-            options.add(decimal(id + ".fx.spread", "Particle spread",
-                    () -> entry.fx.spread, value -> entry.fx.spread = value).in(group));
-            options.add(decimal(id + ".fx.volume", "Volume",
-                    () -> (double) entry.fx.volume,
-                    value -> entry.fx.volume = value.floatValue()).in(group));
-            options.add(decimal(id + ".fx.pitch", "Pitch",
-                    () -> (double) entry.fx.pitch,
-                    value -> entry.fx.pitch = value.floatValue()).in(group));
-        }
-        return options;
-    }
-
     public static List<Option> summons() {
         List<Option> options = new ArrayList<>();
         options.add(decimal("summons.follow_start_distance", "Follow start distance",
@@ -409,6 +337,11 @@ public final class ConfigOptions {
                 () -> SummonTuning.get().huntRange,
                 value -> SummonTuning.get().huntRange = value)
                 .describedAs("Summons only chase targets within this many blocks.")
+                .in(SUMMONS));
+        options.add(decimal("summons.aim_range", "Aim range",
+                () -> SummonTuning.get().aimRange,
+                value -> SummonTuning.get().aimRange = value)
+                .describedAs("How far summon abilities look for a target when they aim at the nearest, weakest, looked-at or last-hit enemy.")
                 .in(SUMMONS));
         options.add(decimal("summons.roster_radius", "Roster radius",
                 () -> SummonTuning.get().rosterRadius,

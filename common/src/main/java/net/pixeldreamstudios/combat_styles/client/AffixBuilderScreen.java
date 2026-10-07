@@ -9,6 +9,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
+import net.pixeldreamstudios.combat_styles.item.TooltipGem;
 import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
@@ -582,6 +583,7 @@ public class AffixBuilderScreen extends PanelScreen {
 
         List<Component> lines = new ArrayList<>();
         AffixText.appendEffects(affix, lines, true);
+        lines = TooltipGem.indentDetails(lines);
         if (lines.isEmpty()) {
             graphics.drawString(font, Component.translatable(KEY_PREVIEW_EMPTY),
                     textX, lineY, ScreenTheme.DIM, false);

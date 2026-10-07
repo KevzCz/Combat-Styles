@@ -17,7 +17,8 @@ public abstract class ContentListScreen<T> extends PanelScreen {
     public enum Source {
         DATAPACK("screen.combat_styles.source_datapack"),
         CONFIG("screen.combat_styles.source_config"),
-        OVERRIDDEN("screen.combat_styles.source_overridden");
+        OVERRIDDEN("screen.combat_styles.source_overridden"),
+        BUILT_IN("screen.combat_styles.source_built_in");
 
         private final String key;
 
@@ -164,7 +165,7 @@ public abstract class ContentListScreen<T> extends PanelScreen {
     }
 
     private static boolean removable(Source source) {
-        return source != Source.DATAPACK;
+        return source != Source.DATAPACK && source != Source.BUILT_IN;
     }
 
     @Override

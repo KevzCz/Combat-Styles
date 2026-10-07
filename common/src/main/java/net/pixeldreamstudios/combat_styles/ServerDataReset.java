@@ -1,4 +1,6 @@
 package net.pixeldreamstudios.combat_styles;
+import net.pixeldreamstudios.combat_styles.entity.AbilityHosts;
+import net.pixeldreamstudios.combat_styles.entity.ScriptedAbilities;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.affix.CustomAffixConfig;
@@ -23,6 +25,8 @@ public final class ServerDataReset {
         DefaultStyles.clear();
         BookRolls.DEFINITIONS.forget();
         WeaponRolls.DEFINITIONS.forget();
+        ScriptedAbilities.DEFINITIONS.forget();
+        AbilityHosts.clear();
         CustomStyles.accept(Map.of());
         CustomStyleConfig.forgetAll();
         CustomAttacks.accept(Map.of());

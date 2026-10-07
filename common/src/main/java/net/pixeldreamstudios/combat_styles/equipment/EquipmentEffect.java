@@ -2,6 +2,7 @@ package net.pixeldreamstudios.combat_styles.equipment;
 
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
@@ -30,7 +31,17 @@ public record EquipmentEffect(Optional<String> substituteStyle,
                          Optional<SummonDive> summonDive,
                          SpellLocks spells,
                          List<DamageBonus> damageBonus,
-                         EventPayloads events) {
+                         EventPayloads events,
+                         Optional<AbilityGrant> grantAbilities) {
+
+    private record SummonParts(Optional<SummonProfile> profile, Optional<AbilityGrant> grant) {
+    }
+
+    private static final MapCodec<SummonParts> SUMMON_PARTS = RecordCodecBuilder.mapCodec(instance ->
+            instance.group(
+                    SummonProfile.CODEC.optionalFieldOf("summon_profile").forGetter(SummonParts::profile),
+                    AbilityGrant.CODEC.optionalFieldOf(AbilityGrant.KEY).forGetter(SummonParts::grant)
+            ).apply(instance, SummonParts::new));
 
     private static final Codec<Integer> REPEAT_CODEC = Codec.either(Codec.INT, Codec.BOOL)
             .xmap(either -> either.map(count -> count, flag -> flag ? 1 : 0),
@@ -55,8 +66,7 @@ public record EquipmentEffect(Optional<String> substituteStyle,
                     .forGetter(EquipmentEffect::substitution),
             SummonReplacement.CODEC.optionalFieldOf("summon_replacement")
                     .forGetter(EquipmentEffect::summonReplacement),
-            SummonProfile.CODEC.optionalFieldOf("summon_profile")
-                    .forGetter(EquipmentEffect::summonProfile),
+            SUMMON_PARTS.forGetter(effect -> new SummonParts(effect.summonProfile(), effect.grantAbilities())),
             SummonDive.CODEC.optionalFieldOf(KEY_SUMMON_ORDER)
                     .forGetter(EquipmentEffect::summonDive),
             SpellLocks.CODEC.optionalFieldOf("spells", SpellLocks.NONE)
@@ -65,7 +75,10 @@ public record EquipmentEffect(Optional<String> substituteStyle,
                     .forGetter(EquipmentEffect::damageBonus),
             EventPayloads.CODEC.optionalFieldOf(EventPayloads.KEY, EventPayloads.EMPTY)
                     .forGetter(EquipmentEffect::events)
-    ).apply(instance, EquipmentEffect::new));
+    ).apply(instance, (substitute, augment, grants, swing, hit, reset, tune, echo, attributes, substitution,
+                       replacement, summon, dive, spells, bonuses, events) -> new EquipmentEffect(substitute,
+            augment, grants, swing, hit, reset, tune, echo, attributes, substitution, replacement,
+            summon.profile(), dive, spells, bonuses, events, summon.grant())));
 
     public EquipmentEffect {
         grantAffixes = grantAffixes == null ? List.of() : List.copyOf(grantAffixes);
@@ -74,6 +87,7 @@ public record EquipmentEffect(Optional<String> substituteStyle,
         spells = spells == null ? SpellLocks.NONE : spells;
         damageBonus = damageBonus == null ? List.of() : List.copyOf(damageBonus);
         events = events == null ? EventPayloads.EMPTY : events;
+        grantAbilities = grantAbilities == null ? Optional.empty() : grantAbilities;
         if (summonReplacement != null && summonReplacement.isPresent()) {
             if (summonProfile == null || summonProfile.isEmpty()) {
                 summonProfile = Optional.of(summonReplacement.get().asProfile());
@@ -85,7 +99,8 @@ public record EquipmentEffect(Optional<String> substituteStyle,
     public static final EquipmentEffect EMPTY = new EquipmentEffect(Optional.empty(),
             Optional.empty(), List.of(), Optional.empty(), Optional.empty(), Optional.empty(),
             Map.of(), Optional.empty(), Map.of(), Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), SpellLocks.NONE, List.of(), EventPayloads.EMPTY);
+            Optional.empty(), Optional.empty(), SpellLocks.NONE, List.of(), EventPayloads.EMPTY,
+            Optional.empty());
 
     public EquipmentEffect mergedWith(EquipmentEffect other) {
         if (other == null || other.isEmpty()) {
@@ -117,13 +132,13 @@ public record EquipmentEffect(Optional<String> substituteStyle,
                 summonReplacement.or(other::summonReplacement),
                 summonProfile.or(other::summonProfile),
                 summonDive.or(other::summonDive), spells.mergedWith(other.spells()), bonuses,
-                events.mergedWith(other.events()));
+                events.mergedWith(other.events()), grantAbilities.or(other::grantAbilities));
     }
 
     public boolean hasAlwaysOnParts() {
         return !attributes.isEmpty() || !spells.isEmpty() || EquipmentDefinition.substitutes(this)
                 || summonProfile.isPresent() || summonReplacement.isPresent()
-                || !damageBonus.isEmpty();
+                || !damageBonus.isEmpty() || grantAbilities.isPresent();
     }
 
     public boolean rewritesAttack() {
@@ -137,6 +152,6 @@ public record EquipmentEffect(Optional<String> substituteStyle,
                 && tuneAffixes.isEmpty() && echo.isEmpty() && attributes.isEmpty()
                 && substitution.isEmpty() && summonReplacement.isEmpty()
                 && summonProfile.isEmpty() && summonDive.isEmpty() && spells.isEmpty()
-                && damageBonus.isEmpty() && events.isEmpty();
+                && damageBonus.isEmpty() && events.isEmpty() && grantAbilities.isEmpty();
     }
 }

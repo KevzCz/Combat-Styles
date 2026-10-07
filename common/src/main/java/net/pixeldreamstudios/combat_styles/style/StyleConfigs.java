@@ -1,4 +1,5 @@
 package net.pixeldreamstudios.combat_styles.style;
+import net.pixeldreamstudios.combat_styles.entity.ScriptedAbilities;
 
 import net.pixeldreamstudios.combat_styles.affix.CustomAffixConfig;
 import net.pixeldreamstudios.combat_styles.affix.TrailPlacements;
@@ -21,6 +22,7 @@ public final class StyleConfigs {
         EquipmentDropConfig.load();
         BookRolls.DEFINITIONS.reloadConfig();
         WeaponRolls.DEFINITIONS.reloadConfig();
+        ScriptedAbilities.DEFINITIONS.reloadConfig();
         int overrides = AttackOverrides.reload();
         StyleRegistry.rebuild();
         DefaultStyleConfig.reload();

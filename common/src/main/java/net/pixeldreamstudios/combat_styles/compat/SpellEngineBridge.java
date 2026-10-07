@@ -13,6 +13,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -27,6 +28,7 @@ import net.minecraft.world.phys.Vec3;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.affix.CastSpell;
+import net.pixeldreamstudios.combat_styles.entity.SummonCastTarget;
 import net.pixeldreamstudios.combat_styles.equipment.CastPhase;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentActivation;
 import net.pixeldreamstudios.combat_styles.equipment.SpellCastEvent;
@@ -55,6 +57,7 @@ import net.spell_engine.internals.casting.SpellCast;
 import net.spell_engine.internals.container.SpellContainerSource;
 import net.spell_engine.internals.delivery.ProjectileLauncher;
 import net.spell_engine.internals.delivery.SpellDelivery;
+import net.spell_engine.internals.target.SpellIntents;
 import net.spell_engine.internals.target.SpellTarget;
 import net.spell_engine.utils.VectorHelper;
 import net.spell_power.api.SpellPower;
@@ -63,6 +66,7 @@ import net.spell_engine.internals.casting.SpellCaster;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -73,6 +77,8 @@ import java.util.function.Consumer;
 
 final class SpellEngineBridge {
 
+    private static final float CERTAIN_CHANCE = 1.0F;
+    private static final float QUARTER_TURN = 90.0F;
     private static final int KEEP_LAUNCH_MOD = -1;
     private static final String GRANT_SOURCE = "combat_styles:granted";
     private static final String NO_PARAMETER = "";
@@ -608,6 +614,14 @@ final class SpellEngineBridge {
         return false;
     }
 
+    public static boolean reownSpellSummon(Entity spawned, Player owner) {
+        if (!isLoaded() || owner == null || !(spawned instanceof SummonedEntity entity)) {
+            return false;
+        }
+        entity.setOwnerUuid(owner.getUUID());
+        return true;
+    }
+
     private static Spell.Impact.Action.Summon summonOf(Spell spell, ResourceLocation entityId) {
         if (spell == null || spell.impacts == null || entityId == null) {
             return null;
@@ -635,17 +649,7 @@ final class SpellEngineBridge {
             if (spell == null) {
                 return null;
             }
-            Spell.Modifier modifier = tuning == null || tuning.isEmpty()
-                    ? new Spell.Modifier()
-                    : modifierFor(tuning);
-            if (tuning != null && !tuning.launch().equals(SpellLaunchTuning.NONE)
-                    && spell.value().deliver != null) {
-                Spell.Delivery deliver = spell.value().deliver;
-                Spell.LaunchProperties launch = deliver.meteor != null
-                        ? deliver.meteor.launch_properties
-                        : (deliver.projectile != null ? deliver.projectile.launch_properties : null);
-                modifier.projectile_launch = launchFor(player, spell, launch, tuning);
-            }
+            Spell.Modifier modifier = tunedCastModifier(player, spell, tuning);
             SpellExecution.ImpactContext context = contextFor(player, spell, modifier, damage);
             SpellTarget.SearchResult targets = targetsFor(player, spell, target, hit);
             boolean delivered = SpellDelivery.resolveAndDeliver(player.level(), player, spell,
@@ -655,6 +659,152 @@ final class SpellEngineBridge {
         } catch (Throwable throwable) {
             CombatStyles.LOGGER.debug("Casting {} failed", spellId, throwable);
             return null;
+        }
+    }
+
+    public static Object castSpellAs(LivingEntity caster, Player owner, ResourceLocation spellId,
+                                     LivingEntity target, float damage, SpellTuning tuning,
+                                     SummonCastTarget mode) {
+        if (!isLoaded() || caster == null || owner == null || spellId == null
+                || caster.level().isClientSide()) {
+            return null;
+        }
+        try {
+            Holder<Spell> spell = holderOf(caster.level(), spellId);
+            if (spell == null) {
+                return null;
+            }
+            SpellTarget.SearchResult targets = summonTargets(caster, owner, spell, target, mode);
+            if (targets == null) {
+                return null;
+            }
+            Spell.Modifier modifier = tunedCastModifier(caster, spell, tuning);
+            SpellExecution.ImpactContext context = contextFor(owner, spell, modifier, damage);
+            boolean delivered = SpellDelivery.resolveAndDeliver(caster.level(), caster, spell,
+                    targets, context, completion -> {
+                    });
+            return delivered ? context.power() : null;
+        } catch (Throwable throwable) {
+            CombatStyles.LOGGER.debug("Summon casting {} failed", spellId, throwable);
+            return null;
+        }
+    }
+
+    private static SpellTarget.SearchResult summonTargets(LivingEntity caster, Player owner,
+                                                          Holder<Spell> spell, LivingEntity target,
+                                                          SummonCastTarget mode) {
+        SummonCastTarget chosen = mode == null ? SummonCastTarget.AUTO : mode;
+        LivingEntity facing = switch (chosen) {
+            case SELF -> null;
+            case OWNER -> owner;
+            default -> target;
+        };
+        if (facing != null && facing != caster) {
+            faceToward(caster, facing);
+        }
+        Spell.Target.Type type = spell.value().target == null ? null : spell.value().target.type;
+        boolean engineSearches = type == Spell.Target.Type.AIM || type == Spell.Target.Type.BEAM
+                || type == Spell.Target.Type.AREA;
+        return switch (chosen) {
+            case SELF -> engineSearches ? searched(caster, spell) : SpellTarget.SearchResult.of(caster);
+            case OWNER -> SpellTarget.SearchResult.of(owner);
+            case HIT -> {
+                if (target == null) {
+                    yield null;
+                }
+                SpellTarget.SearchResult found = engineSearches && type != Spell.Target.Type.AREA
+                        ? searched(caster, spell)
+                        : null;
+                yield found != null ? found : SpellTarget.SearchResult.of(target);
+            }
+            case AIM -> searched(caster, spell);
+            case AUTO -> autoTargets(caster, owner, spell, target);
+        };
+    }
+
+    private static void faceToward(LivingEntity caster, Entity toward) {
+        Vec3 delta = toward.getEyePosition().subtract(caster.getEyePosition());
+        double flat = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
+        float yaw = (float) (Mth.atan2(delta.z, delta.x) * Mth.RAD_TO_DEG) - QUARTER_TURN;
+        float pitch = (float) -(Mth.atan2(delta.y, flat) * Mth.RAD_TO_DEG);
+        caster.setYRot(yaw);
+        caster.setXRot(pitch);
+        caster.yRotO = yaw;
+        caster.xRotO = pitch;
+        caster.setYHeadRot(yaw);
+        caster.setYBodyRot(yaw);
+    }
+
+    private static SpellTarget.SearchResult autoTargets(LivingEntity caster, Player owner,
+                                                        Holder<Spell> spell, LivingEntity target) {
+        if (beneficial(spell.value())) {
+            return SpellTarget.SearchResult.of(owner);
+        }
+        Spell.Target.Type type = spell.value().target == null ? null : spell.value().target.type;
+        if (type == null || type == Spell.Target.Type.NONE
+                || type == Spell.Target.Type.FROM_TRIGGER) {
+            return target == null ? null : SpellTarget.SearchResult.of(target);
+        }
+        if (type == Spell.Target.Type.CASTER) {
+            return SpellTarget.SearchResult.of(caster);
+        }
+        SpellTarget.SearchResult found = searched(caster, spell);
+        if (found != null) {
+            return found;
+        }
+        return target == null ? null : SpellTarget.SearchResult.of(target);
+    }
+
+    private static SpellTarget.SearchResult searched(LivingEntity caster, Holder<Spell> spell) {
+        SpellTarget.SearchResult found = SpellTarget.findTargets(caster, spell,
+                SpellTarget.SearchResult.empty(), true);
+        return found != null && (!found.entities().isEmpty() || found.location() != null)
+                ? found
+                : null;
+    }
+
+    private static boolean beneficial(Spell spell) {
+        if (spell == null) {
+            return false;
+        }
+        return SpellIntents.deliveryIntent(spell)
+                .map(intent -> intent == SpellTarget.Intent.HELPFUL)
+                .orElseGet(() -> SpellIntents.impactIntents(spell)
+                        .equals(EnumSet.of(SpellTarget.Intent.HELPFUL)));
+    }
+
+    public static float triggerChance(ResourceLocation spellId, Level level) {
+        if (!isLoaded() || spellId == null || level == null) {
+            return CERTAIN_CHANCE;
+        }
+        try {
+            Holder<Spell> spell = holderOf(level, spellId);
+            Spell.Passive passive = spell == null ? null : spell.value().passive;
+            if (passive == null || passive.triggers == null || passive.triggers.isEmpty()) {
+                return CERTAIN_CHANCE;
+            }
+            float best = 0.0F;
+            for (Spell.Trigger trigger : passive.triggers) {
+                if (trigger != null) {
+                    best = Math.max(best, trigger.chance);
+                }
+            }
+            return best;
+        } catch (Throwable throwable) {
+            return CERTAIN_CHANCE;
+        }
+    }
+
+    public static boolean deliversProjectile(ResourceLocation spellId, Level level) {
+        if (!isLoaded() || spellId == null || level == null) {
+            return false;
+        }
+        try {
+            Holder<Spell> spell = holderOf(level, spellId);
+            Spell.Delivery deliver = spell == null ? null : spell.value().deliver;
+            return deliver != null && (deliver.projectile != null || deliver.meteor != null);
+        } catch (Throwable throwable) {
+            return false;
         }
     }
 
@@ -878,15 +1028,33 @@ final class SpellEngineBridge {
         return true;
     }
 
-    private static Spell.LaunchProperties launchFor(Player player, Holder<Spell> spell,
+    private static Spell.Modifier tunedCastModifier(LivingEntity caster, Holder<Spell> spell,
+                                                    SpellTuning tuning) {
+        Spell.Modifier modifier = tuning == null || tuning.isEmpty()
+                ? new Spell.Modifier()
+                : modifierFor(tuning);
+        if (tuning != null && !tuning.launch().equals(SpellLaunchTuning.NONE)
+                && spell.value().deliver != null) {
+            Spell.Delivery deliver = spell.value().deliver;
+            Spell.LaunchProperties launch = deliver.meteor != null
+                    ? deliver.meteor.launch_properties
+                    : (deliver.projectile != null ? deliver.projectile.launch_properties : null);
+            modifier.projectile_launch = launchFor(caster, spell, launch, tuning);
+        }
+        return modifier;
+    }
+
+    private static Spell.LaunchProperties launchFor(LivingEntity caster, Holder<Spell> spell,
                                                     Spell.LaunchProperties base,
                                                     SpellTuning tuning) {
         int extras = base == null ? 0 : base.extra_launch_count;
         int delay = base == null ? 0 : base.extra_launch_delay;
-        for (Spell.Modifier active : SpellModifiers.of(player, spell)) {
-            if (active != null && active.projectile_launch != null) {
-                extras += active.projectile_launch.extra_launch_count;
-                delay += active.projectile_launch.extra_launch_delay;
+        if (caster instanceof Player player) {
+            for (Spell.Modifier active : SpellModifiers.of(player, spell)) {
+                if (active != null && active.projectile_launch != null) {
+                    extras += active.projectile_launch.extra_launch_count;
+                    delay += active.projectile_launch.extra_launch_delay;
+                }
             }
         }
         SpellLaunchTuning wanted = tuning == null ? SpellLaunchTuning.NONE : tuning.launch();

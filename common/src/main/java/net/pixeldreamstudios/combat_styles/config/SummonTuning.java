@@ -49,6 +49,7 @@ public final class SummonTuning {
         public double followStopDistance = 2.5D;
         public double teleportDistance = 12.0D;
         public double huntRange = 24.0D;
+        public double aimRange = 20.0D;
     }
 
     private static final class Section<T> {

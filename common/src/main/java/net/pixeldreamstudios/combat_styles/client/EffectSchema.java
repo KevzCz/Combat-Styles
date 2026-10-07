@@ -1,5 +1,26 @@
 package net.pixeldreamstudios.combat_styles.client;
 
+import net.pixeldreamstudios.combat_styles.equipment.SummonCadence;
+import net.pixeldreamstudios.combat_styles.entity.BeamLook;
+import net.pixeldreamstudios.combat_styles.entity.RaiseProfile;
+import net.pixeldreamstudios.combat_styles.entity.BeamOrigin;
+import net.pixeldreamstudios.combat_styles.entity.ParticleShape;
+import net.pixeldreamstudios.combat_styles.equipment.AbilityGrant;
+import net.pixeldreamstudios.combat_styles.equipment.AbilityUse;
+import net.pixeldreamstudios.combat_styles.equipment.GrantTarget;
+import net.pixeldreamstudios.combat_styles.equipment.StepTuning;
+import net.pixeldreamstudios.combat_styles.equipment.SummonPassive;
+import net.pixeldreamstudios.combat_styles.equipment.SummonActives;
+import net.pixeldreamstudios.combat_styles.entity.AbilityKind;
+import net.pixeldreamstudios.combat_styles.entity.MobFilter;
+import net.pixeldreamstudios.combat_styles.entity.RaiseRules;
+import net.pixeldreamstudios.combat_styles.entity.PassiveTrigger;
+import net.pixeldreamstudios.combat_styles.entity.SummonAim;
+import net.pixeldreamstudios.combat_styles.entity.SummonCastTarget;
+import net.pixeldreamstudios.combat_styles.entity.ScriptedAbility;
+import net.pixeldreamstudios.combat_styles.entity.AbilityStacks;
+import net.pixeldreamstudios.combat_styles.entity.AbilityPick;
+import net.pixeldreamstudios.combat_styles.entity.AbilityFocus;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -23,6 +44,8 @@ import net.pixeldreamstudios.combat_styles.affix.SpreadMode;
 import net.pixeldreamstudios.combat_styles.api.SchemaRegistry;
 import net.pixeldreamstudios.combat_styles.config.SpellCompatState;
 import net.pixeldreamstudios.combat_styles.config.SummonTuning;
+import net.pixeldreamstudios.combat_styles.config.OptionField;
+import net.pixeldreamstudios.combat_styles.config.OptionSources;
 import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 import net.pixeldreamstudios.combat_styles.entity.AbilityRegistry;
 import net.pixeldreamstudios.combat_styles.entity.SummonCompanion;
@@ -83,6 +106,7 @@ import net.pixeldreamstudios.combat_styles.style.SlashPlacement;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -140,6 +164,7 @@ public final class EffectSchema {
     private static final String KEY_COMPANION = "companion";
     private static final String KEY_FOLLOW = "follow";
     private static final String KEY_DAMAGE_SPEC = "damage_spec";
+    private static final String KEY_DAMAGE_TYPE = "damage_type";
     private static final String KEY_OWN_DAMAGE = "own_damage";
     public static final List<String> SUMMON_SLOTS = List.of("mainhand", "offhand", "head",
             "chest", "legs", "feet", "body");
@@ -154,10 +179,11 @@ public final class EffectSchema {
     public static final String ROOT_EFFECT = "";
     public static final String ROOT_TRIGGER = "@trigger";
     public static final String ROOT_SUBSTITUTION = "@substitution";
-    public static final String ROOT_SUMMON_PROFILE = "@summon_profile";
+    public static final String ROOT_SUMMON_PROFILE = SummonProfile.SCHEMA;
     public static final String ROOT_ATTRIBUTE_MAP = "@attribute_map";
     public static final String ROOT_CONDITIONAL_ATTRIBUTES = "@conditional_attributes";
     public static final String ROOT_SUMMON_DIVE = "@summon_dive";
+    public static final String ROOT_ABILITY_GRANT = "@ability_grant";
     public static final String ROOT_BEHAVIOUR = "@behaviour";
     public static final String ROOT_TUNING = "@tuning";
     public static final String ROOT_ECHO = "@echo";
@@ -168,6 +194,9 @@ public final class EffectSchema {
     public static final String ROOT_DAMAGE_BONUS = "@damage_bonus";
     public static final String ROOT_STYLE_BOOK = "@style_book";
     public static final String ROOT_WEAPON_ROLL = "@weapon_roll";
+    public static final String ROOT_SUMMON_ABILITY = "@summon_ability";
+    public static final String ROOT_ABILITY_TUNING = "@ability_tuning";
+    private static final String PATH_SEPARATOR = "/";
 
     private static final String DEFAULT_TRAIL_COLOR = "#FFFFFF";
     private static final int DEFAULT_NTH_SWING = 3;
@@ -223,7 +252,21 @@ public final class EffectSchema {
             List.of("HORIZONTAL_PLANE", "VERTICAL_PLANE", "FORWARD_BOX");
 
     public static final String KEY_TUNING = "tuning";
-    private static final String KEY_ABILITY = "ability";
+    public static final String KEY_FOCUS = "focus";
+    public static final String KEY_STEPS = "steps";
+    public static final String KEY_AT = "at";
+    public static final String KEY_ACTION = "action";
+    public static final String KEY_AT_WINDUP = "windup";
+    public static final String KEY_AT_END = "end";
+    public static final String KEY_PARTICLE = "particle";
+    public static final String KEY_USED_BY = "used_by";
+    private static final int DEFAULT_RECAST_TICKS = 60;
+    private static final int DEFAULT_STEP_EVERY = 5;
+    private static final float DEFAULT_HEAL_RATIO = 0.25F;
+    private static final float DEFAULT_STEP_CHANCE = 0.5F;
+    private static final String DEFAULT_ENTITY_TAG = "minecraft:undead";
+    private static final int DEFAULT_RAISE_MAX = 3;
+    private static final float DEFAULT_TRIGGER_CHANCE_ADD = 0.1F;
     private static final String KEY_MODE = "mode";
     static final List<String> DAMAGE_MODES =
             List.of("additive", "amplify", "convert");
@@ -250,6 +293,30 @@ public final class EffectSchema {
         }
         TEMPLATES.computeIfAbsent(path, ignored -> new ArrayList<>())
                 .add(new Template(key, encoded));
+    }
+
+    private static final AffixEffects.Projectile SAMPLE_PROJECTILE = new AffixEffects.Projectile(
+            DEFAULT_PROJECTILE_ENTITY, 1, 1.5F, 0.0F, 0.0F, false, 1.0F, Optional.empty(),
+            DEFAULT_PROJECTILE_LIFETIME, false, ProjectileSpawn.DEFAULT, SpellShot.NONE, "", false);
+
+    private static void registerProjectileFields(String projectileRoot) {
+        register(projectileRoot, "entity", Codec.STRING, DEFAULT_PROJECTILE_ENTITY);
+        register(projectileRoot, "name", Codec.STRING, "");
+        register(projectileRoot, "ignore_iframes", Codec.BOOL, true);
+        if (SpellEngineCompat.isLoaded()) {
+            registerSpellShot(projectileRoot);
+        }
+        register(projectileRoot, "count", Codec.INT, 1);
+        register(projectileRoot, "speed", Codec.FLOAT, 1.5F);
+        register(projectileRoot, "spread", Codec.FLOAT, 0.25F);
+        register(projectileRoot, "damage", Codec.FLOAT, 4.0F);
+        register(projectileRoot, "from_target", Codec.BOOL, true);
+        register(projectileRoot, "chance", Codec.FLOAT, 1.0F);
+        register(projectileRoot, "lifetime_ticks", Codec.INT, DEFAULT_PROJECTILE_LIFETIME);
+        register(projectileRoot, "remove_on_landing", Codec.BOOL, true);
+        register(projectileRoot, "damage_spec", DamageSpec.CODEC, SAMPLE_DAMAGE_SPEC);
+        registerDamageSpec(join(projectileRoot, "damage_spec"));
+        attachSpawn(projectileRoot);
     }
 
     private static void registerSpellShot(String projectileRoot) {
@@ -356,6 +423,8 @@ public final class EffectSchema {
         register(tuningRoot, "impact_school", Codec.STRING.listOf(), List.of(DEFAULT_SCHOOL));
         register(tuningRoot, "ricochet_range", Codec.FLOAT, 4.0F);
         register(tuningRoot, "knockback_multiply", Codec.FLOAT, 0.5F);
+        register(tuningRoot, SpellTuning.KEY_TRIGGER_CHANCE_ADD, Codec.FLOAT,
+                DEFAULT_TRIGGER_CHANCE_ADD);
         register(tuningRoot, "launch", SpellLaunchTuning.CODEC, SpellLaunchTuning.NONE);
         String launchRoot = join(tuningRoot, "launch");
         register(launchRoot, "extra_launches", Codec.INT, 2);
@@ -669,30 +738,11 @@ public final class EffectSchema {
         }
         register("", "particles", AffixEffects.Particles.CODEC.listOf(),
                 List.of(new AffixEffects.Particles(DEFAULT_PARTICLE, 6, 0.35F, 0.0F)));
-        register("", "projectiles", AffixEffects.Projectile.CODEC.listOf(),
-                List.of(new AffixEffects.Projectile(DEFAULT_PROJECTILE_ENTITY, 1, 1.5F, 0.0F,
-                        0.0F, false, 1.0F, Optional.empty(),
-                        DEFAULT_PROJECTILE_LIFETIME, false, ProjectileSpawn.DEFAULT,
-                        SpellShot.NONE, "", false)));
-        String projectileRoot = join("", "projectiles");
-        register(projectileRoot, "entity", Codec.STRING, DEFAULT_PROJECTILE_ENTITY);
-        register(projectileRoot, "name", Codec.STRING, "");
-        register(projectileRoot, "ignore_iframes", Codec.BOOL, true);
+        register("", "projectiles", AffixEffects.Projectile.CODEC.listOf(), List.of(SAMPLE_PROJECTILE));
+        registerProjectileFields(join("", "projectiles"));
         if (SpellEngineCompat.isLoaded()) {
-            registerSpellShot(projectileRoot);
             registerCastSpells(ROOT_EFFECT);
         }
-        register(projectileRoot, "count", Codec.INT, 1);
-        register(projectileRoot, "speed", Codec.FLOAT, 1.5F);
-        register(projectileRoot, "spread", Codec.FLOAT, 0.25F);
-        register(projectileRoot, "damage", Codec.FLOAT, 4.0F);
-        register(projectileRoot, "from_target", Codec.BOOL, true);
-        register(projectileRoot, "chance", Codec.FLOAT, 1.0F);
-        register(projectileRoot, "lifetime_ticks", Codec.INT, DEFAULT_PROJECTILE_LIFETIME);
-        register(projectileRoot, "remove_on_landing", Codec.BOOL, true);
-        register(projectileRoot, "damage_spec", DamageSpec.CODEC, SAMPLE_DAMAGE_SPEC);
-        registerDamageSpec(join(projectileRoot, "damage_spec"));
-        attachSpawn(projectileRoot);
         register("", "echo", AffixEffects.Echo.CODEC,
                 new AffixEffects.Echo(1, DEFAULT_ECHO_DELAY, 1.0F, Optional.empty()));
         attachDamageSpec("", "echo");
@@ -785,6 +835,7 @@ public final class EffectSchema {
                         Optional.empty(), Optional.empty(), SummonEquipment.NONE,
                         SummonStats.NONE, false, false, false)));
         attachDamageSpec("mechanics/spawn", "summons");
+        registerRaiseDead("mechanics/spawn");
         attachSpawn(join("mechanics/spawn", "summons"));
 
         String summons = join("mechanics/spawn", "summons");
@@ -846,6 +897,8 @@ public final class EffectSchema {
         registerCooldown();
         registerAttributeMap();
         registerSummons();
+        registerSummonAbilities();
+        registerAbilityTuning(ROOT_ABILITY_TUNING);
         registerBehaviour();
         registerTuning();
         registerEcho();
@@ -864,6 +917,7 @@ public final class EffectSchema {
         deriveMissing(ROOT_STYLE_BOOK, BookRoll.CODEC, BookRoll.SAMPLE);
         register(ROOT_WEAPON_ROLL, KEY_MODE, Codec.STRING, WeaponRoll.MODE_APPEND);
         deriveMissing(ROOT_WEAPON_ROLL, WeaponRoll.CODEC, WeaponRoll.SAMPLE);
+        deriveMissing(ROOT_SUMMON_ABILITY, ScriptedAbility.CODEC, ScriptedAbility.SAMPLE);
         deriveMissing(ROOT_SUMMON_DIVE, SummonDive.CODEC, SummonDive.SAMPLE);
         deriveMissing(ROOT_ECHO, AffixEffects.Echo.CODEC, AffixEffects.Echo.SAMPLE);
         deriveMissing(ROOT_COOLDOWN, EffectCooldown.EXPANDED, EffectCooldown.SAMPLE);
@@ -894,6 +948,8 @@ public final class EffectSchema {
         audit(ROOT_SUBSTITUTION, StyleSubstitution.CODEC);
         audit(ROOT_SUMMON_PROFILE, SummonProfile.CODEC);
         audit(ROOT_SUMMON_DIVE, SummonDive.CODEC);
+        audit(ROOT_ABILITY_GRANT, AbilityGrant.CODEC);
+        audit(ROOT_SUMMON_ABILITY, ScriptedAbility.CODEC);
         audit(ROOT_BEHAVIOUR, AttackBehaviour.CODEC);
         audit(ROOT_TUNING, AffixTuning.CODEC);
         audit(ROOT_ECHO, AffixEffects.Echo.CODEC);
@@ -1140,6 +1196,10 @@ public final class EffectSchema {
         registerSummonLoadout(companion);
         register(ROOT_SUMMON_PROFILE, "tuning",
                 Codec.unboundedMap(Codec.STRING, AbilityTuning.CODEC), Map.of());
+        keyedMap(join(ROOT_SUMMON_PROFILE, KEY_TUNING), AbilityRegistry.OPTION_SELECTOR);
+        registerAbilityTuning(join(join(ROOT_SUMMON_PROFILE, KEY_TUNING), MAP_ENTRY));
+        registerCadence(ROOT_SUMMON_PROFILE);
+        registerAbilityGrant();
         register(ROOT_SUMMON_PROFILE, "variants", ProfileVariant.CODEC.listOf(),
                 List.of(new ProfileVariant(List.of(), Optional.empty(), Map.of(),
                         List.of(), Optional.empty(), Optional.empty(),
@@ -1149,41 +1209,162 @@ public final class EffectSchema {
         register(variants, KEY_CONDITIONS, ProfileCondition.LIST_CODEC, List.of());
         register(variants, "finale", Codec.STRING, "");
         register(variants, "swaps", Codec.unboundedMap(Codec.STRING, Codec.STRING), Map.of());
-        register(variants, "abilities", Codec.STRING.listOf(), List.of(""));
         register(variants, "max_active", Codec.INT, 1);
         register(variants, "anchored", Codec.INT, 1);
         register(variants, "damage_multiplier", Codec.FLOAT, 1.0F);
         register(variants, "tuning",
                 Codec.unboundedMap(Codec.STRING, AbilityTuning.CODEC), Map.of());
+        keyedMap(join(variants, KEY_TUNING), AbilityRegistry.OPTION_SELECTOR);
+        registerAbilityTuning(join(join(variants, KEY_TUNING), MAP_ENTRY));
+        registerCadence(variants);
 
         register(ROOT_SUMMON_DIVE, "damage_share", Codec.FLOAT, 0.5F);
+        register(ROOT_SUMMON_DIVE, SummonCadence.KEY_AIM, SummonAim.CODEC, SummonAim.HIT_TARGET);
         register(ROOT_SUMMON_DIVE, "max_diving", Codec.INT, 1);
         register(ROOT_SUMMON_DIVE, "entities", Codec.STRING.listOf(),
                 List.of(DEFAULT_SUMMON_ENTITY));
         register(ROOT_SUMMON_DIVE, "tuning", AbilityTuning.CODEC, SummonDive.SAMPLE_TUNING);
 
-        String tuning = join(ROOT_SUMMON_DIVE, KEY_TUNING);
+        registerAbilityTuning(join(ROOT_SUMMON_DIVE, KEY_TUNING));
+    }
+
+    private static void registerMobFilter(String root) {
+        register(root, MobFilter.KEY_ENTITIES, Codec.STRING.listOf(), List.of(DEFAULT_SUMMON_ENTITY));
+        register(root, MobFilter.KEY_ENTITY_TAGS, Codec.STRING.listOf(), List.of(DEFAULT_ENTITY_TAG));
+        register(root, MobFilter.KEY_EXEMPT_ENTITIES, Codec.STRING.listOf(), List.of(DEFAULT_SUMMON_ENTITY));
+        register(root, MobFilter.KEY_EXEMPT_TAGS, Codec.STRING.listOf(), List.of(DEFAULT_ENTITY_TAG));
+    }
+
+    private static void registerAbilityGrant() {
+        register(ROOT_ABILITY_GRANT, AbilityGrant.KEY_APPLIES_TO, GrantTarget.CODEC, GrantTarget.BOTH);
+        registerMobFilter(ROOT_ABILITY_GRANT);
+        registerCadence(ROOT_ABILITY_GRANT);
+    }
+
+    private static void registerRaiseDead(String root) {
+        register(root, RaiseRules.KEY, RaiseRules.CODEC, RaiseRules.DEFAULT);
+        String raise = join(root, RaiseRules.KEY);
+        registerMobFilter(raise);
+        register(raise, RaiseRules.KEY_LIFESPAN_TICKS, Codec.INT, RaiseRules.DEFAULT_LIFESPAN);
+        register(raise, RaiseRules.KEY_KEEP_GEAR, Codec.BOOL, true);
+        register(raise, RaiseRules.KEY_SPECTRAL, Codec.BOOL, true);
+        register(raise, RaiseRules.KEY_MAX_ACTIVE, Codec.INT, DEFAULT_RAISE_MAX);
+        register(raise, RaiseRules.KEY_CHANCE, Codec.FLOAT, RaiseRules.ALWAYS);
+        register(raise, RaiseRules.KEY_PROFILE, RaiseProfile.CODEC, RaiseRules.DEFAULT.profile());
+        register(raise, RaiseRules.KEY_PROFILES, SummonProfile.CODEC.listOf(), List.of(SummonProfile.EMPTY));
+        mount(join(raise, RaiseRules.KEY_PROFILES), ROOT_SUMMON_PROFILE);
+    }
+
+    private static void registerCadence(String root) {
+        register(root, SummonActives.KEY, SummonActives.CODEC, SummonActives.SAMPLE);
+        String actives = join(root, SummonActives.KEY);
+        register(actives, SummonActives.KEY_ABILITIES, AbilityUse.CODEC.listOf(), List.of(AbilityUse.SAMPLE));
+        String uses = join(actives, SummonActives.KEY_ABILITIES);
+        register(uses, AbilityUse.KEY_ABILITY, Codec.STRING, "");
+        register(uses, AbilityUse.KEY_TUNING, AbilityTuning.CODEC, AbilityTuning.NONE);
+        registerAbilityTuning(join(uses, AbilityUse.KEY_TUNING));
+        register(actives, SummonActives.KEY_PICK, AbilityPick.CODEC, AbilityPick.RANDOM);
+        register(actives, SummonCadence.KEY_RECAST_TICKS, Codec.INT, DEFAULT_RECAST_TICKS);
+        register(actives, SummonCadence.KEY_AIM, SummonAim.CODEC, SummonAim.HIT_TARGET);
+        register(root, SummonCadence.KEY_PASSIVES, SummonPassive.CODEC.listOf(),
+                List.of(SummonPassive.SAMPLE));
+        String passives = join(root, SummonCadence.KEY_PASSIVES);
+        register(passives, SummonPassive.KEY_ABILITY, Codec.STRING, "");
+        register(passives, SummonPassive.KEY_ON, PassiveTrigger.CODEC, PassiveTrigger.HIT);
+        register(passives, SummonPassive.KEY_CHANCE, Codec.FLOAT, DEFAULT_STEP_CHANCE);
+        register(passives, SummonPassive.KEY_COOLDOWN_TICKS, Codec.INT, DEFAULT_RECAST_TICKS);
+        register(passives, SummonPassive.KEY_OPTIONS, AbilityTuning.OPTIONS_CODEC, new JsonObject());
+        register(passives, SummonPassive.KEY_TUNING, AbilityTuning.CODEC, AbilityTuning.NONE);
+        registerAbilityTuning(join(passives, SummonPassive.KEY_TUNING));
+    }
+
+    private static void registerSummonAbilities() {
+        register(ROOT_SUMMON_ABILITY, ScriptedAbility.KEY_KIND, AbilityKind.CODEC, AbilityKind.ACTIVE);
+        register(ROOT_SUMMON_ABILITY, ScriptedAbility.KEY_ON, PassiveTrigger.CODEC, PassiveTrigger.HIT);
+        register(ROOT_SUMMON_ABILITY, ScriptedAbility.KEY_CHANCE, Codec.FLOAT, DEFAULT_STEP_CHANCE);
+        register(ROOT_SUMMON_ABILITY, "used_by", Codec.STRING.listOf(),
+                List.of(DEFAULT_SUMMON_ENTITY));
+        register(ROOT_SUMMON_ABILITY, KEY_FOCUS, AbilityFocus.CODEC, AbilityFocus.TARGET);
+        register(ROOT_SUMMON_ABILITY, KEY_TUNING, AbilityTuning.CODEC, AbilityTuning.NONE);
+        registerAbilityTuning(join(ROOT_SUMMON_ABILITY, KEY_TUNING));
+        register(ROOT_SUMMON_ABILITY, KEY_STEPS, ScriptedAbility.Step.CODEC.listOf(),
+                List.of(ScriptedAbility.Step.SAMPLE));
+        String steps = join(ROOT_SUMMON_ABILITY, KEY_STEPS);
+        register(steps, KEY_AT, Codec.STRING, KEY_AT_WINDUP);
+        register(steps, "every", Codec.INT, DEFAULT_STEP_EVERY);
+        register(steps, ScriptedAbility.Step.KEY_UNTIL, Codec.STRING, KEY_AT_END);
+        register(steps, ScriptedAbility.Step.KEY_CHANCE, Codec.FLOAT, DEFAULT_STEP_CHANCE);
+        register(steps, KEY_ACTION, ScriptedAbility.Action.CODEC, ScriptedAbility.Action.SAMPLE);
+        String action = join(steps, KEY_ACTION);
+        register(action, "type", ScriptedAbility.ActionType.CODEC, ScriptedAbility.ActionType.BEAM);
+        register(action, "damage_ratio", Codec.FLOAT, ScriptedAbility.Action.FULL_DAMAGE);
+        register(action, ScriptedAbility.KEY_DAMAGE_SPEC, DamageSpec.CODEC, SAMPLE_DAMAGE_SPEC);
+        registerDamageSpec(join(action, ScriptedAbility.KEY_DAMAGE_SPEC));
+        register(action, "at_focus", Codec.BOOL, true);
+        register(action, "effect", Codec.STRING, "");
+        register(action, "stacks", Codec.INT, 1);
+        register(action, "duration_ticks", Codec.INT, AbilityStacks.DEFAULT_DURATION_TICKS);
+        register(action, "max_stacks", Codec.INT, AbilityStacks.DEFAULT_MAX_STACKS);
+        register(action, "per_stack", Codec.FLOAT, ScriptedAbility.Action.DEFAULT_PER_STACK);
+        register(action, "heal_ratio", Codec.FLOAT, DEFAULT_HEAL_RATIO);
+        register(action, "sound", Codec.STRING, DEFAULT_SOUND);
+        register(action, "particle", Codec.STRING, DEFAULT_PARTICLE);
+        register(action, ScriptedAbility.KEY_PROJECTILE, AffixEffects.Projectile.CODEC, SAMPLE_PROJECTILE);
+        registerProjectileFields(join(action, ScriptedAbility.KEY_PROJECTILE));
+        register(action, ParticleShape.KEY, ParticleShape.CODEC, ParticleShape.DEFAULT);
+        String particleShape = join(action, ParticleShape.KEY);
+        register(particleShape, ParticleShape.KEY_FORM, ParticleShape.Form.CODEC, ParticleShape.Form.RING);
+        register(particleShape, ParticleShape.KEY_RADIUS, Codec.FLOAT, ParticleShape.FROM_TUNING);
+        register(particleShape, ParticleShape.KEY_POINTS, Codec.INT, ParticleShape.POINTS_FROM_TUNING);
+        register(particleShape, ParticleShape.KEY_HEIGHT, Codec.FLOAT, ParticleShape.DEFAULT_HEIGHT);
+        register(particleShape, ParticleShape.KEY_TURNS, Codec.FLOAT, ParticleShape.DEFAULT_TURNS);
+        register(particleShape, ParticleShape.KEY_Y_OFFSET, Codec.FLOAT, ParticleShape.NO_OFFSET);
+        register(particleShape, ParticleShape.KEY_GROW, Codec.BOOL, true);
+        register(action, BeamLook.KEY, BeamLook.CODEC, BeamLook.DEFAULT);
+        String beam = join(action, BeamLook.KEY);
+        register(beam, BeamLook.KEY_COLOR, Codec.STRING, BeamLook.DEFAULT_COLOR);
+        register(beam, BeamLook.KEY_WIDTH, Codec.FLOAT, BeamLook.DEFAULT_WIDTH);
+        register(beam, BeamLook.KEY_LIFT, Codec.FLOAT, BeamLook.NO_LIFT);
+        register(beam, BeamLook.KEY_ORIGIN, BeamOrigin.CODEC, BeamOrigin.ABILITY);
+        register(beam, BeamLook.KEY_DURATION_TICKS, Codec.INT, BeamLook.DEFAULT_DURATION_TICKS);
+        register(beam, BeamLook.KEY_ALPHA, Codec.FLOAT, BeamLook.DEFAULT_ALPHA);
+        register(action, "spell", Codec.STRING, "");
+        register(action, "spell_tuning", SpellTuning.CODEC, SpellTuning.NONE);
+        registerTuningFields(join(action, "spell_tuning"));
+        register(action, ScriptedAbility.Action.KEY_SPELL_TARGET, SummonCastTarget.CODEC,
+                SummonCastTarget.AUTO);
+        register(action, ScriptedAbility.Action.KEY_ROLL_SPELL_CHANCE, Codec.BOOL, true);
+    }
+
+    private static final StepTuning SAMPLE_STEP_TUNING = new StepTuning(StepTuning.FIRST_STEP,
+            Optional.of(SAMPLE_DAMAGE_SPEC));
+
+    private static void registerAbilityTuning(String tuning) {
         register(tuning, "damage", AbilityTuning.Damage.CODEC, AbilityTuning.Damage.NONE);
         register(tuning, "timing", AbilityTuning.Timing.CODEC, AbilityTuning.Timing.NONE);
         register(tuning, "shape", AbilityTuning.Shape.CODEC, AbilityTuning.Shape.NONE);
         register(tuning, "fx", AbilityTuning.Presentation.CODEC,
                 AbilityTuning.Presentation.NONE);
         register(tuning, "extra", Codec.unboundedMap(Codec.STRING, Codec.DOUBLE), Map.of());
+        register(tuning, OptionSources.KEY_OPTIONS, AbilityTuning.OPTIONS_CODEC, new JsonObject());
+        register(tuning, AbilityTuning.KEY_STEPS, StepTuning.CODEC.listOf(), List.of(SAMPLE_STEP_TUNING));
+        String stepTuning = join(tuning, AbilityTuning.KEY_STEPS);
+        register(stepTuning, StepTuning.KEY_STEP, Codec.INT, StepTuning.FIRST_STEP);
+        register(stepTuning, StepTuning.KEY_DAMAGE_SPEC, DamageSpec.CODEC, SAMPLE_DAMAGE_SPEC);
+        registerDamageSpec(join(stepTuning, StepTuning.KEY_DAMAGE_SPEC));
 
-        register(join(tuning, "damage"), "base_damage", Codec.FLOAT, 1.0F);
-        register(join(tuning, "damage"), "weapon_damage_ratio", Codec.FLOAT, 1.0F);
-        register(join(tuning, "damage"), "per_point", Codec.DOUBLE, 1.0D);
         register(join(tuning, "damage"), "hits", Codec.INT, 1);
         register(join(tuning, "damage"), "lifesteal", Codec.FLOAT, 0.5F);
         register(join(tuning, "damage"), "applies", Codec.STRING, "");
         register(join(tuning, "damage"), "applies_stacks", Codec.INT, 1);
         register(join(tuning, "damage"), "applies_chance", Codec.FLOAT, 1.0F);
         register(join(tuning, "damage"), "detonates", Codec.BOOL, true);
-        register(join(tuning, "damage"), "scales_with", Codec.STRING, DEFAULT_ATTRIBUTE);
-        register(join(tuning, "damage"), "school", Codec.STRING, DEFAULT_ATTRIBUTE);
+        register(join(tuning, "damage"), KEY_DAMAGE_SPEC, DamageSpec.CODEC, SAMPLE_DAMAGE_SPEC);
+        registerDamageSpec(join(join(tuning, "damage"), KEY_DAMAGE_SPEC));
 
         register(join(tuning, "timing"), "duration_ticks", Codec.INT, DEFAULT_TUNING_COOLDOWN);
         register(join(tuning, "timing"), "windup_ticks", Codec.INT, 1);
+        register(join(tuning, "timing"), "cooldown_ticks", Codec.INT, DEFAULT_TUNING_COOLDOWN);
 
         register(join(tuning, "shape"), "radius", Codec.DOUBLE, 1.0D);
         register(join(tuning, "shape"), "range", Codec.DOUBLE, 1.0D);
@@ -1333,21 +1514,296 @@ public final class EffectSchema {
 
     public static List<Template> addableAt(String schemaRoot, String path,
                                            JsonElement root, Trigger trigger) {
+        return addableAt(schemaRoot, path, root, trigger, Context.NONE);
+    }
+
+    public record Context(List<String> allowed, String selector, String selectorValue, String scope) {
+        public static final Context NONE = new Context(null, null, null, OptionSources.SCOPE_SELF);
+
+        public Context withAllowed(List<String> paths) {
+            return new Context(paths, selector, selectorValue, scope);
+        }
+
+        public Context withSource(String key, String value, String sourceScope) {
+            return new Context(allowed, key, value,
+                    sourceScope == null ? OptionSources.SCOPE_SELF : sourceScope);
+        }
+    }
+
+    private static final String MAP_ENTRY = "*";
+    private static final Map<String, String> MOUNTS = new LinkedHashMap<>();
+    private static final Map<String, String> OPTION_MOUNTS = new LinkedHashMap<>();
+
+    private record Rebased(String schemaRoot, String path, String at) {
+    }
+
+    private static void mount(String schemaPath, String mountRoot) {
+        MOUNTS.put(schemaPath, mountRoot);
+    }
+
+    private static String optionMount(String key) {
+        return OPTION_MOUNTS.computeIfAbsent(key, missing -> {
+            String found = OptionSources.mountOf(missing);
+            return found == null ? "" : found;
+        });
+    }
+
+    private static Rebased rebased(String schemaRoot, String path) {
+        String[] parts = segmentsOf(path);
+        for (int index = 0; index < parts.length; index++) {
+            String prefix = joined(parts, 0, index + 1);
+            String mounted = MOUNTS.get(join(schemaRoot, withoutIndex(keyedNormalized(schemaRoot, prefix))));
+            if (mounted == null && index > 0 && OptionSources.KEY_OPTIONS.equals(parts[index - 1])) {
+                String option = optionMount(parts[index]);
+                mounted = option.isEmpty() ? null : option;
+            }
+            if (mounted == null) {
+                continue;
+            }
+            int end = index + 1;
+            if (end < parts.length && isIndex(parts[end])) {
+                end++;
+            } else if (end == parts.length) {
+                return null;
+            }
+            String at = joined(parts, 0, end);
+            String rest = joined(parts, end, parts.length);
+            Rebased inner = rebased(mounted, rest);
+            return inner == null
+                    ? new Rebased(mounted, rest, at)
+                    : new Rebased(inner.schemaRoot(), inner.path(), at + PATH_SEPARATOR + inner.at());
+        }
+        return null;
+    }
+    private static final Map<String, String> KEYED_MAPS = new LinkedHashMap<>();
+
+    private static void keyedMap(String schemaPath, String selector) {
+        KEYED_MAPS.put(schemaPath, selector);
+    }
+
+    private static String[] segmentsOf(String path) {
+        String node = path == null ? "" : (path.startsWith(PATH_SEPARATOR) ? path.substring(1) : path);
+        return node.isEmpty() ? new String[0] : node.split(PATH_SEPARATOR);
+    }
+
+    private static String keyedNormalized(String schemaRoot, String path) {
+        StringBuilder walked = new StringBuilder();
+        StringBuilder normalized = new StringBuilder();
+        for (String part : segmentsOf(path)) {
+            String schemaPath = join(schemaRoot, withoutIndex(walked.toString()));
+            String shown = KEYED_MAPS.containsKey(schemaPath) && !isIndex(part) ? MAP_ENTRY : part;
+            if (!walked.isEmpty()) {
+                walked.append(PATH_SEPARATOR);
+                normalized.append(PATH_SEPARATOR);
+            }
+            walked.append(part);
+            normalized.append(shown);
+        }
+        return normalized.toString();
+    }
+
+    private record KeyedEntry(String selector, String value, String rest, String mapKey) {
+    }
+
+    private static KeyedEntry keyedEntryOf(String schemaRoot, String path) {
+        String[] parts = segmentsOf(path);
+        StringBuilder walked = new StringBuilder();
+        for (int index = 0; index < parts.length; index++) {
+            String selector = KEYED_MAPS.get(join(schemaRoot, withoutIndex(walked.toString())));
+            if (selector != null && !isIndex(parts[index])) {
+                StringBuilder rest = new StringBuilder();
+                for (int after = index + 1; after < parts.length; after++) {
+                    if (!rest.isEmpty()) {
+                        rest.append(PATH_SEPARATOR);
+                    }
+                    rest.append(parts[after]);
+                }
+                return new KeyedEntry(selector, parts[index], rest.toString(),
+                        index == 0 ? "" : parts[index - 1]);
+            }
+            if (!walked.isEmpty()) {
+                walked.append(PATH_SEPARATOR);
+            }
+            walked.append(parts[index]);
+        }
+        return null;
+    }
+
+    private record OptionSource(String selector, String value) {
+        private static final OptionSource NONE = new OptionSource(null, null);
+    }
+
+    private record Anchor(OptionSource source, String scope, String rest) {
+    }
+
+    private static String joined(String[] parts, int from, int to) {
+        return String.join(PATH_SEPARATOR, Arrays.copyOfRange(parts, from, Math.max(from, to)));
+    }
+
+    private static Anchor anchorAt(String schemaRoot, String path, JsonElement root, Context context) {
+        KeyedEntry entry = keyedEntryOf(schemaRoot, path);
+        if (entry != null) {
+            return new Anchor(new OptionSource(entry.selector(), entry.value()), entry.mapKey(), entry.rest());
+        }
+        String[] parts = segmentsOf(path);
+        for (int depth = parts.length; depth >= 0; depth--) {
+            JsonElement node = JsonTreeModel.resolve(root, joined(parts, 0, depth));
+            if (node == null || !node.isJsonObject()) {
+                continue;
+            }
+            for (String selector : OptionSources.selectors()) {
+                JsonElement value = node.getAsJsonObject().get(selector);
+                if (value == null || !value.isJsonPrimitive()) {
+                    continue;
+                }
+                OptionSource source = new OptionSource(selector, value.getAsString());
+                return depth == parts.length
+                        ? new Anchor(source, OptionSources.SCOPE_SELF, "")
+                        : new Anchor(source, parts[depth], joined(parts, depth + 1, parts.length));
+            }
+        }
+        Context resolved = context == null ? Context.NONE : context;
+        return resolved.selector() == null
+                ? null
+                : new Anchor(new OptionSource(resolved.selector(), resolved.selectorValue()),
+                        resolved.scope(), joined(parts, 0, parts.length));
+    }
+
+    private static List<Template> keyedMapEntries(String schemaRoot, String path, JsonObject object) {
+        String[] parts = segmentsOf(path);
+        String selector = KEYED_MAPS.get(join(schemaRoot, withoutIndex(keyedNormalized(schemaRoot, path))));
+        if (selector == null || object == null || parts.length == 0) {
+            return null;
+        }
+        String mapKey = parts[parts.length - 1];
+        List<Template> entries = new ArrayList<>();
+        for (String value : OptionSources.values(selector)) {
+            if (object.has(value)) {
+                continue;
+            }
+            JsonElement made = OptionSources.template(selector, value, OptionSources.SCOPE_SELF, mapKey);
+            entries.add(new Template(value, made == null ? new JsonObject() : made));
+        }
+        return entries;
+    }
+
+    private static OptionSource optionSourceAt(String schemaRoot, String optionsPath,
+                                               JsonElement root, Context context) {
+        String[] parts = segmentsOf(optionsPath);
+        if (parts.length == 0 || !OptionSources.KEY_OPTIONS.equals(parts[parts.length - 1])) {
+            return OptionSource.NONE;
+        }
+        String ownerPath = String.join(PATH_SEPARATOR, Arrays.copyOf(parts, parts.length - 1));
+        KeyedEntry entry = keyedEntryOf(schemaRoot, ownerPath);
+        if (entry != null && entry.rest().isEmpty()) {
+            return new OptionSource(entry.selector(), entry.value());
+        }
+        String[] owner = segmentsOf(ownerPath);
+        for (int depth = owner.length; depth >= 0; depth--) {
+            JsonElement node = JsonTreeModel.resolve(root,
+                    String.join(PATH_SEPARATOR, Arrays.copyOf(owner, depth)));
+            if (node == null || !node.isJsonObject()) {
+                continue;
+            }
+            for (String selector : OptionSources.selectors()) {
+                JsonElement value = node.getAsJsonObject().get(selector);
+                if (value != null && value.isJsonPrimitive()) {
+                    return new OptionSource(selector, value.getAsString());
+                }
+            }
+        }
+        Context resolved = context == null ? Context.NONE : context;
+        return new OptionSource(resolved.selector(), resolved.selectorValue());
+    }
+
+    public static List<OptionField> optionFieldsAt(String schemaRoot, String optionsPath,
+                                                   JsonElement root, Context context) {
+        OptionSource source = optionSourceAt(schemaRoot, optionsPath, root, context);
+        return OptionSources.fieldsFor(source.selector(), source.value());
+    }
+
+    public static JsonObject optionsPrefilledAt(String schemaRoot, String optionsPath,
+                                                JsonElement root, Context context) {
+        OptionSource source = optionSourceAt(schemaRoot, optionsPath, root, context);
+        return OptionSources.prefilled(source.selector(), source.value());
+    }
+
+    public static boolean permitted(List<String> allowed, String path) {
+        return OptionSources.permitted(allowed, path);
+    }
+
+    public static List<Template> addableAt(String schemaRoot, String path,
+                                           JsonElement root, Trigger trigger,
+                                           Context context) {
         ensureLoaded();
+        Rebased mountedAt = rebased(schemaRoot, path);
+        if (mountedAt != null) {
+            return addableAt(mountedAt.schemaRoot(), mountedAt.path(),
+                    JsonTreeModel.resolve(root, mountedAt.at()), trigger, Context.NONE);
+        }
+        Context resolved = context == null ? Context.NONE : context;
+        List<String> allowed = resolved.allowed();
+        JsonElement node = JsonTreeModel.resolve(root, path == null ? "" : path);
+        JsonObject object = node != null && node.isJsonObject() ? node.getAsJsonObject() : null;
+        String[] parts = segmentsOf(path);
+        if (parts.length > 0 && OptionSources.KEY_OPTIONS.equals(parts[parts.length - 1])) {
+            List<Template> fields = new ArrayList<>();
+            for (OptionField field : optionFieldsAt(schemaRoot, path, root, resolved)) {
+                if (object == null || !object.has(field.key())) {
+                    fields.add(new Template(field.key(), field.sample().deepCopy()));
+                }
+            }
+            return fields;
+        }
+        List<Template> mapEntries = keyedMapEntries(schemaRoot, path, object);
+        if (mapEntries != null) {
+            return mapEntries;
+        }
         List<Template> candidates = TEMPLATES.get(join(schemaRoot, path));
         if (candidates == null) {
-            candidates = TEMPLATES.get(join(schemaRoot, withoutIndex(path)));
+            candidates = TEMPLATES.get(join(schemaRoot,
+                    withoutIndex(keyedNormalized(schemaRoot, path))));
         }
         if (candidates == null) {
             return List.of();
         }
-        JsonElement node = JsonTreeModel.resolve(root, path == null ? "" : path);
-        JsonObject object = node != null && node.isJsonObject() ? node.getAsJsonObject() : null;
-        List<String> tunable = tunableAt(schemaRoot, path, root);
+        Anchor anchor = anchorAt(schemaRoot, path, root, resolved);
+        List<String> chosenAllowed = anchor == null
+                ? null
+                : OptionSources.allowed(anchor.source().selector(), anchor.source().value(), anchor.scope());
+        ScriptedAbility.ActionType action = actionTypeAt(schemaRoot, path, object);
         List<Template> result = new ArrayList<>();
         for (Template template : candidates) {
             if (object != null && object.has(template.key())) {
                 continue;
+            }
+            if (action != null && !action.reads(template.key())) {
+                continue;
+            }
+            String nodePath = path == null || path.isEmpty()
+                    ? template.key()
+                    : path + PATH_SEPARATOR + template.key();
+            if (!permitted(allowed, nodePath)) {
+                continue;
+            }
+            if (chosenAllowed != null && !permitted(chosenAllowed, anchor.rest().isEmpty()
+                    ? template.key()
+                    : anchor.rest() + PATH_SEPARATOR + template.key())) {
+                continue;
+            }
+            if (anchor != null && anchor.rest().isEmpty()) {
+                JsonElement chosen = OptionSources.template(anchor.source().selector(),
+                        anchor.source().value(), anchor.scope(), template.key());
+                if (chosen != null) {
+                    template = new Template(template.key(), chosen);
+                }
+            }
+            if (OptionSources.KEY_OPTIONS.equals(template.key())) {
+                JsonObject prefilled = optionsPrefilledAt(schemaRoot, nodePath, root, resolved);
+                if (prefilled.isEmpty()) {
+                    continue;
+                }
+                template = new Template(template.key(), prefilled);
             }
             if (!allows(template.key(), trigger)) {
                 continue;
@@ -1355,32 +1811,20 @@ public final class EffectSchema {
             if (blockedByExclusive(template.key(), object)) {
                 continue;
             }
-            if (tunable != null && !tunable.contains(template.key())) {
-                continue;
-            }
             result.add(template);
         }
         return result;
     }
 
-    private static List<String> tunableAt(String schemaRoot, String path, JsonElement root) {
-        if (!ROOT_SUMMON_DIVE.equals(schemaRoot) || path == null) {
+    public static ScriptedAbility.ActionType actionTypeAt(String schemaRoot, String path,
+                                                          JsonObject node) {
+        if (!ROOT_SUMMON_ABILITY.equals(schemaRoot) || path == null || node == null
+                || !KEY_ACTION.equals(path.substring(path.lastIndexOf(PATH_SEPARATOR) + 1))
+                || !node.has(ScriptedAbility.KEY_TYPE)) {
             return null;
         }
-        String node = path.startsWith("/") ? path.substring(1) : path;
-        if (!node.equals(KEY_TUNING)) {
-            return null;
-        }
-        JsonElement owner = JsonTreeModel.resolve(root, "");
-        if (owner == null || !owner.isJsonObject()) {
-            return null;
-        }
-        JsonElement ability = owner.getAsJsonObject().get(KEY_ABILITY);
-        if (ability == null || !ability.isJsonPrimitive()) {
-            return null;
-        }
-        List<String> declared = AbilityRegistry.tunableFor(ability.getAsString());
-        return declared.isEmpty() ? null : declared;
+        JsonElement type = node.get(ScriptedAbility.KEY_TYPE);
+        return type.isJsonPrimitive() ? ScriptedAbility.ActionType.byName(type.getAsString()) : null;
     }
 
     private static final List<List<String>> EXCLUSIVE = List.of(
@@ -1475,6 +1919,11 @@ public final class EffectSchema {
         if (path == null || path.isEmpty()) {
             return null;
         }
+        Rebased mountedAt = rebased(schemaRoot, path);
+        if (mountedAt != null) {
+            return mountedAt.path().isEmpty() ? null : templateAt(mountedAt.schemaRoot(),
+                    withoutIndex(keyedNormalized(mountedAt.schemaRoot(), mountedAt.path())));
+        }
         int slash = path.lastIndexOf('/');
         String parent = slash < 0 ? "" : path.substring(0, slash);
         String key = slash < 0 ? path : path.substring(slash + 1);
@@ -1496,6 +1945,10 @@ public final class EffectSchema {
 
     public static boolean hasTemplates(String schemaRoot, String path) {
         ensureLoaded();
+        Rebased mountedAt = rebased(schemaRoot, path);
+        if (mountedAt != null) {
+            return hasTemplates(mountedAt.schemaRoot(), mountedAt.path());
+        }
         return TEMPLATES.containsKey(join(schemaRoot, path))
                 || TEMPLATES.containsKey(join(schemaRoot, withoutIndex(path)));
     }

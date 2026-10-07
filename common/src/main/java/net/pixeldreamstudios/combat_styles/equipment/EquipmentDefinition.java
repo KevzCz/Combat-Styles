@@ -38,9 +38,18 @@ public record EquipmentDefinition(String id,
                                   List<String> excludedTags,
                                   List<String> excludedCategories,
                                   UseSpec use,
-                                  Optional<String> weaponCategory) {
+                                  Optional<String> weaponCategory,
+                                  ActiveIn activeIn) {
 
     private static final String WEAPON_CATEGORY = "weapon_category";
+
+    private record Extras(Optional<String> weaponCategory, ActiveIn activeIn) {
+    }
+
+    private static final MapCodec<Extras> EXTRAS = RecordCodecBuilder.mapCodec(instance -> instance.group(
+            Codec.STRING.optionalFieldOf(WEAPON_CATEGORY).forGetter(Extras::weaponCategory),
+            ActiveIn.CODEC.optionalFieldOf(ActiveIn.KEY, ActiveIn.ANY).forGetter(Extras::activeIn)
+    ).apply(instance, Extras::new));
 
     private static final MapCodec<EquipmentDefinition> CORE = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Codec.STRING.fieldOf("id").forGetter(EquipmentDefinition::id),
@@ -77,10 +86,11 @@ public record EquipmentDefinition(String id,
                     .forGetter(EquipmentDefinition::use)
     ).apply(instance, EquipmentDefinition::new));
 
-    public static final Codec<EquipmentDefinition> CODEC = Codec.mapPair(CORE,
-                    Codec.STRING.optionalFieldOf(WEAPON_CATEGORY))
-            .xmap(pair -> pair.getFirst().withWeaponCategory(pair.getSecond()),
-                    definition -> Pair.of(definition, definition.weaponCategory()))
+    public static final Codec<EquipmentDefinition> CODEC = Codec.mapPair(CORE, EXTRAS)
+            .xmap(pair -> pair.getFirst().withWeaponCategory(pair.getSecond().weaponCategory())
+                            .withActiveIn(pair.getSecond().activeIn()),
+                    definition -> Pair.of(definition,
+                            new Extras(definition.weaponCategory(), definition.activeIn())))
             .codec();
 
     public static final StreamCodec<ByteBuf, EquipmentDefinition> STREAM_CODEC =
@@ -111,6 +121,20 @@ public record EquipmentDefinition(String id,
         excludedCategories = excludedCategories == null
                 ? List.of()
                 : List.copyOf(excludedCategories);
+        activeIn = activeIn == null ? ActiveIn.ANY : activeIn;
+    }
+
+    public EquipmentDefinition(String id, Map<String, TriggeredEffect> effects,
+                               Map<String, AttributeBonus> attributes, Optional<StyleRarity> rarity,
+                               List<InnateAffixes.Slot> innateAffixes, Map<String, EffectGroup> groups,
+                               Optional<String> pose, Optional<String> offHandPose,
+                               PoseTuning poseTuning, List<String> items, List<String> itemTags,
+                               List<String> weaponCategories, List<String> excludedItems,
+                               List<String> excludedTags, List<String> excludedCategories,
+                               UseSpec use, Optional<String> weaponCategory) {
+        this(id, effects, attributes, rarity, innateAffixes, groups, pose, offHandPose, poseTuning,
+                items, itemTags, weaponCategories, excludedItems, excludedTags, excludedCategories,
+                use, weaponCategory, ActiveIn.ANY);
     }
 
     public EquipmentDefinition(String id, Map<String, TriggeredEffect> effects,
@@ -123,13 +147,19 @@ public record EquipmentDefinition(String id,
                                UseSpec use) {
         this(id, effects, attributes, rarity, innateAffixes, groups, pose, offHandPose, poseTuning,
                 items, itemTags, weaponCategories, excludedItems, excludedTags, excludedCategories,
-                use, Optional.empty());
+                use, Optional.empty(), ActiveIn.ANY);
     }
 
     public EquipmentDefinition withWeaponCategory(Optional<String> category) {
         return new EquipmentDefinition(id, effects, attributes, rarity, innateAffixes, groups, pose,
                 offHandPose, poseTuning, items, itemTags, weaponCategories, excludedItems,
-                excludedTags, excludedCategories, use, category);
+                excludedTags, excludedCategories, use, category, activeIn);
+    }
+
+    public EquipmentDefinition withActiveIn(ActiveIn scope) {
+        return new EquipmentDefinition(id, effects, attributes, rarity, innateAffixes, groups, pose,
+                offHandPose, poseTuning, items, itemTags, weaponCategories, excludedItems,
+                excludedTags, excludedCategories, use, weaponCategory, scope);
     }
 
     private static Map<String, TriggeredEffect> withEventPayloads(Map<String, TriggeredEffect> effects,

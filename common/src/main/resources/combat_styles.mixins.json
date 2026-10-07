@@ -5,6 +5,7 @@
   "minVersion": "0.8",
   "client": [
     "AttackInputMixin",
+    "BeamRenderMixin",
     "ExtraHitDebugMixin",
     "HitboxOffsetMixin",
     "SwingClientMixin",
@@ -48,6 +49,7 @@
     "SummonSpellCastMixin",
     "SpellImpactFilterMixin",
     "SpellPowerResolveMixin",
+    "SpellTriggerChanceMixin",
     "SummonDamageMixin",
     "SummonableEntityMixin",
     "SummonableMobMixin",

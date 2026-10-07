@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 import net.pixeldreamstudios.combat_styles.network.ApplyPosePayload;
 import net.pixeldreamstudios.combat_styles.network.ApplyWeaponCategoryPayload;
+import net.pixeldreamstudios.combat_styles.network.BeamPayload;
 import net.pixeldreamstudios.combat_styles.network.SummonSyncPayload;
 import net.pixeldreamstudios.combat_styles.network.SummonCommandPayload;
 import net.pixeldreamstudios.combat_styles.network.ApplySequencePayload;
@@ -45,6 +46,7 @@ public final class NetworkManagerImpl {
         PayloadTypeRegistry.playC2S().register(ApplyWeaponCategoryPayload.TYPE, ApplyWeaponCategoryPayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(SummonCommandPayload.TYPE, SummonCommandPayload.STREAM_CODEC);
         PayloadTypeRegistry.playS2C().register(SummonSyncPayload.TYPE, SummonSyncPayload.STREAM_CODEC);
+        PayloadTypeRegistry.playS2C().register(BeamPayload.TYPE, BeamPayload.STREAM_CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SummonCommandPayload.TYPE, (payload, context) ->
                 context.server().execute(() -> NetworkManager.handleSummonCommand(context.player(), payload)));
         EntityTrackingEvents.START_TRACKING.register((entity, player) ->

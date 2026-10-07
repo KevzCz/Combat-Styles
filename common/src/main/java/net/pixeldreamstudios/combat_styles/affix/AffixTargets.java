@@ -5,6 +5,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 
+import net.pixeldreamstudios.combat_styles.entity.SummonOwner;
+
 public final class AffixTargets {
 
     private AffixTargets() {
@@ -24,7 +26,8 @@ public final class AffixTargets {
     }
 
     public static boolean canHit(Player player, Entity target) {
-        if (player == null || target == null || target == player) {
+        if (player == null || target == null || target == player
+                || player.getUUID().equals(SummonOwner.ownerOf(target))) {
             return false;
         }
         return TargetHelper.isHitAllowed(false, TargetHelper.getRelation(player, target));

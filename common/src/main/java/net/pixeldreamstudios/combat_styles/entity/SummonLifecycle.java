@@ -8,9 +8,11 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
+import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentActivation;
 import net.pixeldreamstudios.combat_styles.equipment.SummonEvent;
 
@@ -44,6 +46,9 @@ public final class SummonLifecycle {
             return;
         }
         SummonOwner.stamp(entity, owner);
+        if (SpellEngineCompat.reownSpellSummon(entity, owner)) {
+            return;
+        }
         if (creator instanceof SummonData from && entity instanceof SummonData into) {
             into.combat_styles$setSummonDamage(from.combat_styles$summonDamage());
             into.combat_styles$setSummonSpec(from.combat_styles$summonSpec());
@@ -74,7 +79,43 @@ public final class SummonLifecycle {
         Entity killer = summonKillerOf(source);
         if (killer != null) {
             fire(SummonOwner.ownerPlayer(killer), new SummonEvent(SummonEvent.Kind.KILL, killer, dying));
+            AbilityHosts.react(killer, PassiveTrigger.KILL, dying);
+            return;
         }
+        Entity pet = hostedPetBehind(source);
+        if (pet != null) {
+            AbilityHosts.react(pet, PassiveTrigger.KILL, dying);
+        }
+    }
+
+    public static void hurt(LivingEntity victim, DamageSource source) {
+        if (victim == null || victim.level().isClientSide()) {
+            return;
+        }
+        LivingEntity attacker = source != null && source.getEntity() instanceof LivingEntity living
+                ? living
+                : null;
+        if (SummonOwner.isSummon(victim) || AbilityHosts.hosts(victim)) {
+            AbilityHosts.react(victim, PassiveTrigger.HURT, attacker);
+        }
+        Entity pet = hostedPetBehind(source);
+        if (pet != null && pet != victim) {
+            AbilityHosts.react(pet, PassiveTrigger.HIT, victim);
+        }
+    }
+
+    private static Entity hostedPetBehind(DamageSource source) {
+        if (source == null) {
+            return null;
+        }
+        Entity direct = source.getDirectEntity();
+        Entity shooter = direct instanceof Projectile projectile ? projectile.getOwner() : null;
+        for (Entity candidate : new Entity[] {direct, source.getEntity(), shooter}) {
+            if (candidate != null && !SummonOwner.isSummon(candidate) && AbilityHosts.hosts(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private static Entity summonKillerOf(DamageSource source) {

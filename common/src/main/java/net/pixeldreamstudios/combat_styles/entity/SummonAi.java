@@ -21,15 +21,18 @@ public final class SummonAi {
         return owner.equals(data.combat_styles$summonOwner());
     }
 
+    public static boolean friendlyTo(Entity summon, Entity candidate) {
+        UUID owner = SummonOwner.ownerOf(summon);
+        return owner != null && candidate != null
+                && (owner.equals(candidate.getUUID()) || owner.equals(SummonOwner.ownerOf(candidate)));
+    }
+
     public static boolean huntable(Entity summon, LivingEntity candidate) {
         if (candidate == null || !candidate.isAlive() || candidate == summon) {
             return false;
         }
         Player owner = SummonOwner.ownerPlayer(summon);
-        if (owner == null) {
-            return false;
-        }
-        if (candidate == owner || SummonOwner.ownedBy(candidate, owner)) {
+        if (owner == null || friendlyTo(summon, candidate)) {
             return false;
         }
         if (!AffixTargets.canHit(owner, candidate)) {

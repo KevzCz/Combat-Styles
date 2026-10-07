@@ -80,6 +80,7 @@ public class EffectTreeScreen extends PanelScreen {
     private String schemaRoot = EffectSchema.ROOT_EFFECT;
 
     private JsonObject root;
+    private EffectSchema.Context context = EffectSchema.Context.NONE;
     private List<JsonTreeModel.Node> rows = List.of();
     private EditBox valueBox;
     private String editingPath;
@@ -197,6 +198,8 @@ public class EffectTreeScreen extends PanelScreen {
         if (reference != null) {
             lines.addAll(reference);
         }
+        lines.addAll(FieldDependency.related(schemaPathOf(node), node.key(), root));
+        lines.addAll(SummonAbilityFieldInfo.lines(schemaRoot, node, root));
         return lines.isEmpty() ? null : lines;
     }
 
@@ -210,9 +213,19 @@ public class EffectTreeScreen extends PanelScreen {
         return this;
     }
 
+    public EffectTreeScreen withAllowed(List<String> paths) {
+        this.context = context.withAllowed(paths == null ? null : List.copyOf(paths));
+        return this;
+    }
+
+    public EffectTreeScreen withOptionSource(String selector, String value, String scope) {
+        this.context = context.withSource(selector, value, scope);
+        return this;
+    }
+
     private void openAdd(String path) {
         List<EffectSchema.Template> options =
-                EffectSchema.addableAt(schemaRoot, path, root, trigger);
+                EffectSchema.addableAt(schemaRoot, path, root, trigger, context);
         if (options.isEmpty()) {
             return;
         }

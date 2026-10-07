@@ -25,6 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.pixeldreamstudios.combat_styles.entity.SummonBrains;
 import net.pixeldreamstudios.combat_styles.entity.SummonData;
 import net.pixeldreamstudios.combat_styles.entity.SummonFollowOwnerGoal;
+import net.pixeldreamstudios.combat_styles.entity.SummonAi;
 import net.pixeldreamstudios.combat_styles.entity.SummonOwner;
 import net.pixeldreamstudios.combat_styles.entity.SummonOwnerTargetGoal;
 
@@ -60,7 +61,7 @@ public abstract class SummonableMobMixin implements SummonData, OwnableEntity {
     @Override
     public LivingEntity getOwner() {
         Mob self = (Mob) (Object) this;
-        UUID owner = combat_styles$summonOwner();
+        UUID owner = getOwnerUUID();
         return owner == null ? null : self.level().getPlayerByUUID(owner);
     }
 
@@ -79,6 +80,14 @@ public abstract class SummonableMobMixin implements SummonData, OwnableEntity {
         Mob self = (Mob) (Object) this;
         if (SummonOwner.isSummon(self)) {
             SummonBrains.forgetForbiddenTargets(self);
+        }
+    }
+
+    @Inject(method = "setTarget", at = @At("HEAD"), cancellable = true)
+    private void combat_styles$refuseFriendlyTarget(LivingEntity target, CallbackInfo callback) {
+        Mob self = (Mob) (Object) this;
+        if (target != null && SummonOwner.isSummon(self) && SummonAi.friendlyTo(self, target)) {
+            callback.cancel();
         }
     }
 

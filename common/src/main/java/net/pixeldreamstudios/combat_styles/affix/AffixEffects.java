@@ -9,10 +9,13 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 
+import net.pixeldreamstudios.combat_styles.entity.RaiseRules;
 import net.pixeldreamstudios.combat_styles.entity.SummonEquipment;
 import net.pixeldreamstudios.combat_styles.entity.SummonStats;
+import net.pixeldreamstudios.combat_styles.entity.SummonAim;
 import net.pixeldreamstudios.combat_styles.entity.SummonTargeting;
 import net.pixeldreamstudios.combat_styles.equipment.AbilityTuning;
+import net.pixeldreamstudios.combat_styles.equipment.SummonCadence;
 import net.pixeldreamstudios.combat_styles.equipment.StateGate;
 import net.pixeldreamstudios.combat_styles.equipment.SpellShot;
 
@@ -829,9 +832,10 @@ public final class AffixEffects {
                         float chance,
                         SummonTargeting targets,
                         Optional<AbilityTuning> tuning,
-                        int delayTicks) implements Delayed<Order> {
+                        int delayTicks,
+                        Optional<SummonAim> aim) implements Delayed<Order> {
         public static final Order NONE = new Order("", 0.0F, 1.0F,
-                SummonTargeting.ALL, Optional.empty(), 0);
+                SummonTargeting.ALL, Optional.empty(), 0, Optional.empty());
 
         public static final Codec<Order> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.optionalFieldOf("ability", "").forGetter(Order::ability),
@@ -840,14 +844,15 @@ public final class AffixEffects {
                 SummonTargeting.CODEC.optionalFieldOf("targets", SummonTargeting.ALL)
                         .forGetter(Order::targets),
                 AbilityTuning.CODEC.optionalFieldOf("tuning").forGetter(Order::tuning),
-                Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Order::delayTicks)
+                Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Order::delayTicks),
+                SummonAim.CODEC.optionalFieldOf(SummonCadence.KEY_AIM).forGetter(Order::aim)
         ).apply(instance, Order::new));
 
         @Override
         public Order withoutDelay() {
             return delayTicks == 0
                     ? this
-                    : new Order(ability, damageRatio, chance, targets, tuning, 0);
+                    : new Order(ability, damageRatio, chance, targets, tuning, 0, aim);
         }
 
         public boolean isEmpty() {
@@ -857,22 +862,28 @@ public final class AffixEffects {
 
     public record Spawn(List<Summon> summons,
                         List<Command> commands,
-                        int delayTicks) implements Delayed<Spawn> {
-        public static final Spawn NONE = new Spawn(List.of(), List.of(), 0);
+                        int delayTicks,
+                        Optional<RaiseRules> raiseDead) implements Delayed<Spawn> {
+        public static final Spawn NONE = new Spawn(List.of(), List.of(), 0, Optional.empty());
 
         public static final Codec<Spawn> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Summon.CODEC.listOf().optionalFieldOf("summons", List.of()).forGetter(Spawn::summons),
                 Command.CODEC.listOf().optionalFieldOf("commands", List.of()).forGetter(Spawn::commands),
-                Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Spawn::delayTicks)
+                Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Spawn::delayTicks),
+                RaiseRules.CODEC.optionalFieldOf(RaiseRules.KEY).forGetter(Spawn::raiseDead)
         ).apply(instance, Spawn::new));
+
+        public Spawn {
+            raiseDead = raiseDead == null ? Optional.empty() : raiseDead;
+        }
 
         @Override
         public Spawn withoutDelay() {
-            return delayTicks == 0 ? this : new Spawn(summons, commands, 0);
+            return delayTicks == 0 ? this : new Spawn(summons, commands, 0, raiseDead);
         }
 
         public boolean isEmpty() {
-            return summons.isEmpty() && commands.isEmpty();
+            return summons.isEmpty() && commands.isEmpty() && raiseDead.isEmpty();
         }
     }
 
@@ -960,6 +971,10 @@ public final class AffixEffects {
 
         public List<Summon> summons() {
             return spawn.summons();
+        }
+
+        public Optional<RaiseRules> raiseDead() {
+            return spawn.raiseDead();
         }
 
         public List<Command> commands() {
@@ -1095,6 +1110,10 @@ public final class AffixEffects {
 
         public List<Summon> summons() {
             return mechanics.summons();
+        }
+
+        public Optional<RaiseRules> raiseDead() {
+            return mechanics.raiseDead();
         }
 
         public List<Command> commands() {

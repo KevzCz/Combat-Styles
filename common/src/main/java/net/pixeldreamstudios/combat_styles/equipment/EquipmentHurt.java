@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class EquipmentHurt {
 
-    private static final int TOTAL_WINDOW_TICKS = 200;
+    public static final int TOTAL_WINDOW_TICKS = 200;
 
     private record Running(float total, long expiresAt) {
     }

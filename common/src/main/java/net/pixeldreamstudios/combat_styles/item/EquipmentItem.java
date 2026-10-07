@@ -37,7 +37,8 @@ public class EquipmentItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context,
                                 List<Component> tooltip, TooltipFlag flag) {
-        EquipmentDefinition definition = definition();
+        EquipmentDefinition own = EquipmentTooltip.shownFor(stack);
+        EquipmentDefinition definition = own == null ? definition() : own;
         StyleRarity rarity = definition == null
                 ? StyleRarity.COMMON
                 : definition.rarity().orElse(StyleRarity.COMMON);

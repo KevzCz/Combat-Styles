@@ -1,4 +1,5 @@
 package net.pixeldreamstudios.combat_styles.network;
+import net.pixeldreamstudios.combat_styles.entity.ScriptedAbilities;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
@@ -76,6 +77,8 @@ public final class ConfigEditHandler {
             case STYLE_BOOK_CLEAR -> BookRolls.DEFINITIONS.delete(payload.id());
             case WEAPON_ROLL -> saveDefinition(WeaponRolls.DEFINITIONS, payload.id(), json);
             case WEAPON_ROLL_CLEAR -> WeaponRolls.DEFINITIONS.delete(payload.id());
+            case SUMMON_ABILITY -> saveDefinition(ScriptedAbilities.DEFINITIONS, payload.id(), json);
+            case SUMMON_ABILITY_CLEAR -> ScriptedAbilities.DEFINITIONS.delete(payload.id());
             case SUMMON_TUNING -> SummonTuning.applyEdit(json);
         };
         if (!applied) {

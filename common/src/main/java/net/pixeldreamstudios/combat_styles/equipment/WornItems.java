@@ -56,25 +56,37 @@ public final class WornItems {
         WeaponRegistryAccess.pushBypass();
         try {
             for (EquipmentSlot slot : ARMOR) {
-                ItemStack stack = player.getItemBySlot(slot);
-                if (!stack.isEmpty()) {
-                    worn.add(stack);
-                }
+                addIfActive(worn, player.getItemBySlot(slot), false);
             }
-            ItemStack mainHand = player.getMainHandItem();
-            if (!mainHand.isEmpty()) {
-                worn.add(mainHand);
-            }
-            ItemStack offhand = player.getOffhandItem();
-            if (!offhand.isEmpty()) {
-                worn.add(offhand);
-            }
+            addIfActive(worn, player.getMainHandItem(), true);
+            addIfActive(worn, player.getOffhandItem(), true);
             if (AccessoryCompat.isLoaded() && player instanceof Player holder) {
-                worn.addAll(AccessoryCompat.equipped(holder));
+                for (ItemStack accessory : AccessoryCompat.equipped(holder)) {
+                    addIfActive(worn, accessory, false);
+                }
             }
         } finally {
             WeaponRegistryAccess.popBypass();
         }
         return worn;
+    }
+
+    private static void addIfActive(List<ItemStack> worn, ItemStack stack, boolean held) {
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
+        if (definition == null || definition.activeIn().accepts(held)) {
+            worn.add(stack);
+        }
+    }
+
+    public static boolean includes(LivingEntity player, ItemStack stack) {
+        for (ItemStack worn : of(player)) {
+            if (worn == stack) {
+                return true;
+            }
+        }
+        return false;
     }
 }

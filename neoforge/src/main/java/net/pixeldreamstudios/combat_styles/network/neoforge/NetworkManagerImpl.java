@@ -16,8 +16,10 @@ import net.pixeldreamstudios.combat_styles.client.ClientStyleData;
 import net.pixeldreamstudios.combat_styles.client.CooldownMirror;
 import net.pixeldreamstudios.combat_styles.network.ApplyPosePayload;
 import net.pixeldreamstudios.combat_styles.network.ApplyWeaponCategoryPayload;
+import net.pixeldreamstudios.combat_styles.network.BeamPayload;
 import net.pixeldreamstudios.combat_styles.network.SummonSyncPayload;
 import net.pixeldreamstudios.combat_styles.network.SummonCommandPayload;
+import net.pixeldreamstudios.combat_styles.client.ClientBeams;
 import net.pixeldreamstudios.combat_styles.client.ClientSummons;
 import net.pixeldreamstudios.combat_styles.network.ApplySequencePayload;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
@@ -112,6 +114,9 @@ public final class NetworkManagerImpl {
                         NetworkManager.handleSummonCommand(player, payload);
                     }
                 }));
+        registrar.playToClient(BeamPayload.TYPE, BeamPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> ClientBeams.accept(payload)));
         registrar.playToClient(SummonSyncPayload.TYPE, SummonSyncPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(
                         () -> ClientSummons.accept(payload)));

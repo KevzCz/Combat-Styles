@@ -10,9 +10,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
-import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentTooltip;
-import net.pixeldreamstudios.combat_styles.item.ItemTooltip;
 import net.pixeldreamstudios.combat_styles.item.TooltipContextAccess;
 
 import org.joml.Vector2i;
@@ -80,6 +78,7 @@ public class TooltipPreviewDock {
         ItemStack stack = current();
         stamp = stamp * 31 + (stack.isEmpty() ? 0 : stack.getItem().hashCode());
         stamp = stamp * 31 + (TooltipContextAccess.expanded() ? 1 : 0);
+        stamp = stamp * 31 + (TooltipContextAccess.detailed() ? 1 : 0);
         if (stamp == signature) {
             return;
         }
@@ -97,14 +96,11 @@ public class TooltipPreviewDock {
         TooltipFlag flag = minecraft.options.advancedItemTooltips
                 ? TooltipFlag.ADVANCED
                 : TooltipFlag.NORMAL;
-        List<Component> built = new ArrayList<>(
-                stack.getTooltipLines(Item.TooltipContext.of(minecraft.level),
-                        minecraft.player, flag));
-        if (edited != null) {
-            stripEquipmentLines(built, stack);
-            ItemTooltip.expandable(built,
-                    details -> EquipmentTooltip.append(edited, details));
-        }
+        Item.TooltipContext context = Item.TooltipContext.of(minecraft.level);
+        List<Component> built = new ArrayList<>(edited == null
+                ? stack.getTooltipLines(context, minecraft.player, flag)
+                : EquipmentTooltip.previewing(stack, edited,
+                        () -> stack.getTooltipLines(context, minecraft.player, flag)));
         lines = built.size() > MAX_LINES
                 ? List.copyOf(built.subList(0, MAX_LINES))
                 : List.copyOf(built);
@@ -114,21 +110,6 @@ public class TooltipPreviewDock {
             widest = Math.max(widest, font.width(line));
         }
         bodyWidth = widest + BOX_PADDING * 2;
-    }
-
-    private static void stripEquipmentLines(List<Component> built, ItemStack stack) {
-        EquipmentDefinition live = EquipmentProviders.definitionFor(stack);
-        if (live == null) {
-            return;
-        }
-        List<Component> existing = new ArrayList<>();
-        try {
-            ItemTooltip.expandable(existing,
-                    details -> EquipmentTooltip.append(live, details));
-        } catch (RuntimeException ignored) {
-            return;
-        }
-        built.subList(Math.max(0, built.size() - existing.size()), built.size()).clear();
     }
 
     public boolean click(double mouseX, double mouseY, Minecraft minecraft) {

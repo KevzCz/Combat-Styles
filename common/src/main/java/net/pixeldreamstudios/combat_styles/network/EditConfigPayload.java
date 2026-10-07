@@ -34,6 +34,8 @@ public record EditConfigPayload(Kind kind, String id, String json)
         STYLE_BOOK_CLEAR,
         WEAPON_ROLL,
         WEAPON_ROLL_CLEAR,
+        SUMMON_ABILITY,
+        SUMMON_ABILITY_CLEAR,
         SUMMON_TUNING;
 
         private static final IntFunction<Kind> BY_ID =

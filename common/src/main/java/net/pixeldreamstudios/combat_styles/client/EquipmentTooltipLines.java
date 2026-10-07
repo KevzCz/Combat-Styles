@@ -5,7 +5,6 @@ import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
-import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentTooltip;
 import net.pixeldreamstudios.combat_styles.item.EquipmentItem;
 import net.pixeldreamstudios.combat_styles.item.ItemTooltip;
@@ -22,9 +21,8 @@ public final class EquipmentTooltipLines {
                 || stack.getItem() instanceof EquipmentItem) {
             return;
         }
-        EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
-        if (definition == null
-                || (definition.effects().isEmpty() && definition.innateAffixes().isEmpty())) {
+        EquipmentDefinition definition = EquipmentTooltip.shownFor(stack);
+        if (!EquipmentTooltip.describes(definition)) {
             return;
         }
         try {

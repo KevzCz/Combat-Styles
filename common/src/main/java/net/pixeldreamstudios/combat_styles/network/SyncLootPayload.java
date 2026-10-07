@@ -1,4 +1,5 @@
 package net.pixeldreamstudios.combat_styles.network;
+import net.pixeldreamstudios.combat_styles.entity.ScriptedAbilities;
 
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -16,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public record SyncLootPayload(Layer books, Layer rolls)
+public record SyncLootPayload(Layer books, Layer rolls, Layer abilities)
         implements CustomPacketPayload {
 
     public record Layer(Map<String, String> definitions, Set<String> config, Set<String> data) {
@@ -66,24 +67,27 @@ public record SyncLootPayload(Layer books, Layer rolls)
                 @Override
                 public SyncLootPayload decode(RegistryFriendlyByteBuf buffer) {
                     return new SyncLootPayload(LAYER_CODEC.decode(buffer),
-                            LAYER_CODEC.decode(buffer));
+                            LAYER_CODEC.decode(buffer), LAYER_CODEC.decode(buffer));
                 }
 
                 @Override
                 public void encode(RegistryFriendlyByteBuf buffer, SyncLootPayload payload) {
                     LAYER_CODEC.encode(buffer, payload.books());
                     LAYER_CODEC.encode(buffer, payload.rolls());
+                    LAYER_CODEC.encode(buffer, payload.abilities());
                 }
             };
 
     public static SyncLootPayload capture() {
         return new SyncLootPayload(Layer.of(BookRolls.DEFINITIONS),
-                Layer.of(WeaponRolls.DEFINITIONS));
+                Layer.of(WeaponRolls.DEFINITIONS), Layer.of(ScriptedAbilities.DEFINITIONS));
     }
 
     public void applyToClient() {
         books.applyTo(BookRolls.DEFINITIONS);
         rolls.applyTo(WeaponRolls.DEFINITIONS);
+        abilities.applyTo(ScriptedAbilities.DEFINITIONS);
+        ScriptedAbilities.rebuildFromSync();
     }
 
     @Override

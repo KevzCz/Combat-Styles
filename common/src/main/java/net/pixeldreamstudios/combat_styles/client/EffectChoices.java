@@ -1,5 +1,24 @@
 package net.pixeldreamstudios.combat_styles.client;
 
+import net.pixeldreamstudios.combat_styles.equipment.ItemMatch;
+import net.pixeldreamstudios.combat_styles.equipment.SummonCadence;
+import net.pixeldreamstudios.combat_styles.entity.BeamLook;
+import net.pixeldreamstudios.combat_styles.entity.ParticleShape;
+import net.pixeldreamstudios.combat_styles.entity.RaiseProfile;
+import net.pixeldreamstudios.combat_styles.entity.RaiseRules;
+import net.pixeldreamstudios.combat_styles.entity.BeamOrigin;
+import net.pixeldreamstudios.combat_styles.entity.SummonAim;
+import net.pixeldreamstudios.combat_styles.entity.SummonCastTarget;
+import net.pixeldreamstudios.combat_styles.entity.PassiveTrigger;
+import net.pixeldreamstudios.combat_styles.equipment.SummonPassive;
+import net.pixeldreamstudios.combat_styles.equipment.AbilityGrant;
+import net.pixeldreamstudios.combat_styles.equipment.GrantTarget;
+import net.pixeldreamstudios.combat_styles.equipment.SummonActives;
+import net.pixeldreamstudios.combat_styles.entity.AbilityKind;
+import net.pixeldreamstudios.combat_styles.entity.MobFilter;
+import net.pixeldreamstudios.combat_styles.entity.ScriptedAbility;
+import net.pixeldreamstudios.combat_styles.entity.AbilityPick;
+import net.pixeldreamstudios.combat_styles.entity.AbilityFocus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -63,14 +82,16 @@ public final class EffectChoices {
     private static final List<String> ATTRIBUTE_OPERATIONS =
             List.of("add_value", "multiply_base", "multiply_total");
     private static final String KEY_SUBSTITUTE = "substitute";
+    private static final List<String> STEP_PHASES = List.of("start", EffectSchema.KEY_AT_WINDUP, "end");
 
     private EffectChoices() {
     }
 
-    private static final List<String> ENTITY_KEYS = List.of("entity", "summon",
+    private static final List<String> ENTITY_KEYS = List.of("entity", "summon", EffectSchema.KEY_USED_BY,
             "become_entity", "attacker", "replaced_summoned_entities", "entities", "target",
             SummonGate.ENTITIES);
-    private static final String EQUIPMENT_SEGMENT = "/equipment";
+    private static final String PATH_SEPARATOR = "/";
+    private static final String EQUIPMENT_SEGMENT = "equipment";
     private static final String ENTITY_KEY = "entity";
     private static final List<String> ABILITY_KEYS = List.of("ability", "finale", "abilities");
 
@@ -122,13 +143,26 @@ public final class EffectChoices {
     }
 
     private static String parentOf(String path) {
-        int cut = path == null ? -1 : path.lastIndexOf('/');
+        int cut = path == null ? -1 : path.lastIndexOf(PATH_SEPARATOR);
         return cut < 0 ? "" : path.substring(0, cut);
     }
 
     private static String keyOf(String path) {
-        int cut = path == null ? -1 : path.lastIndexOf('/');
+        int cut = path == null ? -1 : path.lastIndexOf(PATH_SEPARATOR);
         return path == null ? "" : (cut < 0 ? path : path.substring(cut + 1));
+    }
+
+    private static String ownerOf(String scope) {
+        return keyOf(parentOf(scope));
+    }
+
+    private static boolean within(String scope, String segment) {
+        for (String part : parentOf(scope).split(PATH_SEPARATOR)) {
+            if (part.equals(segment)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static List<String> choicesFor(String path, String key) {
@@ -142,32 +176,29 @@ public final class EffectChoices {
         if (SchemaRegistry.hasChoices(key)) {
             return SchemaRegistry.choicesFor(key);
         }
-        if (scope.contains(EQUIPMENT_SEGMENT) && EffectSchema.SUMMON_SLOTS.contains(key)) {
+        if (within(scope, EQUIPMENT_SEGMENT) && EffectSchema.SUMMON_SLOTS.contains(key)) {
             return itemIds();
         }
         return switch (key) {
             case "hitbox" -> EffectSchema.HITBOX_SHAPES;
-            case EffectSchema.KEY_CONDITIONS -> EffectSchema.KEY_OVERRIDE.equals(keyOf(scope))
+            case EffectSchema.KEY_CONDITIONS -> EffectSchema.KEY_OVERRIDE.equals(ownerOf(scope))
                     ? AttackConditions.names()
                     : List.of();
-            case "phase" -> scope.contains(CastGate.KEY)
+            case "phase" -> within(scope, CastGate.KEY)
                     ? names(CastPhase.values())
                     : names(UsePhase.values());
             case "cast_type" -> SpellEngineCompat.castTypeNames();
             case "slot_band" -> names(SlotBand.values());
             case "rarity" -> names(StyleRarity.values());
-            case "anchor" -> scope.contains(KEY_SPAWN)
+            case "anchor" -> within(scope, KEY_SPAWN)
                     ? names(SpawnAnchor.values())
                     : names(SlashAnchor.values());
             case "operation" -> ATTRIBUTE_OPERATIONS;
             case EffectSchema.KEY_SLOT -> {
-                if (scope.contains(ItemGate.ACCESSORIES)) {
+                if (within(scope, ItemGate.ACCESSORIES)) {
                     yield accessorySlotIds();
                 }
-                yield scope.contains(EffectSchema.ROOT_ATTRIBUTE_MAP)
-                        || scope.contains(EffectSchema.ROOT_CONDITIONAL_ATTRIBUTES)
-                        ? AttributeBonus.SLOTS
-                        : List.of();
+                yield AttributeBonus.SLOTS;
             }
             case "mode" -> {
                 if (scope.contains(EffectSchema.ROOT_STYLE_BOOK)) {
@@ -176,21 +207,21 @@ public final class EffectChoices {
                 if (scope.contains(EffectSchema.ROOT_WEAPON_ROLL)) {
                     yield WeaponRoll.MODES;
                 }
-                if (scope.contains(KEY_SPAWN)) {
+                if (within(scope, KEY_SPAWN)) {
                     yield names(SpreadMode.values());
                 }
-                if (scope.contains(KEY_PLACEMENT)) {
+                if (within(scope, KEY_PLACEMENT)) {
                     yield names(AttackPlacement.Mode.values());
                 }
-                if (scope.contains(KEY_SCALING)) {
+                if (within(scope, KEY_SCALING)) {
                     yield EffectSchema.SCALING_MODES;
                 }
-                yield scope.contains(EffectSchema.ROOT_SUBSTITUTION) || scope.contains(KEY_SUBSTITUTE)
+                yield scope.contains(EffectSchema.ROOT_SUBSTITUTION) || within(scope, KEY_SUBSTITUTE)
                         ? SUBSTITUTION_MODES
                         : EffectSchema.DAMAGE_MODES;
             }
             case "apply" -> scope.contains(EffectSchema.ROOT_SUBSTITUTION)
-                    || scope.contains(KEY_SUBSTITUTE)
+                    || within(scope, KEY_SUBSTITUTE)
                     ? SUBSTITUTION_APPLY
                     : List.of();
             case "style_id", "substitute_style", "custom_style_id" -> styleIds();
@@ -200,9 +231,41 @@ public final class EffectChoices {
             case "attribute" -> attributeIds();
             case "source", "scales_with" -> scalingSourceIds();
             case "damage_type", "taken_damage_type" -> damageTypeIds();
-            case "type" -> scope.contains(KEY_PARTICLES)
+            case "type" -> {
+                if (EffectSchema.KEY_ACTION.equals(ownerOf(scope))
+                        && scope.contains(EffectSchema.ROOT_SUMMON_ABILITY)) {
+                    yield names(ScriptedAbility.ActionType.values());
+                }
+                yield within(scope, KEY_PARTICLES) ? particleIds() : damageTypeIds();
+            }
+            case SummonCadence.KEY_ABILITY_PICK -> names(AbilityPick.values());
+            case SummonCadence.KEY_AIM -> names(SummonAim.values());
+            case ScriptedAbility.Action.KEY_SPELL_TARGET -> names(SummonCastTarget.values());
+            case RaiseRules.KEY_PROFILE -> names(RaiseProfile.values());
+            case AbilityGrant.KEY_APPLIES_TO -> scope.contains(EffectSchema.ROOT_ABILITY_GRANT)
+                    ? names(GrantTarget.values())
+                    : List.of();
+            case ParticleShape.KEY_FORM -> ParticleShape.KEY.equals(ownerOf(scope))
+                    ? names(ParticleShape.Form.values())
+                    : List.of();
+            case BeamLook.KEY_ORIGIN -> BeamLook.KEY.equals(ownerOf(scope))
+                    ? names(BeamOrigin.values())
+                    : List.of();
+            case SummonPassive.KEY_ON -> within(scope, SummonCadence.KEY_PASSIVES)
+                    || scope.contains(EffectSchema.ROOT_SUMMON_ABILITY)
+                    ? names(PassiveTrigger.values())
+                    : List.of();
+            case EffectSchema.KEY_FOCUS -> scope.contains(EffectSchema.ROOT_SUMMON_ABILITY)
+                    ? names(AbilityFocus.values())
+                    : List.of();
+            case EffectSchema.KEY_AT, ScriptedAbility.Step.KEY_UNTIL ->
+                    scope.contains(EffectSchema.ROOT_SUMMON_ABILITY)
+                    ? STEP_PHASES
+                    : List.of();
+            case EffectSchema.KEY_PARTICLE -> scope.contains(EffectSchema.ROOT_SUMMON_ABILITY)
                     ? particleIds()
-                    : damageTypeIds();
+                    : List.of();
+            case EffectSchema.KEY_USED_BY -> entityIds();
             case "school", "disable_schools", "impact_school" -> spellSchoolIds();
             case EffectSchema.KEY_SPELL, "grant", "disable" -> spellIds();
             case "disable_mode" -> names(SpellLocks.Mode.values());
@@ -216,10 +279,16 @@ public final class EffectChoices {
             case "exempt" -> scope.contains("summon")
                     ? entityIds()
                     : styleIds();
-            case "entities" -> entityIds();
+            case "entities", MobFilter.KEY_EXEMPT_ENTITIES -> entityIds();
+            case MobFilter.KEY_ENTITY_TAGS, MobFilter.KEY_EXEMPT_TAGS ->
+                    DropSuggestions.of(DropSuggestions.ENTITY_TAGS);
             case "effect" -> effectIds();
             case "holding", "wearing", "equipped" -> itemIds();
-            case "items" -> scope.contains(EffectSchema.ROOT_WEAPON_ROLL) ? itemIds() : List.of();
+            case "items", ItemMatch.EXCLUDED_ITEMS -> itemIds();
+            case ItemMatch.EXCLUDED_TAGS -> itemTagIds();
+            case ItemMatch.EXCLUDED_CATEGORIES -> categoryIds();
+            case SummonCadence.KEY_PASSIVES -> passiveAbilityIds();
+            case "applies" -> effectIds();
             case "tags" -> scope.contains(EffectSchema.ROOT_WEAPON_ROLL) ? itemTagIds() : List.of();
             case "tables" -> scope.contains(EffectSchema.ROOT_WEAPON_ROLL)
                     ? DropSuggestions.of(DropSuggestions.LOOT_TABLES)
@@ -228,9 +297,22 @@ public final class EffectChoices {
                     || scope.contains(EffectSchema.ROOT_WEAPON_ROLL)
                     ? styleIds()
                     : List.of();
-            case "ability", "finale", "abilities" -> abilityIds();
+            case "ability" -> {
+                if (within(scope, SummonCadence.KEY_PASSIVES)) {
+                    yield passiveAbilityIds();
+                }
+                yield within(scope, SummonActives.KEY) ? activeAbilityIds() : abilityIds();
+            }
+            case "abilities" -> within(scope, SummonActives.KEY) ? activeAbilityIds() : abilityIds();
+            case "finale" -> activeAbilityIds();
+            case SummonActives.KEY_PICK -> within(scope, SummonActives.KEY)
+                    ? names(AbilityPick.values())
+                    : List.of();
+            case ScriptedAbility.KEY_KIND -> scope.contains(EffectSchema.ROOT_SUMMON_ABILITY)
+                    ? names(AbilityKind.values())
+                    : List.of();
             case "sound", "swing_sound" -> soundIds();
-            case "id" -> scope.contains(KEY_SOUND) ? soundIds() : List.of();
+            case "id" -> within(scope, KEY_SOUND) ? soundIds() : List.of();
             case "particle_type" -> particleIds();
             case "impact_type" -> SpellEngineCompat.impactTypeNames();
             default -> List.of();
@@ -289,6 +371,26 @@ public final class EffectChoices {
     private static List<String> abilityIds() {
         List<String> ids = new ArrayList<>(AbilityRegistry.registered());
         ids.sort(String::compareTo);
+        return ids;
+    }
+
+    private static List<String> activeAbilityIds() {
+        List<String> ids = new ArrayList<>();
+        for (String id : abilityIds()) {
+            if (!AbilityRegistry.passive(id)) {
+                ids.add(id);
+            }
+        }
+        return ids;
+    }
+
+    private static List<String> passiveAbilityIds() {
+        List<String> ids = new ArrayList<>();
+        for (String id : abilityIds()) {
+            if (AbilityRegistry.passive(id)) {
+                ids.add(id);
+            }
+        }
         return ids;
     }
 

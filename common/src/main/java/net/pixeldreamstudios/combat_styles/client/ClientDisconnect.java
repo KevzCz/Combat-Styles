@@ -1,4 +1,5 @@
 package net.pixeldreamstudios.combat_styles.client;
+import net.pixeldreamstudios.combat_styles.entity.ScriptedAbilities;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.equipment.BurstSequence;
@@ -25,10 +26,13 @@ public final class ClientDisconnect {
         CustomAttacks.clearSync();
         EquipmentRegistry.clearSync();
         ClientSummons.clear();
+        ClientBeams.clear();
         AffixRegistry.clearSync();
         AttackOverrides.clearSync();
         BookRolls.DEFINITIONS.clearSync();
         WeaponRolls.DEFINITIONS.clearSync();
+        ScriptedAbilities.DEFINITIONS.clearSync();
+        ScriptedAbilities.rebuildFromSync();
         BurstSequence.clearClient();
     }
 }

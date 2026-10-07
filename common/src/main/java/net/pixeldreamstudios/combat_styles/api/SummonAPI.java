@@ -5,7 +5,7 @@ import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.equipment.SummonProfiles;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
-import net.pixeldreamstudios.combat_styles.entity.AbilityBehaviour;
+import net.pixeldreamstudios.combat_styles.entity.SummonAbility;
 import net.pixeldreamstudios.combat_styles.entity.AbilityParams;
 import net.pixeldreamstudios.combat_styles.entity.AbilityRegistry;
 import net.pixeldreamstudios.combat_styles.entity.ConfigurableSummon;
@@ -94,7 +94,7 @@ public final class SummonAPI {
     }
 
     public static void registerAbility(String ability, AbilityConfig.Entry defaults,
-                                       AbilityBehaviour behaviour) {
+                                       SummonAbility behaviour) {
         AbilityConfig.define(ability, defaults);
         AbilityRegistry.register(ability, behaviour);
     }

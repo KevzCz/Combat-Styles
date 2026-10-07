@@ -1,10 +1,14 @@
 package net.pixeldreamstudios.combat_styles.config;
 
+import com.google.gson.ExclusionStrategy;
+import com.google.gson.FieldAttributes;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.JsonOps;
 
 import net.minecraft.world.entity.player.Player;
 
@@ -16,40 +20,65 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 public final class AbilityConfig {
 
     public static final String FOLDER = "abilities";
 
+    private static final Set<String> LEGACY_DAMAGE_FIELDS = Set.of("baseDamage",
+            "weaponDamageRatio", "perPoint", "scalesWith", "school", "damageType");
+
     private static final Gson GSON = new GsonBuilder()
             .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+            .addSerializationExclusionStrategy(new ExclusionStrategy() {
+                @Override
+                public boolean shouldSkipField(FieldAttributes field) {
+                    return field.getDeclaringClass() == Damage.class
+                            && LEGACY_DAMAGE_FIELDS.contains(field.getName());
+                }
+
+                @Override
+                public boolean shouldSkipClass(Class<?> type) {
+                    return false;
+                }
+            })
             .setPrettyPrinting()
             .create();
 
     private static final String EXTENSION = ".json";
-    private static final String GAZED = "combat_styles_content:gazed";
-    private static final double SPELL_POWER_PER_POINT = 0.02D;
     private static final Map<String, Entry> LOADED = new LinkedHashMap<>();
     private static final Map<String, Entry> DECLARED = new LinkedHashMap<>();
+    private static final Map<String, Entry> DATA = new LinkedHashMap<>();
+    private static boolean loadedOnce;
 
     public static final class Damage {
+        private static final String SPEC_BASE = "base";
+        private static final String SPEC_OF_HIT = "of_hit";
+        private static final String SPEC_TYPE = "type";
+        private static final String SPEC_SCHOOL = "school";
+        private static final String SPEC_SCALING = "scaling";
+
         public float baseDamage;
         public float weaponDamageRatio;
         public double perPoint;
-        public String scalesWith = SpellCompatState.damageSource();
-        public String school = SpellCompatState.damageSource();
+        public String scalesWith;
+        public String school;
         public int hits = 1;
         public String applies;
         public int appliesStacks = 1;
         public float appliesChance = 1.0F;
         public float lifesteal;
         public boolean detonates;
+        public JsonObject damageSpec;
+        public String damageType;
 
         Damage copy() {
             Damage made = new Damage();
@@ -64,18 +93,104 @@ public final class AbilityConfig {
             made.appliesChance = appliesChance;
             made.lifesteal = lifesteal;
             made.detonates = detonates;
+            made.damageSpec = damageSpec == null ? null : damageSpec.deepCopy();
+            made.damageType = damageType;
             return made;
+        }
+
+        public void useSpec(DamageSpec spec) {
+            damageSpec = encoded(spec);
+        }
+
+        public void mergeSpec(DamageSpec patch) {
+            mergeSpec(encoded(patch));
+        }
+
+        public void mergeSpec(JsonObject patch) {
+            if (patch == null) {
+                return;
+            }
+            if (damageSpec == null) {
+                adoptSpec();
+            }
+            for (Map.Entry<String, JsonElement> entry : patch.entrySet()) {
+                damageSpec.add(entry.getKey(), entry.getValue().deepCopy());
+            }
+        }
+
+        public static JsonObject specPatch(DamageSpec patch) {
+            return encoded(patch);
+        }
+
+        public static DamageSpec scaledSpec(float base, float ofHit, double perPoint) {
+            Damage made = new Damage();
+            made.baseDamage = base;
+            made.weaponDamageRatio = ofHit;
+            made.perPoint = perPoint;
+            return made.legacySpec();
+        }
+
+        public DamageSpec legacySpec() {
+            String source = scalesWith == null ? SpellCompatState.damageSource() : scalesWith;
+            List<DamageSpec.ScalingEntry> scaling = perPoint > 0.0D
+                    ? List.of(new DamageSpec.ScalingEntry(source, (float) perPoint, Optional.empty(),
+                            DamageSpec.ScalingKind.MULTIPLIER, DamageSpec.ScalingEntry.DEFAULT_BASELINE))
+                    : List.of();
+            return new DamageSpec(baseDamage, weaponDamageRatio,
+                    DamageSpec.NO_HEALTH_RATIO, DamageSpec.NO_HEALTH_RATIO, DamageSpec.NO_HEALTH_RATIO,
+                    Optional.ofNullable(damageType == null || damageType.isBlank() ? null : damageType),
+                    Optional.of(school == null ? SpellCompatState.damageSource() : school),
+                    scaling, DamageSpec.ScalingMode.SUM, List.of(),
+                    Optional.empty(), Optional.empty(), DamageSpec.FULL_MULTIPLIER);
+        }
+
+        public void adoptSpec() {
+            if (damageSpec == null) {
+                damageSpec = encoded(legacySpec());
+            } else {
+                JsonObject legacy = encoded(legacySpec());
+                if (baseDamage > 0.0F) {
+                    damageSpec.add(SPEC_BASE, legacy.get(SPEC_BASE));
+                }
+                if (weaponDamageRatio > 0.0F) {
+                    damageSpec.add(SPEC_OF_HIT, legacy.get(SPEC_OF_HIT));
+                }
+                if (perPoint > 0.0D) {
+                    damageSpec.add(SPEC_SCALING, legacy.get(SPEC_SCALING));
+                }
+                if (damageType != null && !damageType.isBlank()) {
+                    damageSpec.add(SPEC_TYPE, legacy.get(SPEC_TYPE));
+                }
+                if (school != null && !damageSpec.has(SPEC_SCHOOL)) {
+                    damageSpec.add(SPEC_SCHOOL, legacy.get(SPEC_SCHOOL));
+                }
+            }
+            baseDamage = 0.0F;
+            weaponDamageRatio = 0.0F;
+            perPoint = 0.0D;
+            scalesWith = null;
+            school = null;
+            damageType = null;
+        }
+
+        private static JsonObject encoded(DamageSpec spec) {
+            return DamageSpec.CODEC.encodeStart(JsonOps.INSTANCE, spec).result()
+                    .filter(JsonElement::isJsonObject)
+                    .map(JsonElement::getAsJsonObject)
+                    .orElseGet(JsonObject::new);
         }
     }
 
     public static final class Timing {
         public int durationTicks;
         public int windupTicks;
+        public int cooldownTicks;
 
         Timing copy() {
             Timing made = new Timing();
             made.durationTicks = durationTicks;
             made.windupTicks = windupTicks;
+            made.cooldownTicks = cooldownTicks;
             return made;
         }
     }
@@ -122,6 +237,47 @@ public final class AbilityConfig {
         public Shape shape = new Shape();
         public Presentation fx = new Presentation();
         public Map<String, Double> extra = new LinkedHashMap<>();
+        public JsonObject options;
+        public transient Map<Integer, JsonObject> stepSpecs;
+
+        public void mergeStepSpec(int step, DamageSpec patch) {
+            if (stepSpecs == null) {
+                stepSpecs = new LinkedHashMap<>();
+            }
+            JsonObject merged = stepSpecs.computeIfAbsent(step, ignored -> new JsonObject());
+            for (Map.Entry<String, JsonElement> entry : Damage.specPatch(patch).entrySet()) {
+                merged.add(entry.getKey(), entry.getValue().deepCopy());
+            }
+        }
+
+        public JsonObject stepSpec(int step) {
+            return stepSpecs == null ? null : stepSpecs.get(step);
+        }
+
+        public <T> void useOptions(Codec<T> codec, T value) {
+            options = codec.encodeStart(JsonOps.INSTANCE, value).result()
+                    .filter(JsonElement::isJsonObject)
+                    .map(JsonElement::getAsJsonObject)
+                    .orElse(null);
+        }
+
+        public void mergeOptions(JsonObject patch) {
+            if (patch == null) {
+                return;
+            }
+            if (options == null) {
+                options = new JsonObject();
+            }
+            for (Map.Entry<String, JsonElement> entry : patch.entrySet()) {
+                options.add(entry.getKey(), entry.getValue().deepCopy());
+            }
+        }
+
+        public <T> T options(Codec<T> codec, T fallback) {
+            return options == null
+                    ? fallback
+                    : codec.parse(JsonOps.INSTANCE, options).result().orElse(fallback);
+        }
 
         public Map<String, Double> options() {
             return extra == null ? Map.of() : Map.copyOf(extra);
@@ -173,6 +329,18 @@ public final class AbilityConfig {
             return damage == null ? 1 : Math.max(1, damage.hits);
         }
 
+        public int cooldown() {
+            return timing == null ? 0 : Math.max(0, timing.cooldownTicks);
+        }
+
+        public String damageType() {
+            return asDamageSpec().damageType().filter(type -> !type.isBlank()).orElse(null);
+        }
+
+        public String school() {
+            return asDamageSpec().school().filter(named -> !named.isBlank()).orElse(null);
+        }
+
         public int windup() {
             return timing == null ? 0 : Math.max(0, timing.windupTicks);
         }
@@ -200,6 +368,13 @@ public final class AbilityConfig {
             made.shape = shape == null ? new Shape() : shape.copy();
             made.fx = fx == null ? new Presentation() : fx.copy();
             made.extra = extra == null ? new LinkedHashMap<>() : new LinkedHashMap<>(extra);
+            made.options = options == null ? null : options.deepCopy();
+            if (stepSpecs != null) {
+                made.stepSpecs = new LinkedHashMap<>();
+                for (Map.Entry<Integer, JsonObject> entry : stepSpecs.entrySet()) {
+                    made.stepSpecs.put(entry.getKey(), entry.getValue().deepCopy());
+                }
+            }
             made.stamp = 0;
             return made;
         }
@@ -209,27 +384,32 @@ public final class AbilityConfig {
                 stamp = Objects.hash(damage.baseDamage, damage.weaponDamageRatio,
                         damage.perPoint, damage.scalesWith, damage.school, damage.hits,
                         damage.applies, damage.appliesStacks, damage.appliesChance,
-                        damage.lifesteal, damage.detonates, timing.durationTicks,
-                        timing.windupTicks, shape.radius, shape.range, shape.rise,
+                        damage.lifesteal, damage.detonates, damage.damageSpec,
+                        damage.damageType, timing.durationTicks,
+                        timing.windupTicks, timing.cooldownTicks, shape.radius, shape.range, shape.rise,
                         shape.pull, shape.lift, shape.maxTargets, fx.particles,
-                        fx.spread, fx.volume, fx.pitch, extra);
+                        fx.spread, fx.volume, fx.pitch, extra, options);
             }
             return stamp;
         }
 
         private transient int stamp;
+        private transient DamageSpec parsedSpec;
+        private transient JsonObject parsedSpecSource;
 
         public Entry sane() {
             stamp = 0;
             damage.baseDamage = Math.max(0.0F, damage.baseDamage);
             damage.weaponDamageRatio = Math.max(0.0F, damage.weaponDamageRatio);
             damage.perPoint = Math.max(0.0D, damage.perPoint);
+            damage.adoptSpec();
             damage.hits = Math.max(1, damage.hits);
             damage.appliesStacks = Math.max(1, damage.appliesStacks);
             damage.appliesChance = Math.clamp(damage.appliesChance, 0.0F, 1.0F);
             damage.lifesteal = Math.max(0.0F, damage.lifesteal);
             timing.durationTicks = Math.max(0, timing.durationTicks);
             timing.windupTicks = Math.max(0, timing.windupTicks);
+            timing.cooldownTicks = Math.max(0, timing.cooldownTicks);
             if (timing.durationTicks > 0 && timing.windupTicks > timing.durationTicks) {
                 timing.windupTicks = timing.durationTicks;
             }
@@ -248,18 +428,19 @@ public final class AbilityConfig {
         }
 
         public DamageSpec asDamageSpec() {
-            List<DamageSpec.ScalingEntry> scaling = damage.perPoint > 0.0D
-                    ? List.of(new DamageSpec.ScalingEntry(damage.scalesWith,
-                            (float) damage.perPoint, Optional.empty(),
-                            DamageSpec.ScalingKind.MULTIPLIER,
-                            DamageSpec.ScalingEntry.DEFAULT_BASELINE))
-                    : List.of();
-            return new DamageSpec(damage.baseDamage, damage.weaponDamageRatio,
-                    DamageSpec.NO_HEALTH_RATIO, DamageSpec.NO_HEALTH_RATIO,
-                    DamageSpec.NO_HEALTH_RATIO,
-                    Optional.empty(), Optional.ofNullable(damage.school),
-                    scaling, DamageSpec.ScalingMode.SUM, List.of(),
-                    Optional.empty(), Optional.empty(), DamageSpec.FULL_MULTIPLIER);
+            if (damage.damageSpec != null) {
+                if (parsedSpec == null || parsedSpecSource != damage.damageSpec) {
+                    parsedSpec = DamageSpec.CODEC.parse(JsonOps.INSTANCE, damage.damageSpec)
+                            .resultOrPartial(error -> CombatStyles.LOGGER.warn(
+                                    "Invalid ability damage_spec: {}", error))
+                            .orElse(null);
+                    parsedSpecSource = damage.damageSpec;
+                }
+                if (parsedSpec != null) {
+                    return parsedSpec;
+                }
+            }
+            return damage.legacySpec();
         }
     }
 
@@ -271,7 +452,29 @@ public final class AbilityConfig {
     }
 
     public static Entry get(String id) {
-        return LOADED.computeIfAbsent(key(id), missing -> new Entry());
+        String key = key(id);
+        Entry loaded = LOADED.get(key);
+        if (loaded != null) {
+            return loaded;
+        }
+        Entry data = DATA.get(key);
+        return data != null ? data : LOADED.computeIfAbsent(key, missing -> new Entry());
+    }
+
+    public static void defineData(String ability, Entry defaults) {
+        if (ability == null || defaults == null) {
+            return;
+        }
+        DATA.put(key(ability), defaults.sane());
+    }
+
+    public static void forgetData(String ability) {
+        DATA.remove(key(ability));
+    }
+
+    public static boolean isData(String ability) {
+        String key = key(ability);
+        return DATA.containsKey(key) && !LOADED.containsKey(key);
     }
 
     public static Map<String, Entry> all() {
@@ -298,65 +501,9 @@ public final class AbilityConfig {
         return Map.copyOf(normalized);
     }
 
-    private static Entry define(float baseDamage, float weaponRatio, int hits,
-                                int durationTicks, int windupTicks,
-                                double radius, double range, double rise, int maxTargets,
-                                int particles, double spread, float volume, float pitch) {
-        Entry entry = new Entry();
-        entry.damage.baseDamage = baseDamage;
-        entry.damage.weaponDamageRatio = weaponRatio;
-        entry.damage.perPoint = SPELL_POWER_PER_POINT;
-        entry.damage.hits = hits;
-        entry.timing.durationTicks = durationTicks;
-        entry.timing.windupTicks = windupTicks;
-        entry.shape.radius = radius;
-        entry.shape.range = range;
-        entry.shape.rise = rise;
-        entry.shape.maxTargets = maxTargets;
-        entry.fx.particles = particles;
-        entry.fx.spread = spread;
-        entry.fx.volume = volume;
-        entry.fx.pitch = pitch;
-        return entry.sane();
-    }
-
     private static void defaults() {
         LOADED.clear();
         LOADED.putAll(DECLARED);
-
-        LOADED.put("twin_lance", define(2.0F, 0.5F, 2, 10, 2,
-                0.0D, 14.0D, 0.0D, 1, 4, 0.1D, 0.35F, 1.8F));
-
-        LOADED.put("furrow", define(4.0F, 1.0F, 1, 30, 4,
-                1.1D, 9.0D, 0.0D, 4, 2, 0.2D, 0.35F, 0.6F));
-
-        LOADED.put("wide_cut", define(3.0F, 1.0F, 1, 16, 2,
-                1.0D, 7.0D, 0.0D, 5, 0, 0.0D, 0.35F, 0.7F));
-
-        LOADED.put("blink_watch", define(3.5F, 1.0F, 1, 18, 8,
-                0.0D, 3.0D, 0.0D, 1, 12, 0.3D, 0.35F, 1.5F));
-
-Entry tether = define(1.5F, 0.35F, 1, 40, 8,
-                0.0D, 0.0D, 0.0D, 1, 3, 0.2D, 0.35F, 1.2F);
-        tether.damage.lifesteal = 0.35F;
-        LOADED.put("tether", tether);
-
-        Entry collapse = define(6.0F, 1.0F, 1, 24, 18,
-                4.0D, 0.0D, -0.35D, 8, 1, 0.15D, 0.6F, 1.4F);
-        collapse.damage.applies = GAZED;
-        LOADED.put("collapse", collapse);
-
-        Entry eclipse = define(7.0F, 1.0F, 1, 26, 18,
-                4.5D, 0.0D, 0.9D, 8, 12, 0.7D, 0.55F, 0.75F);
-        eclipse.damage.applies = GAZED;
-        eclipse.shape.pull = 0.35D;
-        eclipse.shape.lift = 0.12D;
-        LOADED.put("eclipse", eclipse);
-
-        Entry supernova = define(10.0F, 1.0F, 1, 30, 22,
-                6.0D, 0.0D, 1.1D, 12, 24, 1.2D, 0.8F, 1.15F);
-        supernova.damage.detonates = true;
-        LOADED.put("supernova", supernova);
     }
 
     public static void define(String ability, Entry defaults) {
@@ -364,8 +511,29 @@ Entry tether = define(1.5F, 0.35F, 1, 40, 8,
             return;
         }
         Entry sane = defaults.sane();
-        DECLARED.put(key(ability), sane);
-        LOADED.putIfAbsent(key(ability), sane);
+        String key = key(ability);
+        DECLARED.put(key, sane);
+        if (!loadedOnce) {
+            LOADED.putIfAbsent(key, sane);
+            return;
+        }
+        if (LOADED.containsKey(key)) {
+            return;
+        }
+        LOADED.put(key, sane.copy());
+        Path directory = directory();
+        try {
+            Files.createDirectories(directory);
+        } catch (IOException failure) {
+            CombatStyles.LOGGER.warn("Could not create {}", directory, failure);
+            return;
+        }
+        Path file = directory.resolve(key + EXTENSION);
+        if (Files.exists(file)) {
+            read(file, key);
+        } else {
+            write(file, LOADED.get(key));
+        }
     }
 
     public static Entry declared(String ability) {
@@ -373,6 +541,7 @@ Entry tether = define(1.5F, 0.35F, 1, 40, 8,
     }
 
     public static void load() {
+        loadedOnce = true;
         defaults();
 
         Path directory = directory();
@@ -402,8 +571,17 @@ Entry tether = define(1.5F, 0.35F, 1, 40, 8,
         if (entry == null || entry.damage == null) {
             return;
         }
-        entry.damage.scalesWith = SpellCompatState.damageSource();
-        entry.damage.school = SpellCompatState.damageSource();
+        String source = SpellCompatState.damageSource();
+        DamageSpec spec = entry.asDamageSpec();
+        List<DamageSpec.ScalingEntry> scaling = new ArrayList<>();
+        for (DamageSpec.ScalingEntry scale : spec.scaling()) {
+            scaling.add(new DamageSpec.ScalingEntry(source, scale.perPoint(), scale.cap(),
+                    scale.mode(), scale.baseline()));
+        }
+        entry.damage.useSpec(new DamageSpec(spec.base(), spec.ofHit(), spec.ofTargetMaxHealth(),
+                spec.ofTargetMissingHealth(), spec.ofSelfMissingHealth(), spec.damageType(),
+                Optional.of(source), scaling, spec.scalingMode(), spec.proportional(),
+                spec.minimum(), spec.maximum(), spec.multiplier()));
     }
 
     private static void read(Path file, String id) {
@@ -451,7 +629,15 @@ Entry tether = define(1.5F, 0.35F, 1, 40, 8,
         if (parsed.extra == null) {
             parsed.extra = known == null ? new LinkedHashMap<>() : known.extra;
         }
+        if (parsed.options == null && known != null && known.options != null) {
+            parsed.options = known.options.deepCopy();
+        }
         return parsed.sane();
+    }
+
+    public static JsonObject entryJson(String id) {
+        JsonElement tree = GSON.toJsonTree(get(id));
+        return tree != null && tree.isJsonObject() ? tree.getAsJsonObject() : new JsonObject();
     }
 
     public static JsonObject toJson() {

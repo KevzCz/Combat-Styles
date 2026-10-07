@@ -1,5 +1,6 @@
 package net.pixeldreamstudios.combat_styles.entity;
 
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.OwnableEntity;
@@ -65,11 +66,17 @@ public final class SummonOwner {
     }
 
     public static Entity summoningCreatorOf(Entity spawned) {
-        if (!(spawned instanceof Mob) || !(spawned instanceof TraceableEntity traceable)) {
+        if (!(spawned instanceof Mob)) {
             return null;
         }
-        Entity creator = traceable.getOwner();
-        return creator != null && creator != spawned && isSummon(creator) ? creator : null;
+        Entity creator = spawned instanceof TraceableEntity traceable ? traceable.getOwner() : null;
+        if (creator == null && spawned instanceof OwnableEntity ownable
+                && ownable.getOwnerUUID() != null
+                && spawned.level() instanceof ServerLevel server) {
+            creator = server.getEntity(ownable.getOwnerUUID());
+        }
+        return creator != null && creator != spawned
+                && (isSummon(creator) || creator instanceof ConfigurableSummon) ? creator : null;
     }
 
     public static UUID ownerOf(Entity summon) {
@@ -147,10 +154,6 @@ public final class SummonOwner {
         if (owner == null || summon == victim) {
             return false;
         }
-        if (owner.equals(victim.getUUID())) {
-            return true;
-        }
-        return (isSummon(victim) || victim instanceof ConfigurableSummon)
-                && owner.equals(ownerOf(victim));
+        return owner.equals(victim.getUUID()) || owner.equals(ownerOf(victim));
     }
 }

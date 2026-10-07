@@ -7,6 +7,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 
+import net.pixeldreamstudios.combat_styles.item.TooltipGem;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
 import net.pixeldreamstudios.combat_styles.affix.AffixText;
@@ -103,7 +104,7 @@ public final class RefTooltip {
         if (tuning == null || tuning.isEmpty()) {
             lines.add(AffixText.name(affix));
             AffixText.appendEffects(affix, lines);
-            return lines;
+            return TooltipGem.indentDetails(lines);
         }
         StyleAffix tuned = tuning.applyTo(affix);
         lines.add(AffixText.name(tuned).copy()
@@ -111,7 +112,7 @@ public final class RefTooltip {
                 .append(Component.translatable(source == null ? KEY_TUNED : KEY_TUNED_BY, source)
                         .withStyle(ChatFormatting.DARK_AQUA)));
         AffixText.appendTuned(affix, tuned, lines, true);
-        return lines;
+        return TooltipGem.indentDetails(lines);
     }
 
     public static List<Component> forSpell(String spellId) {

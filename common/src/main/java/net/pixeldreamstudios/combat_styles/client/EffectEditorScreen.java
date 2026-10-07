@@ -18,6 +18,7 @@ import net.pixeldreamstudios.combat_styles.equipment.EffectCooldown;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentEffect;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+import net.pixeldreamstudios.combat_styles.equipment.AbilityGrant;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentEffects;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLocks;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentTrigger;
@@ -106,6 +107,7 @@ public class EffectEditorScreen extends PanelScreen {
     private static final String ROW_RESET = "screen.combat_styles.effect_row_reset";
     private static final String ROW_SUMMON_PROFILE = "screen.combat_styles.effect_row_summon_profile";
     private static final String ROW_SUMMON_DIVE = "screen.combat_styles.effect_row_summon_dive";
+    private static final String ROW_GRANT_ABILITIES = "screen.combat_styles.effect_row_grant_abilities";
     private static final String ROW_HIDE_TOOLTIP = "screen.combat_styles.effect_row_hide_tooltip";
     private static final String ROW_TOOLTIP_TEXT = "screen.combat_styles.effect_row_tooltip_text";
     private static final String ROW_DELAY = "screen.combat_styles.effect_row_delay";
@@ -126,7 +128,7 @@ public class EffectEditorScreen extends PanelScreen {
                 ROW_TRIGGER, ROW_COOLDOWN, ROW_SUBSTITUTE, ROW_SUBSTITUTION, ROW_AUGMENT,
                 ROW_GRANTS, ROW_TUNES, ROW_ATTRS, ROW_DAMAGE_BONUS, ROW_ON_SWING, ROW_ON_HIT,
                 ROW_EVENTS, ROW_ECHO,
-                ROW_RESET, ROW_SUMMON_PROFILE, ROW_SUMMON_DIVE,
+                ROW_RESET, ROW_SUMMON_PROFILE, ROW_SUMMON_DIVE, ROW_GRANT_ABILITIES,
                 ROW_HIDE_TOOLTIP, ROW_TOOLTIP_TEXT, ROW_DELAY, ROW_SELF_EFFECTS));
         if (SpellEngineCompat.isLoaded()) {
             rows.add(rows.indexOf(ROW_ECHO), ROW_SPELLS);
@@ -286,6 +288,7 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_SELF_EFFECTS -> count(effect.selfEffects().size());
             case ROW_SUMMON_PROFILE -> flag(payload.summonProfile().isPresent());
             case ROW_SUMMON_DIVE -> flag(payload.summonDive().isPresent());
+            case ROW_GRANT_ABILITIES -> flag(payload.grantAbilities().isPresent());
             default -> Component.empty();
         };
     }
@@ -449,6 +452,9 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_SUMMON_DIVE -> openTree(ROW_SUMMON_DIVE, SummonDive.CODEC,
                     payload.summonDive().orElse(null),
                     applied -> setPayload(EquipmentEffects.withSummonDive(payload(), applied)));
+            case ROW_GRANT_ABILITIES -> openTree(ROW_GRANT_ABILITIES, AbilityGrant.CODEC,
+                    payload.grantAbilities().orElse(AbilityGrant.EMPTY),
+                    applied -> setPayload(EquipmentEffects.withGrantAbilities(payload(), applied)));
             default -> {
             }
         }
@@ -527,6 +533,7 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_SUBSTITUTION -> EffectSchema.ROOT_SUBSTITUTION;
             case ROW_SUMMON_PROFILE -> EffectSchema.ROOT_SUMMON_PROFILE;
             case ROW_SUMMON_DIVE -> EffectSchema.ROOT_SUMMON_DIVE;
+            case ROW_GRANT_ABILITIES -> EffectSchema.ROOT_ABILITY_GRANT;
             case ROW_ECHO -> EffectSchema.ROOT_ECHO;
             case ROW_SPELLS -> EffectSchema.ROOT_SPELLS;
             case ROW_ATTRS -> EffectSchema.ROOT_CONDITIONAL_ATTRIBUTES;
@@ -644,6 +651,8 @@ public class EffectEditorScreen extends PanelScreen {
                     payload, Optional.empty()));
             case ROW_SUMMON_DIVE -> setPayload(EquipmentEffects.withSummonDive(
                     payload, Optional.empty()));
+            case ROW_GRANT_ABILITIES -> setPayload(EquipmentEffects.withGrantAbilities(
+                    payload, Optional.empty()));
             case ROW_GRANTS -> setPayload(EquipmentEffects.withGrantAffixes(payload, List.of()));
             case ROW_TUNES -> setPayload(EquipmentEffects.withTuneAffixes(payload, Map.of()));
             case ROW_ATTRS -> setPayload(EquipmentEffects.withAttributes(payload, Map.of()));
@@ -672,6 +681,7 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_SPELLS -> !payload.spells().isEmpty();
             case ROW_SUMMON_PROFILE -> payload.summonProfile().isPresent();
             case ROW_SUMMON_DIVE -> payload.summonDive().isPresent();
+            case ROW_GRANT_ABILITIES -> payload.grantAbilities().isPresent();
             case ROW_GRANTS -> !payload.grantAffixes().isEmpty();
             case ROW_TUNES -> !payload.tuneAffixes().isEmpty();
             case ROW_ATTRS -> !payload.attributes().isEmpty();

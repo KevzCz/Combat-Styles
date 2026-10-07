@@ -9,6 +9,9 @@ import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public enum TooltipGem {
     SAPPHIRE(0xE000),
     AMBER(0xE001),
@@ -37,6 +40,7 @@ public enum TooltipGem {
     private static final String GAP = " ";
     private static final String PLAIN_INDENT = "  ";
     private static final String LEAD = " ";
+    private static final String DETAIL_MARK = CombatStyles.MOD_ID + ":detail";
 
     private final int glyph;
 
@@ -61,6 +65,30 @@ public enum TooltipGem {
             return Component.literal(PLAIN_INDENT).append(line);
         }
         return Component.literal(LEAD).append(spacer()).append(GAP).append(line);
+    }
+
+    public static MutableComponent detail(Component line) {
+        return Component.empty().withStyle(style -> style.withInsertion(DETAIL_MARK)).append(line);
+    }
+
+    public static boolean isDetail(Component line) {
+        return line != null && DETAIL_MARK.equals(line.getStyle().getInsertion());
+    }
+
+    public MutableComponent place(Component line) {
+        return isDetail(line) ? hang(bullet(line)) : bullet(line);
+    }
+
+    public static MutableComponent hangPlace(Component line) {
+        return isDetail(line) ? hang(hang(line)) : hang(line);
+    }
+
+    public static List<Component> indentDetails(List<Component> lines) {
+        List<Component> shown = new ArrayList<>(lines.size());
+        for (Component line : lines) {
+            shown.add(isDetail(line) ? hang(line) : line);
+        }
+        return shown;
     }
 
     private static MutableComponent spacer() {

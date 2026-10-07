@@ -31,12 +31,17 @@ public final class SummonProfiles {
     private static final String KEY_SEPARATOR = "|";
 
     private static final Map<UUID, Cached> RESOLVED = new ConcurrentHashMap<>();
+    private static final Map<String, Cached> RESOLVED_BY_KEY = new ConcurrentHashMap<>();
+    private static final Map<String, SummonProfile> INLINE = new ConcurrentHashMap<>();
+    private static final String INLINE_PREFIX = "inline:";
 
     private SummonProfiles() {
     }
 
     public static void forget(UUID playerId) {
         RESOLVED.remove(playerId);
+        String prefix = playerId + KEY_SEPARATOR;
+        RESOLVED_BY_KEY.keySet().removeIf(key -> key.startsWith(prefix));
     }
 
     private static List<Map.Entry<String, TriggeredEffect>> liveEffects(Player player,
@@ -76,6 +81,19 @@ public final class SummonProfiles {
         return found;
     }
 
+    public static List<AbilityGrant> liveGrants(Player player) {
+        List<AbilityGrant> found = new ArrayList<>();
+        if (player == null) {
+            return found;
+        }
+        for (WornEquipment worn : WornEquipment.of(player)) {
+            for (Map.Entry<String, TriggeredEffect> entry : liveEffects(player, worn.definition(), worn.copy())) {
+                entry.getValue().effect().grantAbilities().ifPresent(found::add);
+            }
+        }
+        return found;
+    }
+
     public static List<Sourced> liveProfiles(Player player) {
         List<Sourced> found = new ArrayList<>();
         if (player == null) {
@@ -96,8 +114,12 @@ public final class SummonProfiles {
         if (player == null) {
             return null;
         }
-        SummonProfile main = profileOf(player, player.getMainHandItem());
-        return main != null ? main : profileOf(player, player.getOffhandItem());
+        SummonProfile main = activeProfileOf(player, player.getMainHandItem());
+        return main != null ? main : activeProfileOf(player, player.getOffhandItem());
+    }
+
+    private static SummonProfile activeProfileOf(Player player, ItemStack stack) {
+        return WornItems.includes(player, stack) ? profileOf(player, stack) : null;
     }
 
     public static SummonProfile wornProfileOf(Player player) {
@@ -190,6 +212,50 @@ public final class SummonProfiles {
                 ? null
                 : profile.resolve(player, CONTEXT);
         RESOLVED.put(player.getUUID(), new Cached(now, fresh));
+        return fresh;
+    }
+
+    public static String keyOf(Player player, SummonProfile profile) {
+        if (player == null || profile == null) {
+            return null;
+        }
+        for (Sourced sourced : liveProfiles(player)) {
+            if (sourced.profile() == profile) {
+                return sourced.key();
+            }
+        }
+        String inline = INLINE_PREFIX + Integer.toHexString(profile.hashCode());
+        INLINE.put(inline, profile);
+        return inline;
+    }
+
+    public static SummonProfile.Resolved resolvedFor(Player player, String key, String entityId) {
+        if (player == null) {
+            return null;
+        }
+        String cacheKey = player.getUUID() + KEY_SEPARATOR + key + KEY_SEPARATOR + entityId;
+        long now = player.level().getGameTime();
+        Cached cached = RESOLVED_BY_KEY.get(cacheKey);
+        if (cached != null && cached.tick() == now) {
+            return cached.resolved();
+        }
+        SummonProfile profile = key == null ? null : INLINE.get(key);
+        if (profile == null && key != null) {
+            for (Sourced sourced : liveProfiles(player)) {
+                if (sourced.key().equals(key)) {
+                    profile = sourced.profile();
+                    break;
+                }
+            }
+        }
+        if (profile == null && entityId != null) {
+            profile = profileFor(player, entityId);
+        }
+        if (profile == null) {
+            profile = replacingProfileOf(player);
+        }
+        SummonProfile.Resolved fresh = profile == null ? null : profile.resolve(player, CONTEXT);
+        RESOLVED_BY_KEY.put(cacheKey, new Cached(now, fresh));
         return fresh;
     }
 

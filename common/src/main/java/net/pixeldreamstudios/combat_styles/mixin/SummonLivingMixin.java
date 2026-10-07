@@ -48,6 +48,14 @@ public abstract class SummonLivingMixin {
         }
     }
 
+    @Inject(method = "hurt", at = @At("RETURN"))
+    private void combat_styles$summonHurt(DamageSource source, float amount,
+                                          CallbackInfoReturnable<Boolean> callback) {
+        if (callback.getReturnValueZ()) {
+            SummonLifecycle.hurt((LivingEntity) (Object) this, source);
+        }
+    }
+
     @Inject(method = "addEffect(Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)Z",
             at = @At("HEAD"), cancellable = true)
     private void combat_styles$noFriendlyDebuff(MobEffectInstance effect, Entity source,

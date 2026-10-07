@@ -32,6 +32,7 @@ public final class DropSuggestions {
     public static final String HUD_DENSITY = ConfigOptions.KIND_HUD_DENSITY;
     public static final String SCHOOLS = ConfigOptions.SUGGEST_SCHOOLS;
     public static final String SCALING_SOURCES = ConfigOptions.SUGGEST_SCALING_SOURCES;
+    public static final String DAMAGE_TYPES = ConfigOptions.SUGGEST_DAMAGE_TYPES;
 
     private static final List<String> MOTIONS = List.of("dash", "blink", "vault");
 
@@ -54,6 +55,7 @@ public final class DropSuggestions {
             case HUD_DENSITY -> HudDensity.keys();
             case SCHOOLS -> SpellPowerAccess.schoolIds();
             case SCALING_SOURCES -> scalingSources();
+            case DAMAGE_TYPES -> EffectChoices.damageTypeIds();
             default -> List.of();
         };
     }

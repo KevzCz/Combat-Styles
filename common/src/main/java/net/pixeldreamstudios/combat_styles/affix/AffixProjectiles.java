@@ -1,6 +1,7 @@
 package net.pixeldreamstudios.combat_styles.affix;
 
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+import net.pixeldreamstudios.combat_styles.entity.ConfigurableSummon;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.mixin.ArrowPickupAccessor;
@@ -21,7 +22,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Items;
 import net.minecraft.core.registries.BuiltInRegistries;
 
-final class AffixProjectiles {
+public final class AffixProjectiles {
 
     private static final String PROJECTILE_DEBUG = "projectile";
 
@@ -128,6 +129,80 @@ final class AffixProjectiles {
                 spawned.setDeltaMovement(direction.scale(projectile.speed()).add(carried));
             }
             if (spawn.velocity().overridesGravity()) {
+                spawned.setNoGravity(true);
+            }
+            applyProjectileDamage(player, spawned, projectile, hitDamage);
+            if (spawned instanceof AbstractArrow arrow) {
+                arrow.pickup = AbstractArrow.Pickup.DISALLOWED;
+                if (arrow.getPickupItemStackOrigin().isEmpty()) {
+                    ((ArrowPickupAccessor) arrow)
+                            .combat_styles$setPickupItemStack(new ItemStack(Items.ARROW));
+                }
+            }
+            ProjectileUpkeep.track(player, spawned, projectile);
+            level.addFreshEntity(spawned);
+        }
+    }
+
+    public static void spawnFrom(ServerLevel level, Player player, Entity origin,
+                                 LivingEntity target, AffixEffects.Projectile projectile,
+                                 float triggeringDamage) {
+        if (origin == null || !EffectChance.rolls(player, projectile.chance())) {
+            return;
+        }
+        int count = Math.max(1, projectile.count());
+        if (!projectile.spellProjectile().isEmpty()) {
+            ResourceLocation spellId = ResourceLocation.tryParse(projectile.spellProjectile().spell());
+            if (spellId == null || !SpellEngineCompat.isLoaded()) {
+                return;
+            }
+            float damage = spellDamageOf(player, projectile, triggeringDamage);
+            DamageSpec spec = projectile.damageSpec().orElse(null);
+            for (int shot = 0; shot < count; shot++) {
+                Object tag = SpellEngineCompat.shootSpell(player, spellId, target, damage,
+                        projectile.spellProjectile().tuning(),
+                        launched -> SpellShotPlacement.expectFrom(launched, player, target, origin));
+                if (tag == null) {
+                    return;
+                }
+                ProjectileUpkeep.watchSpellShot(tag, player, spec, projectile.ignoreIframes());
+            }
+            return;
+        }
+        ResourceLocation entityId = ResourceLocation.tryParse(projectile.entity());
+        EntityType<?> type = entityId == null
+                ? null
+                : BuiltInRegistries.ENTITY_TYPE.getOptional(entityId).orElse(null);
+        if (type == null) {
+            CombatStyles.LOGGER.warn("Ability projectile entity {} does not exist", projectile.entity());
+            return;
+        }
+        Vec3 from = origin instanceof ConfigurableSummon summon
+                ? summon.abilityOrigin()
+                : origin.getEyePosition();
+        Vec3 toward = target != null && target.isAlive()
+                ? target.getBoundingBox().getCenter().subtract(from)
+                : origin.getLookAngle();
+        Vec3 aimed = toward.lengthSqr() < 1.0E-6D ? player.getLookAngle() : toward.normalize();
+        float hitDamage = projectileDamage(player, projectile, triggeringDamage);
+        for (int i = 0; i < count; i++) {
+            Entity spawned = type.create(level);
+            if (spawned == null) {
+                return;
+            }
+            Vec3 direction = jitter(aimed, projectile.spread(), player);
+            spawned.setPos(from.x, from.y, from.z);
+            if (spawned instanceof Projectile shot) {
+                shot.setOwner(player);
+                shot.shoot(direction.x, direction.y, direction.z, projectile.speed(),
+                        projectile.spawn().velocity().divergence());
+            } else {
+                if (spawned instanceof SlashWaveEntity wave) {
+                    wave.setOwner(player);
+                }
+                spawned.setDeltaMovement(direction.scale(projectile.speed()));
+            }
+            if (projectile.spawn().velocity().overridesGravity()) {
                 spawned.setNoGravity(true);
             }
             applyProjectileDamage(player, spawned, projectile, hitDamage);

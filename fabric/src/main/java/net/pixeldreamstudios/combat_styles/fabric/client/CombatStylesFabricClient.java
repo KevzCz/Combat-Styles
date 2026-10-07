@@ -13,7 +13,9 @@ import net.pixeldreamstudios.combat_styles.client.ClientTooltipBinding;
 import net.pixeldreamstudios.combat_styles.client.SwungAttackReporter;
 import net.pixeldreamstudios.combat_styles.equipment.SwingHaste;
 import net.pixeldreamstudios.combat_styles.network.AlignComboPayload;
+import net.pixeldreamstudios.combat_styles.network.BeamPayload;
 import net.pixeldreamstudios.combat_styles.network.SummonSyncPayload;
+import net.pixeldreamstudios.combat_styles.client.ClientBeams;
 import net.pixeldreamstudios.combat_styles.client.ClientSummons;
 import net.pixeldreamstudios.combat_styles.network.HoldComboPayload;
 import net.pixeldreamstudios.combat_styles.network.SwingHastePayload;
@@ -60,6 +62,10 @@ public class CombatStylesFabricClient implements ClientModInitializer {
                     ComboHold.queue(context.player(), payload.slots());
                     ComboHold.apply(context.player());
                 }));
+
+        ClientPlayNetworking.registerGlobalReceiver(BeamPayload.TYPE,
+                (payload, context) -> context.client().execute(() ->
+                        ClientBeams.accept(payload)));
 
         ClientPlayNetworking.registerGlobalReceiver(SummonSyncPayload.TYPE,
                 (payload, context) -> context.client().execute(() ->

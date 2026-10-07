@@ -5,7 +5,6 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.config.EquipmentDropConfig;
 import net.pixeldreamstudios.combat_styles.config.ConfigOptions.Option;
@@ -107,7 +106,6 @@ public class ConfigScreen extends PanelScreen {
         List<Option> all = new ArrayList<>();
         all.addAll(ConfigOptions.of(CombatStylesConfig.get()));
         all.addAll(ConfigOptions.statusEffects());
-        all.addAll(ConfigOptions.abilities());
         all.addAll(ConfigOptions.equipmentDrops());
         all.addAll(ConfigOptions.summons());
         all.add(ConfigOptions.action("hudMove",
@@ -253,7 +251,6 @@ public class ConfigScreen extends PanelScreen {
         CombatStylesConfig.save();
         if (!ConfigEdits.connected()) {
             StatusEffectConfig.save();
-            AbilityConfig.save();
             EquipmentDropConfig.save();
         } else {
             sendChanges();

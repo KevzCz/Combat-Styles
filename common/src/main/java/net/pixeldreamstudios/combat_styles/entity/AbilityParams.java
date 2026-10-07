@@ -1,6 +1,7 @@
 package net.pixeldreamstudios.combat_styles.entity;
 
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
+import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -65,15 +66,19 @@ public final class AbilityParams {
         if (entry == null) {
             return params;
         }
-        params.put("base_damage", (double) entry.damage.baseDamage);
-        params.put("weapon_damage_ratio", (double) entry.damage.weaponDamageRatio);
-        params.put("per_point", entry.damage.perPoint);
+        DamageSpec spec = entry.asDamageSpec();
+        params.put("base_damage", (double) spec.base());
+        params.put("weapon_damage_ratio", (double) spec.ofHit());
+        params.put("per_point", spec.scaling().isEmpty()
+                ? 0.0D
+                : (double) spec.scaling().getFirst().perPoint());
         params.put("hits", (double) entry.hits());
         params.put("lifesteal", (double) entry.damage.lifesteal);
         params.put("applies_stacks", (double) entry.damage.appliesStacks);
         params.put("applies_chance", (double) entry.damage.appliesChance);
         params.put("duration_ticks", (double) entry.duration());
         params.put("windup_ticks", (double) entry.windup());
+        params.put("cooldown_ticks", (double) entry.cooldown());
         params.put("radius", entry.shape.radius);
         params.put("range", entry.shape.range);
         params.put("rise", entry.shape.rise);

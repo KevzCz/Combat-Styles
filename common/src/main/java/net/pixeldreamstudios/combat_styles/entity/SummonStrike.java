@@ -12,6 +12,7 @@ import net.minecraft.world.entity.TraceableEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.equipment.ProjectileImpactScope;
 
@@ -46,6 +47,9 @@ public final class SummonStrike {
                     + " causing=" + describe(source.getEntity())
                     + " summon=" + describe(summon));
         }
+        if (ownAttack(summon, source.getDirectEntity())) {
+            AbilityHosts.react(summon, PassiveTrigger.HIT, target);
+        }
         SummonData data = (SummonData) summon;
         float damage = data.combat_styles$summonDamage();
         if (damage <= 0.0F) {
@@ -70,6 +74,11 @@ public final class SummonStrike {
             STRIKER.remove();
         }
         return true;
+    }
+
+    private static boolean ownAttack(Entity summon, Entity direct) {
+        return direct == summon
+                || (direct instanceof Projectile && !SpellEngineCompat.isSpellProjectile(direct));
     }
 
     public static Entity striking() {

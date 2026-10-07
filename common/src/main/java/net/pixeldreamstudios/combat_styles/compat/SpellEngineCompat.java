@@ -4,12 +4,14 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import net.pixeldreamstudios.combat_styles.affix.CastSpell;
+import net.pixeldreamstudios.combat_styles.entity.SummonCastTarget;
 import net.pixeldreamstudios.combat_styles.equipment.SpellTuning;
 
 import java.util.Collection;
@@ -95,6 +97,10 @@ public final class SpellEngineCompat {
         return SpellEngineBridge.prepareSummon(spawned, owner);
     }
 
+    public static boolean reownSpellSummon(Entity spawned, Player owner) {
+        return SpellEngineBridge.reownSpellSummon(spawned, owner);
+    }
+
     public static void init() {
         SpellEngineBridge.init();
     }
@@ -106,6 +112,20 @@ public final class SpellEngineCompat {
     public static Object castSpell(Player player, ResourceLocation spellId, CastSpell.Target target,
                                    Entity hit, float damage, SpellTuning tuning) {
         return SpellEngineBridge.castSpell(player, spellId, target, hit, damage, tuning);
+    }
+
+    public static Object castSpellAs(LivingEntity caster, Player owner, ResourceLocation spellId,
+                                     LivingEntity target, float damage, SpellTuning tuning,
+                                     SummonCastTarget mode) {
+        return SpellEngineBridge.castSpellAs(caster, owner, spellId, target, damage, tuning, mode);
+    }
+
+    public static float triggerChance(ResourceLocation spellId, Level level) {
+        return SpellEngineBridge.triggerChance(spellId, level);
+    }
+
+    public static boolean deliversProjectile(ResourceLocation spellId, Level level) {
+        return SpellEngineBridge.deliversProjectile(spellId, level);
     }
 
     public static SpellChannel channelOf(ResourceLocation spellId, Level level, SpellTuning tuning) {

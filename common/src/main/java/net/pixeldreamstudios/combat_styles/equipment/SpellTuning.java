@@ -12,13 +12,17 @@ public record SpellTuning(float powerMultiplier, float criticalChanceBonus,
                           int effectAmplifierAdd, List<String> impactSchools,
                           List<String> impactTypes, float ricochetRange,
                           float knockbackMultiply, SpellLaunchTuning launch,
-                          SpellChainTuning chainReaction, float cooldownReduction) {
+                          SpellChainTuning chainReaction, float cooldownReduction,
+                          float triggerChanceAdd) {
 
     public static final float NO_MULTIPLIER = 1.0F;
+    public static final String KEY_TRIGGER_CHANCE_ADD = "trigger_chance_add";
+    private static final float NO_CHANCE = 0.0F;
+    private static final float CERTAIN = 1.0F;
 
     public static final SpellTuning NONE = new SpellTuning(NO_MULTIPLIER, 0.0F, 0.0F,
             0, 0, 0, 0.0F, 0, 0.0F, 0, List.of(), List.of(), 0.0F, 0.0F,
-            SpellLaunchTuning.NONE, SpellChainTuning.NONE, 0.0F);
+            SpellLaunchTuning.NONE, SpellChainTuning.NONE, 0.0F, 0.0F);
 
     private record Power(float powerMultiplier, float criticalChanceBonus,
                          float criticalDamageBonus, int ricochet, int pierce, int bounce,
@@ -29,7 +33,7 @@ public record SpellTuning(float powerMultiplier, float criticalChanceBonus,
                          List<String> impactSchools, List<String> impactTypes,
                          float ricochetRange, float knockbackMultiply,
                          SpellLaunchTuning launch, SpellChainTuning chainReaction,
-                         float cooldownReduction) {
+                         float cooldownReduction, float triggerChanceAdd) {
     }
 
     private static final MapCodec<Power> POWER_CODEC = RecordCodecBuilder.mapCodec(
@@ -68,7 +72,9 @@ public record SpellTuning(float powerMultiplier, float criticalChanceBonus,
                             .optionalFieldOf("chain_reaction", SpellChainTuning.NONE)
                             .forGetter(Reach::chainReaction),
                     Codec.FLOAT.optionalFieldOf("cooldown_reduction", 0.0F)
-                            .forGetter(Reach::cooldownReduction)
+                            .forGetter(Reach::cooldownReduction),
+                    Codec.FLOAT.optionalFieldOf(KEY_TRIGGER_CHANCE_ADD, 0.0F)
+                            .forGetter(Reach::triggerChanceAdd)
             ).apply(instance, Reach::new));
 
     public static final MapCodec<SpellTuning> MAP_CODEC = RecordCodecBuilder.mapCodec(
@@ -81,14 +87,15 @@ public record SpellTuning(float powerMultiplier, float criticalChanceBonus,
                             tuning.effectAmplifierAdd(), tuning.impactSchools(),
                             tuning.impactTypes(), tuning.ricochetRange(),
                             tuning.knockbackMultiply(), tuning.launch(),
-                            tuning.chainReaction(), tuning.cooldownReduction()))
+                            tuning.chainReaction(), tuning.cooldownReduction(),
+                            tuning.triggerChanceAdd()))
             ).apply(instance, (power, reach) -> new SpellTuning(power.powerMultiplier(),
                     power.criticalChanceBonus(), power.criticalDamageBonus(), power.ricochet(),
                     power.pierce(), power.bounce(), power.rangeAdd(), power.channelTicksAdd(),
                     reach.effectDurationAdd(), reach.effectAmplifierAdd(),
                     reach.impactSchools(), reach.impactTypes(), reach.ricochetRange(),
                     reach.knockbackMultiply(), reach.launch(), reach.chainReaction(),
-                    reach.cooldownReduction())));
+                    reach.cooldownReduction(), reach.triggerChanceAdd())));
 
     public static final Codec<SpellTuning> CODEC = MAP_CODEC.codec();
 
@@ -104,7 +111,12 @@ public record SpellTuning(float powerMultiplier, float criticalChanceBonus,
                 && criticalDamageBonus == 0.0F && !hasPerks() && rangeAdd == 0.0F
                 && channelTicksAdd == 0 && effectDurationAdd == 0.0F
                 && effectAmplifierAdd == 0 && knockbackMultiply == 0.0F
-                && cooldownReduction == 0.0F && launch.isEmpty();
+                && cooldownReduction == 0.0F && launch.isEmpty()
+                && triggerChanceAdd == 0.0F;
+    }
+
+    public float chanceFrom(float base) {
+        return Math.max(NO_CHANCE, Math.min(CERTAIN, base + triggerChanceAdd));
     }
 
     public boolean hasPerks() {

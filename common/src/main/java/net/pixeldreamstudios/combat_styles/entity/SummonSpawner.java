@@ -28,6 +28,7 @@ import net.pixeldreamstudios.combat_styles.equipment.SummonProfile;
 import net.pixeldreamstudios.combat_styles.equipment.SummonProfiles;
 import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -68,24 +69,39 @@ public final class SummonSpawner {
     }
 
     public static void tickDespawns(long gameTime) {
+        List<Despawn> delayed = new ArrayList<>();
         DESPAWNING.removeIf(despawn -> {
             if (gameTime < despawn.expiresAt()) {
                 return false;
             }
             Entity entity = despawn.entity();
             if (!entity.isAlive()) {
+                AbilityHosts.forget(entity);
                 return true;
             }
             if (entity instanceof ConfigurableSummon summon && summon.beginDespawn()) {
                 return summon.fading();
             }
+            int finale = AbilityHosts.beginFinale(entity);
+            if (finale > 0) {
+                delayed.add(new Despawn(entity, gameTime + finale));
+                return true;
+            }
+            AbilityHosts.forget(entity);
             entity.discard();
             return true;
         });
+        DESPAWNING.addAll(delayed);
     }
 
     public static void applySummons(ServerLevel level, Player player, LivingEntity target,
                                     List<AffixEffects.Summon> summons, float dealtDamage) {
+        applySummons(level, player, target, summons, dealtDamage, null);
+    }
+
+    public static void applySummons(ServerLevel level, Player player, LivingEntity target,
+                                    List<AffixEffects.Summon> summons, float dealtDamage,
+                                    RaiseRules raise) {
         for (AffixEffects.Summon declared : summons) {
             AffixEffects.Summon summon = resolveVictim(declared, target);
             if (summon == null) {
@@ -96,15 +112,20 @@ public final class SummonSpawner {
                 CombatStyles.LOGGER.warn("Unknown summon entity {}", summon.entity());
                 continue;
             }
-            SummonProfile replacing = SummonProfiles.replacementFor(player, summon.entity());
+            SummonProfile replacing = declared.raisesVictim()
+                    ? null
+                    : SummonProfiles.replacementFor(player, summon.entity());
             if (replacing != null) {
                 EntityType<?> replaced = typeOf(replacing.entity().orElse(""));
                 if (replaced != null) {
                     type = replaced;
                 }
             }
+            RaiseRules raised = raise == null ? RaiseRules.DEFAULT : raise;
             SummonProfile profile = replacing != null
                     ? replacing
+                    : declared.raisesVictim()
+                    ? raised.profile().profileFor(player, summon.entity(), raised.profiles())
                     : profileFor(player, summon.entity());
             if (!EffectChance.rolls(player, summon.chance())) {
                 continue;
@@ -153,11 +174,17 @@ public final class SummonSpawner {
             }
             if (configurable != null) {
                 configurable.onSpawned(player, i);
+                configurable.bindProfile(SummonProfiles.keyOf(player, profile), i);
                 configure(player, target, configurable, summon, profile, summonDamage, i);
             } else if (spawned instanceof SummonData data
                     && !summon.ownDamage() && (profile == null || !profile.ownDamage())) {
                 data.combat_styles$setSummonDamage(summonDamage);
                 data.combat_styles$setSummonSpec(spec);
+            }
+            if (configurable == null && spawned instanceof LivingEntity hosted
+                    && AbilityHosts.wants(profile)) {
+                AbilityHosts.track(player, hosted, SummonProfiles.keyOf(player, profile), i,
+                        summonDamage);
             }
             prepare(player, spawned, configurable);
             if (spawned instanceof LivingEntity living) {
@@ -207,12 +234,18 @@ public final class SummonSpawner {
         float attack = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
         DamageSpec spec = profile.damageSpec().orElse(null);
         float damage = spec != null ? spec.amountFor(player, attack) : attack * resolved.damageScale();
+        String profileKey = SummonProfiles.keyOf(player, profile);
         if (configurable != null) {
             configurable.configure(player, null, damage, 0);
             configurable.companionSpawned(player, slot, count);
+            configurable.bindProfile(profileKey, slot);
         } else if (spawned instanceof SummonData data && !profile.ownDamage()) {
             data.combat_styles$setSummonDamage(damage);
             data.combat_styles$setSummonSpec(spec);
+        }
+        if (configurable == null && spawned instanceof LivingEntity hosted
+                && AbilityHosts.wants(profile)) {
+            AbilityHosts.track(player, hosted, profileKey, slot, damage);
         }
         prepare(player, spawned, configurable);
         if (spawned instanceof LivingEntity living) {
@@ -268,8 +301,7 @@ public final class SummonSpawner {
     }
 
     private static SummonProfile profileFor(Player player, String entityId) {
-        SummonProfile matched = SummonProfiles.profileFor(player, entityId);
-        return matched != null ? matched : SummonProfiles.profileFor(player);
+        return RaiseProfile.INHERIT.profileFor(player, entityId);
     }
 
     private static EntityType<?> typeOf(String raw) {

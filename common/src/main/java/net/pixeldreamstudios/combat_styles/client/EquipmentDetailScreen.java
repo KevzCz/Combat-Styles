@@ -16,6 +16,7 @@ import net.minecraft.world.item.ItemStack;
 import net.pixeldreamstudios.combat_styles.platform.WeaponRegistryAccess;
 
 import net.pixeldreamstudios.combat_styles.style.InnateAffixes;
+import net.pixeldreamstudios.combat_styles.equipment.ActiveIn;
 import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
 import net.pixeldreamstudios.combat_styles.equipment.EffectCooldown;
 import net.pixeldreamstudios.combat_styles.equipment.EffectGroup;
@@ -97,6 +98,10 @@ public class EquipmentDetailScreen extends PanelScreen {
     private static final String KEY_SOURCE_DATA = "screen.combat_styles.equipment_source_data";
     private static final String KEY_POSE = "screen.combat_styles.equipment_pose";
     private static final String KEY_CATEGORY = "screen.combat_styles.equipment_weapon_category";
+    private static final String KEY_ACTIVE_IN = "screen.combat_styles.equipment_active_in";
+    private static final String KEY_ACTIVE_IN_PREFIX = "screen.combat_styles.equipment_active_in.";
+    private static final String KEY_ACTIVE_IN_HINT = "hint.combat_styles.active_in";
+    private static final int META_COLUMNS = 3;
     private static final String KEY_CATEGORY_PICKER = "screen.combat_styles.weapon_category_picker";
     private static final String KEY_USE = "screen.combat_styles.equipment_use";
     private static final String KEY_PASSIVES = "screen.combat_styles.equipment_passives";
@@ -123,6 +128,7 @@ public class EquipmentDetailScreen extends PanelScreen {
     private PoseTuning poseTuning;
     private UseSpec use = UseSpec.NONE;
     private Optional<String> weaponCategory;
+    private ActiveIn activeIn;
     private final List<String> matchItems = new ArrayList<>();
     private final List<String> matchTags = new ArrayList<>();
     private final List<String> matchCategories = new ArrayList<>();
@@ -154,6 +160,7 @@ public class EquipmentDetailScreen extends PanelScreen {
         this.poseTuning = definition.poseTuning();
         this.use = definition.use();
         this.weaponCategory = definition.weaponCategory();
+        this.activeIn = definition.activeIn();
         this.matchItems.addAll(definition.items());
         this.matchTags.addAll(definition.itemTags());
         this.matchCategories.addAll(definition.weaponCategories());
@@ -527,7 +534,7 @@ public class EquipmentDetailScreen extends PanelScreen {
                 pose, offHandPose, poseTuning, List.copyOf(matchItems),
                 List.copyOf(matchTags), List.copyOf(matchCategories),
                 List.copyOf(excludeItems), List.copyOf(excludeTags),
-                List.copyOf(excludeCategories), use, weaponCategory);
+                List.copyOf(excludeCategories), use, weaponCategory, activeIn);
     }
 
     private void export() {
@@ -729,12 +736,29 @@ public class EquipmentDetailScreen extends PanelScreen {
         return contentRight() - REMOVE_WIDTH;
     }
 
+    private int metaThird() {
+        return contentWidth() / META_COLUMNS;
+    }
+
     private int rarityWidth() {
-        return contentWidth() / 2 - GAP;
+        return metaThird() - GAP;
+    }
+
+    private int activeInX() {
+        return contentLeft() + metaThird();
+    }
+
+    private int activeInWidth() {
+        return metaThird() - GAP;
     }
 
     private int innateX() {
-        return contentLeft() + contentWidth() / 2 + GAP;
+        return contentLeft() + metaThird() * (META_COLUMNS - 1);
+    }
+
+    private ActiveIn nextActiveIn() {
+        ActiveIn[] values = ActiveIn.values();
+        return values[(activeIn.ordinal() + 1) % values.length];
     }
 
     private boolean isWeapon() {
@@ -770,6 +794,11 @@ public class EquipmentDetailScreen extends PanelScreen {
         if (ScreenDraw.isWithin(mouseX, mouseY, left + ScreenTheme.PADDING, top + META_Y,
                 rarityWidth(), ROW_HEIGHT)) {
             rarity = nextRarity();
+            return true;
+        }
+        if (ScreenDraw.isWithin(mouseX, mouseY, activeInX(), top + META_Y,
+                activeInWidth(), ROW_HEIGHT)) {
+            activeIn = nextActiveIn();
             return true;
         }
         if (isWeapon() && ScreenDraw.isWithin(mouseX, mouseY, innateX(), top + META_Y,
@@ -869,6 +898,21 @@ public class EquipmentDetailScreen extends PanelScreen {
         graphics.drawString(font, rarityLabel,
                 contentLeft() + rarityWidth() - TEXT_INSET - font.width(rarityLabel),
                 top + META_Y + 5, ScreenTheme.MUTED, false);
+
+        boolean activeHover = ScreenDraw.isWithin(mouseX, mouseY,
+                activeInX(), top + META_Y, activeInWidth(), ROW_HEIGHT);
+        ScreenDraw.rowBackground(graphics, activeInX(), top + META_Y,
+                activeInWidth(), ROW_HEIGHT - 2, 1, activeHover, false);
+        graphics.drawString(font, Component.translatable(KEY_ACTIVE_IN),
+                activeInX() + TEXT_INSET, top + META_Y + 5, ScreenTheme.TEXT, false);
+        Component activeLabel = Component.translatable(KEY_ACTIVE_IN_PREFIX
+                + activeIn.getSerializedName());
+        graphics.drawString(font, activeLabel,
+                activeInX() + activeInWidth() - TEXT_INSET - font.width(activeLabel),
+                top + META_Y + 5, ScreenTheme.MUTED, false);
+        if (activeHover) {
+            tooltip = List.of(Component.translatable(KEY_ACTIVE_IN_HINT));
+        }
 
         if (isWeapon()) {
             int innateWidth = contentRight() - innateX();
