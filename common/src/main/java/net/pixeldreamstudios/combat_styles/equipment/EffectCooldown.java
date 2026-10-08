@@ -4,6 +4,8 @@ import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 public record EffectCooldown(int ticks, int uses, int duration, boolean refreshOnUse,
                              boolean holdWhileActive) {
 
@@ -23,11 +25,11 @@ public record EffectCooldown(int ticks, int uses, int duration, boolean refreshO
                             .forGetter(EffectCooldown::holdWhileActive)
             ).apply(instance, EffectCooldown::new));
 
-    public static final Codec<EffectCooldown> CODEC = Codec.either(Codec.INT, EXPANDED)
+    public static final Codec<EffectCooldown> CODEC = Customs.wrap(EffectCooldown.class, Codec.either(Codec.INT, EXPANDED)
             .xmap(either -> either.map(EffectCooldown::of, value -> value),
                     value -> value.windowed() || !value.holdWhileActive()
                             ? Either.right(value)
-                            : Either.left(value.ticks()));
+                            : Either.left(value.ticks())));
 
     public static final EffectCooldown SAMPLE =
             new EffectCooldown(0, 1, DEFAULT_DURATION, true, true);

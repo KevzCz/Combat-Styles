@@ -4,6 +4,7 @@ import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,8 +22,8 @@ public record EventPayloads(Map<EventKind, List<AffixEffects.OnHit>> payloads) {
             .xmap(either -> either.map(List::of, list -> list),
                     list -> list.size() == 1 ? Either.left(list.getFirst()) : Either.right(list));
 
-    public static final Codec<EventPayloads> CODEC = Codec.unboundedMap(EventKind.CODEC, ONE_OR_MANY)
-            .xmap(EventPayloads::new, EventPayloads::payloads);
+    public static final Codec<EventPayloads> CODEC = Customs.wrap(EventPayloads.class, Codec.unboundedMap(EventKind.CODEC, ONE_OR_MANY)
+            .xmap(EventPayloads::new, EventPayloads::payloads));
 
     public static final EventPayloads EMPTY = new EventPayloads(Map.of());
 
@@ -34,7 +35,8 @@ public record EventPayloads(Map<EventKind, List<AffixEffects.OnHit>> payloads) {
                         ? List.of()
                         : entry.getValue().stream()
                                 .filter(payload -> payload != null
-                                        && !payload.equals(AffixEffects.OnHit.EMPTY))
+                                        && (!payload.equals(AffixEffects.OnHit.EMPTY)
+                                                || Customs.has(payload)))
                                 .toList();
                 if (entry.getKey() != null && !list.isEmpty()) {
                     kept.put(entry.getKey(), list);

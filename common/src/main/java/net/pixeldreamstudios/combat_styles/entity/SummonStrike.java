@@ -11,7 +11,7 @@ import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.TraceableEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.equipment.ProjectileImpactScope;
@@ -68,7 +68,7 @@ public final class SummonStrike {
         try {
             DamageDealer.dealSpec(owner, target, data.combat_styles$summonSpec(),
                     damage, source);
-            AffixDamageDealer.onSummonHit(owner, target, damage);
+            CombatEffectDealer.onSummonHit(owner, target, damage);
         } finally {
             STRIKING.set(Boolean.FALSE);
             STRIKER.remove();

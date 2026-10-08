@@ -4,6 +4,8 @@ import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.Optional;
 
 public record AbilityUse(String ability, Optional<AbilityTuning> tuning) {
@@ -16,9 +18,9 @@ public record AbilityUse(String ability, Optional<AbilityTuning> tuning) {
             AbilityTuning.CODEC.optionalFieldOf(KEY_TUNING).forGetter(AbilityUse::tuning)
     ).apply(instance, AbilityUse::new));
 
-    public static final Codec<AbilityUse> CODEC = Codec.either(Codec.STRING, FULL).xmap(
+    public static final Codec<AbilityUse> CODEC = Customs.wrap(AbilityUse.class, Codec.either(Codec.STRING, FULL).xmap(
             either -> either.map(AbilityUse::of, full -> full),
-            Either::right);
+            Either::right));
 
     public static final AbilityUse SAMPLE = of("");
 

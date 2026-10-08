@@ -8,6 +8,7 @@ import net.minecraft.util.ExtraCodecs;
 
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
 import net.pixeldreamstudios.combat_styles.config.OptionSources;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 
 import java.util.List;
@@ -29,9 +30,9 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
 
     public static final Codec<JsonObject> OPTIONS_CODEC = ExtraCodecs.JSON.comapFlatMap(
             json -> json.isJsonObject()
-                    ? DataResult.success(json.getAsJsonObject())
+                    ? DataResult.success(json.getAsJsonObject().deepCopy())
                     : DataResult.error(() -> NOT_AN_OBJECT),
-            json -> json);
+            JsonObject::deepCopy);
 
     public record Damage(Optional<Float> baseDamage,
                          Optional<Float> weaponDamageRatio,
@@ -52,7 +53,7 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty());
 
-        public static final Codec<Damage> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Damage> CODEC = Customs.wrap(Damage.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("base_damage").forGetter(Damage::baseDamage),
                 Codec.FLOAT.optionalFieldOf("weapon_damage_ratio").forGetter(Damage::weaponDamageRatio),
                 Codec.DOUBLE.optionalFieldOf("per_point").forGetter(Damage::perPoint),
@@ -66,7 +67,7 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
                 Codec.BOOL.optionalFieldOf("detonates").forGetter(Damage::detonates),
                 DamageSpec.CODEC.optionalFieldOf("damage_spec").forGetter(Damage::damageSpec),
                 Codec.STRING.optionalFieldOf("damage_type").forGetter(Damage::damageType)
-        ).apply(instance, Damage::new));
+        ).apply(instance, Damage::new)));
     }
 
     public record Timing(Optional<Integer> durationTicks, Optional<Integer> windupTicks,
@@ -75,11 +76,11 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
         public static final Timing NONE = new Timing(Optional.empty(), Optional.empty(),
                 Optional.empty());
 
-        public static final Codec<Timing> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Timing> CODEC = Customs.wrap(Timing.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.optionalFieldOf("duration_ticks").forGetter(Timing::durationTicks),
                 Codec.INT.optionalFieldOf("windup_ticks").forGetter(Timing::windupTicks),
                 Codec.INT.optionalFieldOf("cooldown_ticks").forGetter(Timing::cooldownTicks)
-        ).apply(instance, Timing::new));
+        ).apply(instance, Timing::new)));
     }
 
     public record Shape(Optional<Double> radius, Optional<Double> range, Optional<Double> rise,
@@ -89,14 +90,14 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
         public static final Shape NONE = new Shape(Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        public static final Codec<Shape> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Shape> CODEC = Customs.wrap(Shape.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.DOUBLE.optionalFieldOf("radius").forGetter(Shape::radius),
                 Codec.DOUBLE.optionalFieldOf("range").forGetter(Shape::range),
                 Codec.DOUBLE.optionalFieldOf("rise").forGetter(Shape::rise),
                 Codec.DOUBLE.optionalFieldOf("pull").forGetter(Shape::pull),
                 Codec.DOUBLE.optionalFieldOf("lift").forGetter(Shape::lift),
                 Codec.INT.optionalFieldOf("max_targets").forGetter(Shape::maxTargets)
-        ).apply(instance, Shape::new));
+        ).apply(instance, Shape::new)));
     }
 
     public record Presentation(Optional<Integer> particles, Optional<Double> spread,
@@ -105,15 +106,15 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
         public static final Presentation NONE = new Presentation(Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty());
 
-        public static final Codec<Presentation> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Presentation> CODEC = Customs.wrap(Presentation.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.optionalFieldOf("particles").forGetter(Presentation::particles),
                 Codec.DOUBLE.optionalFieldOf("spread").forGetter(Presentation::spread),
                 Codec.FLOAT.optionalFieldOf("volume").forGetter(Presentation::volume),
                 Codec.FLOAT.optionalFieldOf("pitch").forGetter(Presentation::pitch)
-        ).apply(instance, Presentation::new));
+        ).apply(instance, Presentation::new)));
     }
 
-    public static final Codec<AbilityTuning> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<AbilityTuning> CODEC = Customs.wrap(AbilityTuning.class, RecordCodecBuilder.create(instance -> instance.group(
             Damage.CODEC.optionalFieldOf(KEY_DAMAGE, Damage.NONE).forGetter(AbilityTuning::damage),
             Timing.CODEC.optionalFieldOf(KEY_TIMING, Timing.NONE).forGetter(AbilityTuning::timing),
             Shape.CODEC.optionalFieldOf(KEY_SHAPE, Shape.NONE).forGetter(AbilityTuning::shape),
@@ -122,7 +123,7 @@ public record AbilityTuning(Damage damage, Timing timing, Shape shape, Presentat
                     .forGetter(AbilityTuning::extra),
             OPTIONS_CODEC.optionalFieldOf(KEY_OPTIONS).forGetter(AbilityTuning::options),
             StepTuning.CODEC.listOf().optionalFieldOf(KEY_STEPS, List.of()).forGetter(AbilityTuning::steps)
-    ).apply(instance, AbilityTuning::new));
+    ).apply(instance, AbilityTuning::new)));
 
     public static final AbilityTuning NONE = new AbilityTuning(Damage.NONE, Timing.NONE,
             Shape.NONE, Presentation.NONE, Map.of(), Optional.empty(), List.of());

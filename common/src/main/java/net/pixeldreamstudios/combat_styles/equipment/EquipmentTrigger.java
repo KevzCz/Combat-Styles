@@ -3,6 +3,8 @@ package net.pixeldreamstudios.combat_styles.equipment;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.minecraft.world.entity.player.Player;
 
@@ -171,7 +173,7 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
         allOf = allOf == null ? List.of() : List.copyOf(allOf);
     }
 
-    public static final Codec<EquipmentTrigger> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<EquipmentTrigger> CODEC = Customs.wrap(EquipmentTrigger.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.optionalFieldOf("every_nth_swing").forGetter(EquipmentTrigger::everyNthSwing),
             Codec.INT.optionalFieldOf("slot_index").forGetter(EquipmentTrigger::slotIndex),
             Codec.BOOL.optionalFieldOf("last_slot").forGetter(EquipmentTrigger::lastSlot),
@@ -192,7 +194,7 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
                     .optionalFieldOf("any_of", List.of()).forGetter(EquipmentTrigger::anyOf),
             Codec.lazyInitialized(() -> EquipmentTrigger.CODEC).listOf()
                     .optionalFieldOf("all_of", List.of()).forGetter(EquipmentTrigger::allOf)
-    ).apply(instance, EquipmentTrigger::new));
+    ).apply(instance, EquipmentTrigger::new)));
 
     public boolean isAlways() {
         return withChance(Optional.empty()).equals(ALWAYS);
@@ -265,6 +267,11 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
                 && !trigger.activation().onUse().instant());
     }
 
+    public boolean needsTarget() {
+        return health.needsTarget() || phase.state().needsTarget()
+                || allOf.stream().anyMatch(EquipmentTrigger::needsTarget);
+    }
+
     public boolean readyAtRest(Player player, int swingCount, EquipmentDefinition definition) {
         return readyAtRest(player, swingCount, definition, false);
     }
@@ -283,7 +290,7 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
         if (!activation.cast().castingNow(player)) {
             return false;
         }
-        if (health.needsTarget() || phase.state().needsTarget()) {
+        if (needsTarget()) {
             return false;
         }
         if (health.rejectsSelf(player) != null || phase.state().rejectsAtRest(player) != null) {
@@ -314,10 +321,10 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
         if (attack == null) {
             return false;
         }
-        if (slotIndex.isPresent() && attack.slot() != slotIndex.get()) {
+        if (!slotIndexMatches(attack.slot(), attack.size())) {
             return false;
         }
-        if (lastSlot.orElse(false) && attack.slot() != attack.size() - 1) {
+        if (!lastSlotMatches(attack.slot(), attack.size())) {
             return false;
         }
         if (slots.isPresent() && !slots.get().matches(attack.slot(), attack.size())) {
@@ -396,14 +403,22 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
         return false;
     }
 
+    private boolean slotIndexMatches(int slot, int sequenceSize) {
+        return slotIndex.isEmpty() || SlotSelection.resolve(slotIndex.get(), sequenceSize) == slot;
+    }
+
+    private boolean lastSlotMatches(int slot, int sequenceSize) {
+        return lastSlot.isEmpty() || lastSlot.get() == (slot == sequenceSize - 1);
+    }
+
     public boolean readyAtSlot(int slotIndexValue, int sequenceSize) {
         if (slotIndexValue < 0 || sequenceSize <= 0) {
             return true;
         }
-        if (slotIndex.isPresent() && slotIndexValue != slotIndex.get()) {
+        if (!slotIndexMatches(slotIndexValue, sequenceSize)) {
             return false;
         }
-        if (lastSlot.orElse(false) && slotIndexValue != sequenceSize - 1) {
+        if (!lastSlotMatches(slotIndexValue, sequenceSize)) {
             return false;
         }
         if (slots.isPresent() && !slots.get().matches(slotIndexValue, sequenceSize)) {
@@ -447,6 +462,8 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
         }
         return false;
     }
+
+    private static final String CUSTOM_REJECTED = "custom hook rejected";
 
     public boolean matches(EquipmentContext context) {
         return rejectedBy(context) == null;
@@ -495,8 +512,8 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
         if (phase.onSwing().orElse(false)) {
             return "on_swing";
         }
-        if (lastSlot.orElse(false)) {
-            return "last_slot";
+        if (lastSlot.isPresent()) {
+            return lastSlot.get() ? "last_slot" : "not last_slot";
         }
         if (slotBand.isPresent()) {
             return "slot_band " + slotBand.get().getSerializedName();
@@ -588,6 +605,10 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
     }
 
     private String rejectedBy(EquipmentContext context, boolean checkPhase) {
+        if (context != null && !Customs.allows(CustomScopes.TRIGGER, this, context.player(),
+                context.player(), context.target())) {
+            return CUSTOM_REJECTED;
+        }
         if (!anyOfMatches(context, checkPhase)) {
             return "any_of (no option matched)";
         }
@@ -630,12 +651,12 @@ public record EquipmentTrigger(Optional<Integer> everyNthSwing,
                         + ", needs a multiple of " + every + ")";
             }
         }
-        if (slotIndex.isPresent() && context.slotIndex() != slotIndex.get()) {
+        if (!slotIndexMatches(context.slotIndex(), context.sequenceSize())) {
             return "slot_index " + slotIndex.get() + " (on "
-                    + CombatDebug.slot(context.slotIndex()) + ")";
+                    + CombatDebug.slot(context.slotIndex(), context.sequenceSize()) + ")";
         }
-        if (lastSlot.orElse(false) && context.slotIndex() != context.sequenceSize() - 1) {
-            return "last_slot (on "
+        if (!lastSlotMatches(context.slotIndex(), context.sequenceSize())) {
+            return "last_slot " + lastSlot.get() + " (on "
                     + CombatDebug.slot(context.slotIndex(), context.sequenceSize()) + ")";
         }
         if (slots.isPresent()

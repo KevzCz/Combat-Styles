@@ -71,12 +71,12 @@ public final class ClaimedHits {
                     .withDamageType(Optional.of(declared));
         }
         DamageSpec resolved = spec;
-        AffixDamageDealer.onPlayerHit(player, target, amount);
+        CombatEffectDealer.onPlayerHit(player, target, amount);
         DamageDealer.beginDealing();
         try {
-            AffixDamageDealer.withAttackAffixes(
-                    AffixDamageDealer.affixesForCurrentAttack(player,
-                            AffixDamageDealer.swingingWeapon(player)),
+            CombatEffectDealer.withAttackAffixes(
+                    CombatEffectDealer.affixesForCurrentAttack(player,
+                            CombatEffectDealer.swingingWeapon(player)),
                     () -> DamageDealer.dealSpec(player, target, resolved, amount, source));
         } finally {
             DamageDealer.endDealing();

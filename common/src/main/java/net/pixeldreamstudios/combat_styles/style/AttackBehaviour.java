@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +22,7 @@ public record AttackBehaviour(Optional<AffixEffects.Motion> motion,
             new AttackBehaviour(Optional.empty(), Optional.empty(), List.of(), List.of(),
                     Optional.empty(), Optional.empty());
 
-    public static final Codec<AttackBehaviour> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<AttackBehaviour> CODEC = Customs.wrap(AttackBehaviour.class, RecordCodecBuilder.create(instance -> instance.group(
             AffixEffects.Motion.CODEC.optionalFieldOf("motion").forGetter(AttackBehaviour::motion),
             HitboxOffset.CODEC.optionalFieldOf("hitbox_offset").forGetter(AttackBehaviour::hitboxOffset),
             SlashPlacement.CODEC.listOf().optionalFieldOf("slashes", List.of())
@@ -32,7 +33,7 @@ public record AttackBehaviour(Optional<AffixEffects.Motion> motion,
                     .forGetter(AttackBehaviour::placement),
             HitboxSet.CODEC.optionalFieldOf("boxes").forGetter(AttackBehaviour::boxes),
             AttackTrail.CODEC.optionalFieldOf("trail").forGetter(AttackBehaviour::trail)
-    ).apply(instance, AttackBehaviour::new));
+    ).apply(instance, AttackBehaviour::new)));
 
     public AttackBehaviour(Optional<AffixEffects.Motion> motion,
                            Optional<HitboxOffset> hitboxOffset,

@@ -9,6 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.List;
 
@@ -37,8 +38,8 @@ public record CastGate(boolean enabled, CastPhase phase, List<String> spells,
                             .forGetter(CastGate::includeTriggered)
             ).apply(instance, CastGate::new));
 
-    public static final Codec<CastGate> CODEC = Codec.either(EXPANDED.codec(), Codec.BOOL)
-            .xmap(either -> either.map(value -> value, CastGate::of), Either::left);
+    public static final Codec<CastGate> CODEC = Customs.wrap(CastGate.class, Codec.either(EXPANDED.codec(), Codec.BOOL)
+            .xmap(either -> either.map(value -> value, CastGate::of), Either::left));
 
     public static CastGate of(boolean enabled) {
         return new CastGate(enabled, CastPhase.CASTING, List.of(), List.of(), List.of(), false);

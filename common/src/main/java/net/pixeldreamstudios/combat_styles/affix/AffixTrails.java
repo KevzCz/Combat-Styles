@@ -101,7 +101,7 @@ public final class AffixTrails {
         if (page == null) {
             return null;
         }
-        StyleAffix.TrailColor resolved = AffixDamageDealer.affixesForTrail(player,
+        StyleAffix.TrailColor resolved = CombatEffectDealer.affixesForTrail(player,
                         entry.resolveAffixes(page).restrictedTo(page),
                         entry, slot, entries.size())
                 .blendedTrail().orElse(null);

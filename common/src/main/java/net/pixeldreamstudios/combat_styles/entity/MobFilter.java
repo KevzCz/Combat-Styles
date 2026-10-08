@@ -18,7 +18,7 @@ public record MobFilter(List<String> entities, List<String> entityTags,
     public static final String KEY_ENTITY_TAGS = "entity_tags";
     public static final String KEY_EXEMPT_ENTITIES = "exempt_entities";
     public static final String KEY_EXEMPT_TAGS = "exempt_tags";
-    private static final String TAG_MARKER = "#";
+    public static final String TAG_MARKER = "#";
 
     public static final MobFilter ANY = new MobFilter(List.of(), List.of(), List.of(), List.of());
 
@@ -53,12 +53,19 @@ public record MobFilter(List<String> entities, List<String> entityTags,
 
     private static boolean inAny(EntityType<?> type, List<String> tags) {
         for (String raw : tags) {
-            String bare = raw.startsWith(TAG_MARKER) ? raw.substring(1) : raw;
-            ResourceLocation id = ResourceLocation.tryParse(bare);
-            if (id != null && type.is(TagKey.create(Registries.ENTITY_TYPE, id))) {
+            if (tagged(type, raw)) {
                 return true;
             }
         }
         return false;
+    }
+
+    public static boolean tagged(EntityType<?> type, String raw) {
+        if (type == null || raw == null) {
+            return false;
+        }
+        String bare = raw.startsWith(TAG_MARKER) ? raw.substring(TAG_MARKER.length()) : raw;
+        ResourceLocation id = ResourceLocation.tryParse(bare);
+        return id != null && type.is(TagKey.create(Registries.ENTITY_TYPE, id));
     }
 }

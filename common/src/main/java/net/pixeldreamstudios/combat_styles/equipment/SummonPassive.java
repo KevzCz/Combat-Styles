@@ -6,6 +6,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.pixeldreamstudios.combat_styles.config.OptionSources;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.entity.AbilityRegistry;
 import net.pixeldreamstudios.combat_styles.entity.PassiveAbility;
 import net.pixeldreamstudios.combat_styles.entity.PassiveTrigger;
@@ -34,9 +35,9 @@ public record SummonPassive(String ability, Optional<PassiveTrigger> on, Optiona
             AbilityTuning.CODEC.optionalFieldOf(KEY_TUNING).forGetter(SummonPassive::tuning)
     ).apply(instance, SummonPassive::new));
 
-    public static final Codec<SummonPassive> CODEC = Codec.either(Codec.STRING, FULL).xmap(
+    public static final Codec<SummonPassive> CODEC = Customs.wrap(SummonPassive.class, Codec.either(Codec.STRING, FULL).xmap(
             either -> either.map(SummonPassive::of, full -> full),
-            Either::right);
+            Either::right));
 
     public static final SummonPassive SAMPLE = of("");
 

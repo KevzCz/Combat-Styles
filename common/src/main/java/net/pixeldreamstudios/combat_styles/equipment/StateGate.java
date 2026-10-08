@@ -6,6 +6,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.bettercombat.api.WeaponAttributes;
 import net.bettercombat.logic.PlayerAttackHelper;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
@@ -25,12 +26,13 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
                         Optional<Boolean> dualWielding, Optional<Boolean> twoHanded,
                         ItemGate items, List<String> playerTags,
                         Optional<Integer> playerTagsMin, List<String> missingPlayerTags,
-                        Optional<Integer> summonsActive) {
+                        Optional<Integer> summonsActive, List<String> heldSpellSchools) {
 
     public static final String PLAYER_TAGS = "player_tags";
     public static final String PLAYER_TAGS_MIN = "player_tags_min";
     public static final String MISSING_PLAYER_TAGS = "missing_player_tags";
     public static final String SUMMONS_ACTIVE = "summons_active";
+    public static final String HAS_SPELL_SCHOOL = "has_spell_school";
 
     public static final long NIGHT_START = 13000L;
     public static final long NIGHT_END = 23000L;
@@ -40,7 +42,7 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
     public static final StateGate ANY = new StateGate(Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), ItemGate.NONE,
-            List.of(), Optional.empty(), List.of(), Optional.empty());
+            List.of(), Optional.empty(), List.of(), Optional.empty(), List.of());
 
     public static final MapCodec<StateGate> CODEC = RecordCodecBuilder.mapCodec(
             instance -> instance.group(
@@ -63,7 +65,9 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
                     Codec.INT.optionalFieldOf(PLAYER_TAGS_MIN).forGetter(StateGate::playerTagsMin),
                     Codec.STRING.listOf().optionalFieldOf(MISSING_PLAYER_TAGS, List.of())
                             .forGetter(StateGate::missingPlayerTags),
-                    Codec.INT.optionalFieldOf(SUMMONS_ACTIVE).forGetter(StateGate::summonsActive)
+                    Codec.INT.optionalFieldOf(SUMMONS_ACTIVE).forGetter(StateGate::summonsActive),
+                    Codec.STRING.listOf().optionalFieldOf(HAS_SPELL_SCHOOL, List.of())
+                            .forGetter(StateGate::heldSpellSchools)
             ).apply(instance, StateGate::new));
 
     public StateGate {
@@ -72,6 +76,7 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
         playerTagsMin = playerTagsMin == null ? Optional.empty() : playerTagsMin;
         missingPlayerTags = meaningful(missingPlayerTags);
         summonsActive = summonsActive == null ? Optional.empty() : summonsActive;
+        heldSpellSchools = meaningful(heldSpellSchools);
     }
 
     public int tagsNeeded() {
@@ -91,7 +96,7 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
                 && night.isEmpty() && damagedWithin.isEmpty() && hasSpell.isEmpty()
                 && castingSpell.isEmpty() && crouching.isEmpty() && dualWielding.isEmpty() && twoHanded.isEmpty()
                 && items.isEmpty() && playerTags.isEmpty() && missingPlayerTags.isEmpty()
-                && summonsActive.isEmpty();
+                && summonsActive.isEmpty() && heldSpellSchools.isEmpty();
     }
 
     public boolean needsTarget() {
@@ -103,7 +108,7 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
                 ? this
                 : new StateGate(sprinting, airborne, Optional.empty(), night, damagedWithin,
                         hasSpell, castingSpell, crouching, dualWielding, twoHanded, items,
-                        playerTags, playerTagsMin, missingPlayerTags, summonsActive);
+                        playerTags, playerTagsMin, missingPlayerTags, summonsActive, heldSpellSchools);
     }
 
     public String rejects(Player player, LivingEntity target) {
@@ -147,6 +152,9 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
                 && SpellEngineCompat.hasSpell(player.getMainHandItem()) != hasSpell.get()) {
             return "has_spell";
         }
+        if (!heldSpellSchools.isEmpty() && !holdsSpellSchool(player)) {
+            return HAS_SPELL_SCHOOL;
+        }
         if (castingSpell.isPresent()
                 && SpellEngineCompat.isCasting(player) != castingSpell.get()) {
             return "casting_spell";
@@ -179,6 +187,15 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
 
     public boolean matches(Player player, LivingEntity target) {
         return rejects(player, target) == null;
+    }
+
+    private boolean holdsSpellSchool(Player player) {
+        for (ResourceLocation spell : SpellEngineCompat.spellsOn(player.getMainHandItem())) {
+            if (SpellMatch.inSchool(heldSpellSchools, SpellEngineCompat.schoolOf(spell, player.level()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean twoHandedMatches(Player player, boolean wanted) {

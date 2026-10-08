@@ -9,6 +9,7 @@ import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.phys.Vec3;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 
 import java.util.ArrayList;
@@ -21,13 +22,13 @@ public record HitboxSet(Resolve resolve, List<Shape> shapes) {
 
     public static final HitboxSet NONE = new HitboxSet(Resolve.UNION, List.of());
 
-    public static final Codec<HitboxSet> CODEC = RecordCodecBuilder.create(
+    public static final Codec<HitboxSet> CODEC = Customs.wrap(HitboxSet.class, RecordCodecBuilder.create(
             instance -> instance.group(
                     Resolve.CODEC.optionalFieldOf("resolve", Resolve.UNION)
                             .forGetter(HitboxSet::resolve),
                     Shape.CODEC.listOf().optionalFieldOf("shapes", List.of())
                             .forGetter(HitboxSet::shapes)
-            ).apply(instance, HitboxSet::new));
+            ).apply(instance, HitboxSet::new)));
 
     public HitboxSet {
         shapes = shapes == null ? List.of() : List.copyOf(shapes);
@@ -228,7 +229,7 @@ public record HitboxSet(Resolve resolve, List<Shape> shapes) {
             return Math.clamp(depth, 0.1F, MAX_SIZE);
         }
 
-        public static final Codec<Shape> CODEC = RecordCodecBuilder.create(
+        public static final Codec<Shape> CODEC = Customs.wrap(Shape.class, RecordCodecBuilder.create(
                 instance -> instance.group(
                         HitboxOffset.CODEC.optionalFieldOf("offset", HitboxOffset.NONE)
                                 .forGetter(Shape::offset),
@@ -249,7 +250,7 @@ public record HitboxSet(Resolve resolve, List<Shape> shapes) {
                                 .forGetter(Shape::override),
                         Codec.INT.optionalFieldOf("delay_ticks", 0)
                                 .forGetter(Shape::delayTicks)
-                ).apply(instance, Shape::new));
+                ).apply(instance, Shape::new)));
 
         public Shape {
             offset = offset == null ? HitboxOffset.NONE : offset;

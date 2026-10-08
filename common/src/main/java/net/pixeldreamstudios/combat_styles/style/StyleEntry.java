@@ -9,6 +9,7 @@ import net.minecraft.network.codec.StreamCodec;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
 import net.pixeldreamstudios.combat_styles.affix.ResolvedAffixes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -37,7 +38,7 @@ public record StyleEntry(String styleId, Optional<String> soundId, List<String> 
                             ? Either.left(list.getFirst())
                             : Either.right(list));
 
-    public static final Codec<StyleEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<StyleEntry> CODEC = Customs.wrap(StyleEntry.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf("style", "").forGetter(StyleEntry::rawStyleId),
             Codec.STRING.optionalFieldOf("sound").forGetter(StyleEntry::soundId),
             AFFIX_LIST_CODEC.optionalFieldOf("affixes", List.of()).forGetter(StyleEntry::affixIds),
@@ -47,7 +48,7 @@ public record StyleEntry(String styleId, Optional<String> soundId, List<String> 
             AffixTuning.MAP_CODEC.optionalFieldOf("affix_tuning", Map.of())
                     .forGetter(StyleEntry::affixTuning),
             Codec.STRING.optionalFieldOf("custom_style_id").forGetter(StyleEntry::customStyleId)
-    ).apply(instance, StyleEntry::new));
+    ).apply(instance, StyleEntry::new)));
 
     public static final StreamCodec<ByteBuf, StyleEntry> STREAM_CODEC = new StreamCodec<>() {
 
@@ -219,9 +220,8 @@ public record StyleEntry(String styleId, Optional<String> soundId, List<String> 
         if (customStyleId.isPresent()) {
             return CUSTOM_PREFIX + customStyleId.get();
         }
-        StylePage page = StyleRegistry.get(styleId);
-        String canonical = page == null ? styleId : page.styleId();
-        String base = key(canonical, affixIds);
+        String canonical = StyleRegistry.representativeOf(styleId);
+        String base = key(canonical == null ? styleId : canonical, affixIds);
         if (isPlain()) {
             return base;
         }

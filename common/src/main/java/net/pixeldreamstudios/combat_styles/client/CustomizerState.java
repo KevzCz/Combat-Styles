@@ -244,7 +244,7 @@ public class CustomizerState {
     }
 
     public int copiesOwned(String styleId, List<String> affixIds) {
-        return ClientStyleData.copies(StyleEntry.key(styleId, affixIds));
+        return ClientStyleData.copies(StyleEntry.key(StyleRegistry.representativeOf(styleId), affixIds));
     }
 
     public boolean isGranted(String styleId, List<String> affixIds) {
@@ -502,7 +502,7 @@ public class CustomizerState {
         if (!nativeNodes.isEmpty()) {
             tabs.add(NATIVE_CATEGORY);
         }
-        if (weaponCategory != null && !StyleRegistry.forCategory(weaponCategory).isEmpty()) {
+        if (weaponCategory != null && !StyleRegistry.distinctFor(weaponCategory).isEmpty()) {
             tabs.add(weaponCategory);
         }
         for (String category : StyleRegistry.categories()) {
@@ -517,7 +517,7 @@ public class CustomizerState {
         if (NATIVE_CATEGORY.equals(category)) {
             return nativeNodes.size();
         }
-        return category == null ? StyleRegistry.size() : StyleRegistry.forCategory(category).size();
+        return category == null ? StyleRegistry.distinct().size() : StyleRegistry.distinctFor(category).size();
     }
 
     public List<StylePage> visiblePages() {
@@ -525,9 +525,9 @@ public class CustomizerState {
         if (NATIVE_CATEGORY.equals(activeCategory)) {
             source = nativeNodes;
         } else if (activeCategory == null) {
-            source = StyleRegistry.all();
+            source = StyleRegistry.distinct();
         } else {
-            source = StyleRegistry.forCategory(activeCategory);
+            source = StyleRegistry.distinctFor(activeCategory);
         }
 
         boolean showLocked = CombatStylesConfig.get().showLockedStyles();

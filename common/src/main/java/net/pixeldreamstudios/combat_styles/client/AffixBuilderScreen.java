@@ -58,6 +58,7 @@ public class AffixBuilderScreen extends PanelScreen {
             List.of("HORIZONTAL_PLANE", "VERTICAL_PLANE", "FORWARD_BOX");
 
     private static final String KEY_TITLE = "screen.combat_styles.affix_builder";
+    private static final String KEY_EDIT_TITLE = "screen.combat_styles.affix_builder_edit";
     private static final String KEY_ID = "screen.combat_styles.affix_id";
     private static final String KEY_WEIGHT = "screen.combat_styles.affix_weight";
     private static final String KEY_COST = "screen.combat_styles.affix_cost_label";
@@ -119,7 +120,7 @@ public class AffixBuilderScreen extends PanelScreen {
     }
 
     public AffixBuilderScreen(Screen parent, StyleAffix existing, Consumer<StyleAffix> onSaved) {
-        super(Component.translatable(KEY_TITLE), parent);
+        super(Component.translatable(existing == null ? KEY_TITLE : KEY_EDIT_TITLE), parent);
         this.onSaved = onSaved;
         this.existing = existing;
         if (existing != null) {
@@ -497,7 +498,7 @@ public class AffixBuilderScreen extends PanelScreen {
         onSwingButton.setMessage(effectLabel(KEY_ON_SWING, onSwing));
         rarityButton.setMessage(rarityLabel());
 
-        graphics.drawString(font, Component.translatable(KEY_TITLE),
+        graphics.drawString(font, getTitle(),
                 left + ScreenTheme.PADDING, top + TITLE_Y, ScreenTheme.HEADING, false);
 
         int y = top + FORM_TOP + (FIELD_HEIGHT - font.lineHeight) / 2 + 1;
@@ -511,21 +512,7 @@ public class AffixBuilderScreen extends PanelScreen {
         renderTrailSwatch(graphics);
         renderPreview(graphics);
         renderFooter(graphics);
-            if (idBox != null && idBox.isVisible()) {
-            idBox.render(graphics, mouseX, mouseY, partialTick);
-        }
-        if (weightBox != null && weightBox.isVisible()) {
-            weightBox.render(graphics, mouseX, mouseY, partialTick);
-        }
-        if (costBox != null && costBox.isVisible()) {
-            costBox.render(graphics, mouseX, mouseY, partialTick);
-        }
-        if (damageBox != null && damageBox.isVisible()) {
-            damageBox.render(graphics, mouseX, mouseY, partialTick);
-        }
-        if (trailBox != null && trailBox.isVisible()) {
-            trailBox.render(graphics, mouseX, mouseY, partialTick);
-        }
+        drawWidgets(graphics, mouseX, mouseY, partialTick);
     }
 
     private void renderTrailSwatch(GuiGraphics graphics) {

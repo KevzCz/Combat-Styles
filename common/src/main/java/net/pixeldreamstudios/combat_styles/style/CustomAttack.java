@@ -6,6 +6,8 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -19,7 +21,7 @@ public record CustomAttack(String id, DeclaredAttack attack,
 
     public static final String DEFAULT_CATEGORY = "custom";
 
-    public static final Codec<CustomAttack> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<CustomAttack> CODEC = Customs.wrap(CustomAttack.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("id").forGetter(CustomAttack::id),
             DeclaredAttack.CODEC.fieldOf("attack").forGetter(CustomAttack::attack),
             Codec.STRING.optionalFieldOf("category").forGetter(CustomAttack::category),
@@ -27,7 +29,7 @@ public record CustomAttack(String id, DeclaredAttack attack,
             Codec.DOUBLE.optionalFieldOf("cost").forGetter(CustomAttack::costOverride),
             Codec.STRING.optionalFieldOf("name_key").forGetter(CustomAttack::nameKey),
             Codec.BOOL.optionalFieldOf(StylePool.KEY_STYLE_PAGE).forGetter(CustomAttack::stylePage)
-    ).apply(instance, CustomAttack::new));
+    ).apply(instance, CustomAttack::new)));
 
     public static final StreamCodec<ByteBuf, CustomAttack> STREAM_CODEC =
             ByteBufCodecs.fromCodec(CODEC);

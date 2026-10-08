@@ -149,6 +149,18 @@ public final class Gates {
         }
     }
 
+    public static void refund(Player player, GateScope scope, String ownerId, String name,
+                              int ticks) {
+        if (player.level().isClientSide() || ticks <= 0) {
+            return;
+        }
+        Cooldowns.shorten(player, ownerId, cooldownKey(scope, name), 0, Cooldowns.Track.PROC, ticks);
+        if (CombatDebug.enabled(player)) {
+            CombatDebug.note(player, "gate — " + ownerId + EffectKeys.SEPARATOR
+                    + scope.prefix() + name + " refunded " + ticks + "t");
+        }
+    }
+
     public static boolean windowOpen(Player player, GateScope scope, String ownerId,
                                      String name) {
         Window open = windowOf(player, scope, ownerId, name);

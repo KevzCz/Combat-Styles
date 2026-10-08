@@ -19,7 +19,7 @@ public final class SwingScales {
         if (player == null) {
             return SwingHaste.NEUTRAL_MULTIPLIER;
         }
-        AttackOverride override = AffixDamageDealer.plannedAttackOverrideFor(player, comboCount);
+        AttackOverride override = CombatEffectDealer.plannedAttackOverrideFor(player, comboCount);
         return override == null
                 ? SwingHaste.NEUTRAL_MULTIPLIER
                 : override.cooldownScale()
@@ -31,7 +31,7 @@ public final class SwingScales {
         if (player == null || comboCount <= 0) {
             return SwingHaste.NEUTRAL_MULTIPLIER;
         }
-        AttackOverride previous = AffixDamageDealer.plannedAttackOverrideFor(player, comboCount - 1);
+        AttackOverride previous = CombatEffectDealer.plannedAttackOverrideFor(player, comboCount - 1);
         return previous == null
                 ? SwingHaste.NEUTRAL_MULTIPLIER
                 : previous.hastensNext()
@@ -43,7 +43,7 @@ public final class SwingScales {
         if (player == null) {
             return false;
         }
-        AttackOverride override = AffixDamageDealer.plannedAttackOverrideFor(player, comboCount);
+        AttackOverride override = CombatEffectDealer.plannedAttackOverrideFor(player, comboCount);
         return override != null && override.scalesAnimation();
     }
 
@@ -59,12 +59,12 @@ public final class SwingScales {
         if (player == null) {
             return SwingHaste.NEUTRAL_MULTIPLIER;
         }
-        AttackOverride override = AffixDamageDealer.plannedAttackOverrideFor(player, comboCount);
+        AttackOverride override = CombatEffectDealer.plannedAttackOverrideFor(player, comboCount);
         float own = ownCooldownScaleFor(player, comboCount);
         float inherited = inheritedHasteFor(player, comboCount);
         float scale = own;
         if (CombatStylesConfig.get().debugLogging()) {
-            ItemStack weapon = AffixDamageDealer.swingingWeapon(player, comboCount);
+            ItemStack weapon = CombatEffectDealer.swingingWeapon(player, comboCount);
             StyleSequence sequence = SequenceService.sequenceOf(weapon, player.getUUID());
             int slots = sequence.entries().size();
             CombatStyles.LOGGER.info(
@@ -82,7 +82,7 @@ public final class SwingScales {
         }
         float own = ownCooldownScaleFor(player, comboCount);
         float next = ownCooldownScaleFor(player, comboCount + 1);
-        AttackOverride override = AffixDamageDealer.plannedAttackOverrideFor(player, comboCount);
+        AttackOverride override = CombatEffectDealer.plannedAttackOverrideFor(player, comboCount);
         float hastens = override == null
                 ? SwingHaste.NEUTRAL_MULTIPLIER
                 : override.hastensNext()

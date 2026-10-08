@@ -3,12 +3,14 @@ package net.pixeldreamstudios.combat_styles.equipment;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 public record SpellTune(String spell, SpellTuning tuning) {
 
-    public static final Codec<SpellTune> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<SpellTune> CODEC = Customs.wrap(SpellTune.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("spell").forGetter(SpellTune::spell),
             SpellTuning.MAP_CODEC.forGetter(SpellTune::tuning)
-    ).apply(instance, SpellTune::new));
+    ).apply(instance, SpellTune::new)));
 
     public SpellTune {
         spell = spell == null ? "" : spell;

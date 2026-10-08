@@ -8,6 +8,8 @@ import com.mojang.datafixers.util.Either;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.Optional;
 
 public record UseGate(boolean enabled, UsePhase phase,
@@ -26,9 +28,9 @@ public record UseGate(boolean enabled, UsePhase phase,
                     Codec.INT.optionalFieldOf("held_below").forGetter(UseGate::heldBelow)
             ).apply(instance, UseGate::new));
 
-    public static final Codec<UseGate> CODEC = Codec.either(EXPANDED.codec(), Codec.BOOL)
+    public static final Codec<UseGate> CODEC = Customs.wrap(UseGate.class, Codec.either(EXPANDED.codec(), Codec.BOOL)
             .xmap(either -> either.map(value -> value, UseGate::of),
-                    Either::left);
+                    Either::left));
 
     public static UseGate of(boolean enabled) {
         return new UseGate(enabled, UsePhase.ANY, Optional.empty(), Optional.empty());
@@ -77,7 +79,7 @@ public record UseGate(boolean enabled, UsePhase phase,
             if (used.phase() != used.completion()) {
                 return "on_use (waiting for " + used.completion().serializedName() + ")";
             }
-        } else if (phase != used.phase()) {
+        } else if (phase != UsePhase.EVERY && phase != used.phase()) {
             return "on_use phase (" + used.phase().serializedName() + ")";
         }
         if (heldAbove.isPresent() && used.heldTicks() <= heldAbove.get()) {

@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.pixeldreamstudios.combat_styles.config.SummonTuning;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.Optional;
 
@@ -13,12 +14,12 @@ public record SummonFollow(Optional<Double> startDistance, Optional<Double> stop
     public static final SummonFollow DEFAULTS = new SummonFollow(Optional.empty(),
             Optional.empty(), Optional.empty());
 
-    public static final Codec<SummonFollow> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<SummonFollow> CODEC = Customs.wrap(SummonFollow.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.DOUBLE.optionalFieldOf("start_distance").forGetter(SummonFollow::startDistance),
             Codec.DOUBLE.optionalFieldOf("stop_distance").forGetter(SummonFollow::stopDistance),
             Codec.DOUBLE.optionalFieldOf("teleport_distance")
                     .forGetter(SummonFollow::teleportDistance)
-    ).apply(instance, SummonFollow::new));
+    ).apply(instance, SummonFollow::new)));
 
     public SummonFollow {
         startDistance = startDistance == null ? Optional.empty() : startDistance;

@@ -9,6 +9,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
 import net.pixeldreamstudios.combat_styles.affix.TrailPlacements;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.List;
 import java.util.Locale;
@@ -50,7 +51,7 @@ public record DeclaredAttack(String animation,
                             .forGetter(ParticlePlacement::roll_set)
             ).apply(entry, ParticlePlacement::new));
 
-    public static final Codec<DeclaredAttack> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<DeclaredAttack> CODEC = Customs.wrap(DeclaredAttack.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("animation").forGetter(DeclaredAttack::animation),
             Codec.STRING.optionalFieldOf("hitbox", DEFAULT_HITBOX).forGetter(DeclaredAttack::hitbox),
             Codec.DOUBLE.optionalFieldOf("damage_multiplier", DEFAULT_DAMAGE)
@@ -66,7 +67,7 @@ public record DeclaredAttack(String animation,
             TRAIL_CODEC.listOf().optionalFieldOf("trail").forGetter(DeclaredAttack::trail),
             SlashPlacement.CODEC.listOf().optionalFieldOf("slashes", List.of())
                     .forGetter(DeclaredAttack::slashes)
-    ).apply(instance, DeclaredAttack::new));
+    ).apply(instance, DeclaredAttack::new)));
 
     public DeclaredAttack {
         slashes = slashes == null ? List.of() : List.copyOf(slashes);

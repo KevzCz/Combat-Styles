@@ -22,6 +22,9 @@ public final class DropdownMenu {
     private static final int TEXT_PADDING = 8;
     private static final int GAP = 2;
     private static final int TEXT_OFFSET = 3;
+    private static final int CARET_INSET = 4;
+    private static final String CARET_CLOSED = "▲";
+    private static final String CARET_OPEN = "▼";
 
     private final AbstractWidget anchor;
     private final List<Option> options;
@@ -69,6 +72,7 @@ public final class DropdownMenu {
         List<Option> shown = shown();
         open = !shown.isEmpty() && anchor.visible
                 && (anchor.isMouseOver(mouseX, mouseY) || open && overMenu(font, shown, mouseX, mouseY));
+        drawCaret(graphics, font, !shown.isEmpty());
         if (!open) {
             return;
         }
@@ -84,6 +88,20 @@ public final class DropdownMenu {
             graphics.drawString(font, shown.get(i).label(), x + TEXT_PADDING, rowY + TEXT_OFFSET,
                     hovered ? ScreenTheme.ACCENT : ScreenTheme.TEXT, false);
         }
+    }
+
+    private void drawCaret(GuiGraphics graphics, Font font, boolean available) {
+        if (!available || !anchor.visible) {
+            return;
+        }
+        String caret = open ? CARET_OPEN : CARET_CLOSED;
+        int x = anchor.getX() + anchor.getWidth() - CARET_INSET - font.width(caret);
+        int y = anchor.getY() + (anchor.getHeight() - font.lineHeight) / 2 + 1;
+        graphics.drawString(font, caret, x, y, open ? ScreenTheme.ACCENT : ScreenTheme.MUTED, false);
+    }
+
+    public static int caretWidth(Font font) {
+        return font.width(CARET_CLOSED) + CARET_INSET;
     }
 
     public boolean mouseClicked(Font font, double mouseX, double mouseY) {

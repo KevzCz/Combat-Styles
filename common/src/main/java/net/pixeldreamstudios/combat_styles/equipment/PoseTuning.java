@@ -3,6 +3,8 @@ package net.pixeldreamstudios.combat_styles.equipment;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.List;
 
 public record PoseTuning(BoneOffset rightItem, BoneOffset leftItem,
@@ -24,7 +26,7 @@ public record PoseTuning(BoneOffset rightItem, BoneOffset leftItem,
             BONE_RIGHT_ITEM, BONE_LEFT_ITEM, BONE_RIGHT_ARM,
             BONE_LEFT_ARM, BONE_TORSO, BONE_HEAD);
 
-    public static final Codec<PoseTuning> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<PoseTuning> CODEC = Customs.wrap(PoseTuning.class, RecordCodecBuilder.create(instance -> instance.group(
             BoneOffset.CODEC.optionalFieldOf(BONE_RIGHT_ITEM, BoneOffset.NONE)
                     .forGetter(PoseTuning::rightItem),
             BoneOffset.CODEC.optionalFieldOf(BONE_LEFT_ITEM, BoneOffset.NONE)
@@ -37,7 +39,7 @@ public record PoseTuning(BoneOffset rightItem, BoneOffset leftItem,
                     .forGetter(PoseTuning::torso),
             BoneOffset.CODEC.optionalFieldOf(BONE_HEAD, BoneOffset.NONE)
                     .forGetter(PoseTuning::head)
-    ).apply(instance, PoseTuning::new));
+    ).apply(instance, PoseTuning::new)));
 
     public PoseTuning {
         rightItem = rightItem == null ? BoneOffset.NONE : rightItem;
@@ -96,14 +98,14 @@ public record PoseTuning(BoneOffset rightItem, BoneOffset leftItem,
 
         public static final BoneOffset NONE = new BoneOffset(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
 
-        public static final Codec<BoneOffset> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<BoneOffset> CODEC = Customs.wrap(BoneOffset.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("pitch", 0.0F).forGetter(BoneOffset::pitch),
                 Codec.FLOAT.optionalFieldOf("yaw", 0.0F).forGetter(BoneOffset::yaw),
                 Codec.FLOAT.optionalFieldOf("roll", 0.0F).forGetter(BoneOffset::roll),
                 Codec.FLOAT.optionalFieldOf("x", 0.0F).forGetter(BoneOffset::x),
                 Codec.FLOAT.optionalFieldOf("y", 0.0F).forGetter(BoneOffset::y),
                 Codec.FLOAT.optionalFieldOf("z", 0.0F).forGetter(BoneOffset::z)
-        ).apply(instance, BoneOffset::new));
+        ).apply(instance, BoneOffset::new)));
 
         public boolean isEmpty() {
             return pitch == 0.0F && yaw == 0.0F && roll == 0.0F

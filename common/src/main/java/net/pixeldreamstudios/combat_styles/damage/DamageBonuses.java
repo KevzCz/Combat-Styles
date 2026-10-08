@@ -5,7 +5,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.entity.SummonOwner;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentActivation;
@@ -47,7 +47,7 @@ public final class DamageBonuses {
             return amount;
         }
         List<DamageBonus> equipment = equipmentFor(owner);
-        List<DamageBonus> affixes = AffixDamageDealer.attackBonuses(owner, source);
+        List<DamageBonus> affixes = CombatEffectDealer.attackBonuses(owner, source);
         if (equipment.isEmpty() && affixes.isEmpty()) {
             return amount;
         }

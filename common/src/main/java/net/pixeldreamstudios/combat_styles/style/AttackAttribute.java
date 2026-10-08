@@ -5,6 +5,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.Locale;
 
 public record AttackAttribute(double amount, AttributeModifier.Operation operation,
@@ -44,12 +46,12 @@ public record AttackAttribute(double amount, AttributeModifier.Operation operati
             Codec.BOOL.optionalFieldOf("set", false).forGetter(AttackAttribute::set)
     ).apply(instance, AttackAttribute::new));
 
-    public static final Codec<AttackAttribute> CODEC = Codec.either(Codec.DOUBLE, FULL)
+    public static final Codec<AttackAttribute> CODEC = Customs.wrap(AttackAttribute.class, Codec.either(Codec.DOUBLE, FULL)
             .xmap(either -> either.map(AttackAttribute::flat, value -> value),
                     value -> value.operation() == AttributeModifier.Operation.ADD_VALUE
                             && value.stacks()
                             ? Either.left(value.amount())
-                            : Either.right(value));
+                            : Either.right(value)));
 
     public AttackAttribute(double amount, AttributeModifier.Operation operation) {
         this(amount, operation, true);

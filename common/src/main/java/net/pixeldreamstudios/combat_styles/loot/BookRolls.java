@@ -350,16 +350,17 @@ public final class BookRolls {
     private static StyleEntry fromRegistry(BookRoll roll, RandomSource random) {
         List<StylePage> pages = new ArrayList<>();
         if (roll.categories().isEmpty()) {
-            pages.addAll(StylePool.natural(StyleRegistry.all()));
+            pages.addAll(StylePool.natural(StyleRegistry.distinct()));
         } else {
             for (String category : roll.categories()) {
-                pages.addAll(StylePool.natural(StyleRegistry.forCategory(category)));
+                pages.addAll(StylePool.natural(StyleRegistry.distinctFor(category)));
             }
         }
         if (pages.isEmpty()) {
             return null;
         }
-        StyleEntry entry = SequenceService.entryFor(pages.get(random.nextInt(pages.size())).styleId());
+        StylePage chosen = StyleRegistry.variantOf(pages.get(random.nextInt(pages.size())), random);
+        StyleEntry entry = SequenceService.entryFor(chosen.styleId());
         if (entry == null || roll.roll().isEmpty()) {
             return entry;
         }

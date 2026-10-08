@@ -11,18 +11,29 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.affix.AffixText;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
+import net.pixeldreamstudios.combat_styles.equipment.EnchantLevels;
+import net.pixeldreamstudios.combat_styles.equipment.UseScope;
 import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public final class StyleText {
     private static final ChatFormatting NEUTRAL = ChatFormatting.GRAY;
     private static final ChatFormatting GOOD = ChatFormatting.GREEN;
     private static final ChatFormatting BAD = ChatFormatting.RED;
+    private static final String DECIMAL_FORMAT = "%.2f";
+    private static final String USE_SOURCE_PREFIX = "scaling_source.combat_styles.use.";
+    private static final char DECIMAL_POINT = '.';
+    private static final Pattern TRAILING_ZEROS = Pattern.compile("\\.?0+$");
+    private static final String NEGATIVE_ZERO = "-0";
+    private static final String ZERO = "0";
     private static final String SPELL_NAME_KEY = "spell.%s.%s.name";
+    private static final String ENCHANTMENT_PREFIX = "enchantment.";
+    private static final String KEY_ENCHANT_LEVEL_SOURCE = "tooltip.combat_styles.enchant_level_source";
     public static final String CONDITION_JOINER = " + ";
 
     private StyleText() {
@@ -65,6 +76,9 @@ public final class StyleText {
         StyleAffix affix = AffixRegistry.get(trimmed);
         if (affix != null) {
             return AffixText.name(affix);
+        }
+        if (UseScope.isSource(trimmed) || EnchantLevels.isSource(trimmed)) {
+            return scalingSourceName(trimmed);
         }
         return registryName(trimmed);
     }
@@ -151,6 +165,29 @@ public final class StyleText {
         return Component.translatableWithFallback(StyleIds.CATEGORY_PREFIX + category, prettify(category));
     }
 
+    public static Component damageTypeName(String type) {
+        if (type == null || type.isBlank()) {
+            return schoolName(type);
+        }
+        ResourceLocation id = ResourceLocation.tryParse(type.trim());
+        if (id == null) {
+            return schoolName(type);
+        }
+        return Component.translatableWithFallback(
+                StyleIds.DAMAGE_TYPE_PREFIX + id.getNamespace() + "." + id.getPath(),
+                schoolName(type).getString());
+    }
+
+    public static Component damageTypeTagName(String tag) {
+        ResourceLocation id = tag == null ? null : ResourceLocation.tryParse(tag.trim());
+        if (id == null) {
+            return Component.literal(tag == null ? "" : tag);
+        }
+        return Component.translatableWithFallback(
+                StyleIds.DAMAGE_TYPE_TAG_PREFIX + id.getNamespace() + "." + id.getPath(),
+                prettify(id.getPath()));
+    }
+
     public static Component schoolName(String school) {
         if (school == null || school.isBlank()) {
             return Component.translatableWithFallback(
@@ -166,6 +203,19 @@ public final class StyleText {
     public static Component scalingSourceName(String source) {
         if (source == null || source.isBlank()) {
             return Component.empty();
+        }
+        String enchantment = EnchantLevels.enchantmentOf(source);
+        if (enchantment != null) {
+            ResourceLocation id = ResourceLocation.tryParse(enchantment);
+            Component name = id == null
+                    ? Component.literal(enchantment)
+                    : Component.translatableWithFallback(ENCHANTMENT_PREFIX + id.getNamespace() + "."
+                            + id.getPath(), prettify(id.getPath()));
+            return Component.translatable(KEY_ENCHANT_LEVEL_SOURCE, name);
+        }
+        if (UseScope.isSource(source)) {
+            String name = source.substring(UseScope.PREFIX.length());
+            return Component.translatableWithFallback(USE_SOURCE_PREFIX + name, prettify(name));
         }
         String qualified = source.contains(":")
                 ? source
@@ -253,7 +303,12 @@ public final class StyleText {
     }
 
     public static String formatDecimal(double value) {
-        return String.format(Locale.ROOT, "%.2f", value);
+        String formatted = String.format(Locale.ROOT, DECIMAL_FORMAT, value);
+        if (formatted.indexOf(DECIMAL_POINT) < 0) {
+            return formatted;
+        }
+        String trimmed = TRAILING_ZEROS.matcher(formatted).replaceAll("");
+        return NEGATIVE_ZERO.equals(trimmed) ? ZERO : trimmed;
     }
 
     public static String formatDegrees(double value) {

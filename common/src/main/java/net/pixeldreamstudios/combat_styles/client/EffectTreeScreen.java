@@ -15,7 +15,12 @@ import net.minecraft.network.chat.Component;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
+import net.pixeldreamstudios.combat_styles.config.OptionSources;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
+import net.pixeldreamstudios.combat_styles.damage.ScaledNumber;
 import net.pixeldreamstudios.combat_styles.equipment.ItemMatch;
+import net.pixeldreamstudios.combat_styles.style.StyleText;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -67,6 +72,31 @@ public class EffectTreeScreen extends PanelScreen {
     private static final String KEY_NO = "screen.combat_styles.toggle_no";
     private static final String CHOICE_MARK = " ▾";
     private static final String KEY_NOT_NUMBER = "screen.combat_styles.effect_not_number";
+    private static final int SCALE_WIDTH = 10;
+    private static final int ADD_WIDTH = 12;
+    private static final int OPTIONS_OFFSET = 1;
+    private static final int CUSTOM_OFFSET = 3;
+    private static final String SCALE_GLYPH = "↗";
+    private static final String FLATTEN_GLYPH = "↘";
+    private static final String SUMMARY_JOIN = ", ";
+    private static final String KEY_SCALE_MAKE = "screen.combat_styles.scaled_number_make";
+    private static final String KEY_SCALE_FLATTEN = "screen.combat_styles.scaled_number_flatten";
+    private static final String KEY_SCALE_PICK = "screen.combat_styles.scaled_number_pick";
+    private static final String KEY_SCALE_SUMMARY = "screen.combat_styles.scaled_number_summary";
+    private static final String KEY_SCALE_BASE = "screen.combat_styles.scaled_number_base";
+    private static final String KEY_SCALE_ENTRY = "screen.combat_styles.scaled_number_entry";
+    private static final String KEY_SCALE_STRONGEST = "screen.combat_styles.scaled_number_strongest";
+    private static final String KEY_SCALE_MIN = "screen.combat_styles.scaled_number_min";
+    private static final String KEY_SCALE_MAX = "screen.combat_styles.scaled_number_max";
+    private static final String KEY_SCALE_STEP = "screen.combat_styles.scaled_number_step";
+    private static final String KEY_SCALE_NOW = "screen.combat_styles.scaled_number_now";
+    private static final String SCALED_FIELD_PREFIX = "field.combat_styles.scaled_number.";
+    private static final String SCALED_HINT_PREFIX = "hint.combat_styles.scaled_number.";
+    private static final String SOURCE_KEY = "source";
+    private static final Set<String> UNSCALABLE = Set.of("cooldown", "condition", "conditions", "requires");
+    private static final float DEFAULT_PER_POINT = 0.1F;
+    private static final float DEFAULT_STEP = 0.5F;
+    private static final float DEFAULT_MAX_FACTOR = 2.0F;
 
     private static final int KEY_ENTER = 257;
 
@@ -182,13 +212,184 @@ public class EffectTreeScreen extends PanelScreen {
     }
 
     private Component labelFor(JsonTreeModel.Node node) {
+        if (scaledParent(node.path())) {
+            return Component.translatableWithFallback(SCALED_FIELD_PREFIX + node.key(),
+                    StyleText.prettify(node.key()));
+        }
         return EffectLabels.labelFor(schemaPathOf(node), node.key());
     }
 
+    private Component hintFor(JsonTreeModel.Node node) {
+        if (scaledParent(node.path())) {
+            return Component.translatable(SCALED_HINT_PREFIX + node.key());
+        }
+        return EffectLabels.hintFor(schemaPathOf(node), node.key());
+    }
+
+    private boolean scaledParent(String path) {
+        String parent = parentPathOf(path);
+        return !parent.equals(path) && ScaledNumber.isScaled(JsonTreeModel.resolve(root, parent));
+    }
+
+    private boolean insideScaled(String path) {
+        String current = path;
+        while (!current.isEmpty()) {
+            current = parentPathOf(current);
+            if (!current.isEmpty() && ScaledNumber.isScaled(JsonTreeModel.resolve(root, current))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean scalable(JsonTreeModel.Node node) {
+        if (node.kind() != JsonTreeModel.Kind.NUMBER || insideScaled(node.path())) {
+            return false;
+        }
+        String[] parts = node.path().split("/");
+        for (String part : parts) {
+            if (UNSCALABLE.contains(part)) {
+                return false;
+            }
+        }
+        int last = parts.length - 1;
+        boolean hookOption = last >= CUSTOM_OFFSET
+                && OptionSources.KEY_OPTIONS.equals(parts[last - OPTIONS_OFFSET])
+                && Customs.KEY.equals(parts[last - CUSTOM_OFFSET]);
+        return hookOption || binding.codec() == AffixEffects.OnHit.CODEC;
+    }
+
+    private String scaledSummary(JsonElement value) {
+        ScaledNumber number = ScaledNumber.parse(value).orElse(null);
+        if (number == null) {
+            return "";
+        }
+        List<String> names = new ArrayList<>();
+        for (String source : number.sources()) {
+            names.add(StyleText.scalingSourceName(source).getString());
+        }
+        return Component.translatable(KEY_SCALE_SUMMARY, trimNumber(number.base()),
+                String.join(SUMMARY_JOIN, names)).getString();
+    }
+
+    private List<Component> scaledTooltip(JsonTreeModel.Node node) {
+        ScaledNumber number = ScaledNumber.parse(node.value()).orElse(null);
+        if (number == null) {
+            return List.of();
+        }
+        List<Component> lines = new ArrayList<>();
+        lines.add(labelFor(node).copy().withStyle(ChatFormatting.WHITE));
+        lines.add(Component.translatable(KEY_SCALE_BASE, trimNumber(number.base()))
+                .withStyle(ChatFormatting.GRAY));
+        for (DamageSpec.ScalingEntry entry : number.by()) {
+            lines.add(Component.translatable(KEY_SCALE_ENTRY, trimNumber(entry.perPoint()),
+                    StyleText.scalingSourceName(entry.source())).withStyle(ChatFormatting.AQUA));
+        }
+        if (number.mode() == DamageSpec.ScalingMode.STRONGEST && number.by().size() > 1) {
+            lines.add(Component.translatable(KEY_SCALE_STRONGEST).withStyle(ChatFormatting.GRAY));
+        }
+        number.min().ifPresent(min -> lines.add(Component.translatable(KEY_SCALE_MIN,
+                trimNumber(min)).withStyle(ChatFormatting.GRAY)));
+        number.max().ifPresent(max -> lines.add(Component.translatable(KEY_SCALE_MAX,
+                trimNumber(max)).withStyle(ChatFormatting.GRAY)));
+        number.step().ifPresent(step -> lines.add(Component.translatable(KEY_SCALE_STEP,
+                trimNumber(step)).withStyle(ChatFormatting.GRAY)));
+        if (minecraft != null && minecraft.player != null) {
+            lines.add(Component.translatable(KEY_SCALE_NOW,
+                    trimNumber(number.resolve(minecraft.player))).withStyle(ChatFormatting.GREEN));
+        }
+        lines.add(Component.translatable(KEY_SCALE_FLATTEN).withStyle(ChatFormatting.DARK_GRAY));
+        return lines;
+    }
+
+    private List<String> missingExtras(JsonTreeModel.Node node) {
+        List<String> missing = new ArrayList<>();
+        JsonObject object = node.value().getAsJsonObject();
+        for (String key : List.of(ScaledNumber.KEY_MODE, ScaledNumber.KEY_MIN, ScaledNumber.KEY_MAX,
+                ScaledNumber.KEY_STEP)) {
+            if (!object.has(key)) {
+                missing.add(key);
+            }
+        }
+        return missing;
+    }
+
+    private void openScaledAdd(JsonTreeModel.Node node) {
+        ScaledNumber number = ScaledNumber.parse(node.value()).orElse(null);
+        if (number == null) {
+            return;
+        }
+        List<EffectSchema.Template> options = new ArrayList<>();
+        for (String key : missingExtras(node)) {
+            JsonElement value = switch (key) {
+                case ScaledNumber.KEY_MODE ->
+                        new JsonPrimitive(DamageSpec.ScalingMode.STRONGEST.serializedName());
+                case ScaledNumber.KEY_MIN -> new JsonPrimitive(number.base());
+                case ScaledNumber.KEY_MAX -> new JsonPrimitive(number.base() * DEFAULT_MAX_FACTOR);
+                default -> new JsonPrimitive(DEFAULT_STEP);
+            };
+            options.add(new EffectSchema.Template(key, value));
+        }
+        String path = node.path();
+        minecraft.setScreen(new EffectFieldPickerScreen(this, EffectSchema.join(schemaRoot, path),
+                options, template -> {
+                    JsonElement parent = JsonTreeModel.resolve(root, path);
+                    if (parent != null && parent.isJsonObject()) {
+                        parent.getAsJsonObject().add(template.key(), template.value().deepCopy());
+                        collapsed.remove(path);
+                    }
+                    rebuild();
+                }));
+    }
+
+    private void openScalePicker(JsonTreeModel.Node node) {
+        String path = node.path();
+        float base = node.value().getAsFloat();
+        List<String> sources = EffectChoices.choicesFor(EffectSchema.join(schemaRoot, path), SOURCE_KEY);
+        minecraft.setScreen(new ChoicePickerScreen(this, Component.translatable(KEY_SCALE_PICK),
+                sources, "", picked -> {
+                    ScaledNumber number = ScaledNumber.of(base, List.of(new DamageSpec.ScalingEntry(
+                            picked, DEFAULT_PER_POINT, Optional.empty(), DamageSpec.ScalingKind.PER_POINT,
+                            DamageSpec.ScalingEntry.DEFAULT_BASELINE)));
+                    ScaledNumber.CODEC.encodeStart(JsonOps.INSTANCE, number).result().ifPresent(json -> {
+                        JsonTreeModel.set(root, path, json);
+                        collapsed.remove(path);
+                    });
+                    rebuild();
+                }));
+    }
+
+    private void flatten(JsonTreeModel.Node node) {
+        ScaledNumber.parse(node.value()).ifPresent(number -> {
+            JsonTreeModel.set(root, node.path(), new JsonPrimitive(number.base()));
+            forget(node.path());
+        });
+        rebuild();
+    }
+
+    private void drawGlyph(GuiGraphics graphics, int x, int y, String glyph, int colour,
+                           int mouseX, int mouseY) {
+        boolean hovered = ScreenDraw.isWithin(mouseX, mouseY, x, y + 1, SCALE_WIDTH, ROW_HEIGHT - 2);
+        graphics.drawString(font, glyph, x + SCALE_WIDTH / 2 - font.width(glyph) / 2, y + 3,
+                hovered ? COLOR_ACCENT : colour, false);
+    }
+
+    private int scaleX(int valueRight) {
+        return valueRight - STEP_WIDTH * 2 - 4 - SCALE_WIDTH - 2;
+    }
+
+    private int controlsRight(JsonTreeModel.Node node, String summary, int valueRight) {
+        int summaryLeft = valueRight - font.width(summary);
+        return ScaledNumber.isScaled(node.value()) ? summaryLeft - SCALE_WIDTH - 4 : summaryLeft;
+    }
+
     private List<Component> tooltipFor(JsonTreeModel.Node node) {
+        if (node.expandable() && ScaledNumber.isScaled(node.value())) {
+            return scaledTooltip(node);
+        }
         List<Component> lines = new ArrayList<>(
                 FieldDependency.lines(EffectSchema.join(schemaRoot, node.path()), node.key()));
-        Component hint = EffectLabels.hintFor(schemaPathOf(node), node.key());
+        Component hint = hintFor(node);
         if (hint != null) {
             lines.add(labelFor(node).copy()
                     .withStyle(ChatFormatting.WHITE));
@@ -199,7 +400,10 @@ public class EffectTreeScreen extends PanelScreen {
             lines.addAll(reference);
         }
         lines.addAll(FieldDependency.related(schemaPathOf(node), node.key(), root));
-        lines.addAll(SummonAbilityFieldInfo.lines(schemaRoot, node, root));
+        lines.addAll(FieldUses.lines(schemaRoot, node, root));
+        if (scalable(node)) {
+            lines.add(Component.translatable(KEY_SCALE_MAKE).withStyle(ChatFormatting.DARK_GRAY));
+        }
         return lines.isEmpty() ? null : lines;
     }
 
@@ -401,13 +605,19 @@ public class EffectTreeScreen extends PanelScreen {
 
         if (node.expandable()) {
             String summary = summaryOf(node);
-            graphics.drawString(font, summary, valueRight - font.width(summary), y + 3,
-                    COLOR_MUTED, false);
-            boolean canAdd = canGrow(node);
-            if (canAdd) {
-                boolean hovered = ScreenDraw.isWithin(mouseX, mouseY, valueRight - font.width(summary) - 16,
-                        y + 1, 12, ROW_HEIGHT - 2);
-                graphics.drawString(font, "+", valueRight - font.width(summary) - 13, y + 3,
+            boolean scaled = ScaledNumber.isScaled(node.value());
+            int summaryLeft = valueRight - font.width(summary);
+            graphics.drawString(font, summary, summaryLeft, y + 3,
+                    scaled ? COLOR_ACCENT : COLOR_MUTED, false);
+            if (scaled) {
+                drawGlyph(graphics, summaryLeft - SCALE_WIDTH - 2, y, FLATTEN_GLYPH, COLOR_MUTED,
+                        mouseX, mouseY);
+            }
+            int controls = controlsRight(node, summary, valueRight);
+            if (canGrow(node)) {
+                boolean hovered = ScreenDraw.isWithin(mouseX, mouseY, controls - 16,
+                        y + 1, ADD_WIDTH, ROW_HEIGHT - 2);
+                graphics.drawString(font, "+", controls - 13, y + 3,
                         hovered ? COLOR_ACCENT : COLOR_MUTED, false);
             }
             return;
@@ -432,7 +642,12 @@ public class EffectTreeScreen extends PanelScreen {
 
         if (node.kind() == JsonTreeModel.Kind.NUMBER) {
             String shown = trimNumber(node.value().getAsDouble());
-            int numberLeft = valueRight - STEP_WIDTH * 2 - 8 - font.width(shown);
+            boolean canScale = scalable(node);
+            if (canScale) {
+                drawGlyph(graphics, scaleX(valueRight), y, SCALE_GLYPH, COLOR_MUTED, mouseX, mouseY);
+            }
+            int numberLeft = (canScale ? scaleX(valueRight) - 2 : valueRight - STEP_WIDTH * 2 - 8)
+                    - font.width(shown);
             outlineIfHovered(graphics, numberLeft, y, font.width(shown), mouseX, mouseY);
             graphics.drawString(font, shown, numberLeft, y + 3, COLOR_TEXT, false);
             drawStep(graphics, valueRight - STEP_WIDTH * 2 - 4, y, "-", mouseX, mouseY);
@@ -611,6 +826,9 @@ public class EffectTreeScreen extends PanelScreen {
     }
 
     private String summaryOf(JsonTreeModel.Node node) {
+        if (ScaledNumber.isScaled(node.value())) {
+            return trim(scaledSummary(node.value()), EDIT_WIDTH * 2);
+        }
         if (node.value().isJsonObject()) {
             return "{" + node.value().getAsJsonObject().size() + "}";
         }
@@ -701,6 +919,9 @@ public class EffectTreeScreen extends PanelScreen {
     }
 
     private boolean canGrow(JsonTreeModel.Node node) {
+        if (ScaledNumber.isScaled(node.value())) {
+            return !missingExtras(node).isEmpty();
+        }
         if (node.value().isJsonArray()) {
             return !node.value().getAsJsonArray().isEmpty()
                     || EffectSchema.elementFor(schemaRoot, node.path()) != null;
@@ -760,9 +981,19 @@ public class EffectTreeScreen extends PanelScreen {
 
             if (node.expandable()) {
                 String summary = summaryOf(node);
+                boolean scaled = ScaledNumber.isScaled(node.value());
+                int summaryLeft = valueRight - font.width(summary);
+                if (scaled && ScreenDraw.isWithin((int) mouseX, (int) mouseY,
+                        summaryLeft - SCALE_WIDTH - 2, y + 1, SCALE_WIDTH, ROW_HEIGHT - 2)) {
+                    flatten(node);
+                    return true;
+                }
+                int controls = controlsRight(node, summary, valueRight);
                 if (canGrow(node) && ScreenDraw.isWithin((int) mouseX, (int) mouseY,
-                                valueRight - font.width(summary) - 16, y + 1, 12, ROW_HEIGHT - 2)) {
-                    if (node.value().isJsonArray()) {
+                                controls - 16, y + 1, ADD_WIDTH, ROW_HEIGHT - 2)) {
+                    if (scaled) {
+                        openScaledAdd(node);
+                    } else if (node.value().isJsonArray()) {
                         JsonElement seed = seedElementFor(node);
                         if (seed != null) {
                             node.value().getAsJsonArray().add(seed);
@@ -791,6 +1022,11 @@ public class EffectTreeScreen extends PanelScreen {
             }
 
             if (node.kind() == JsonTreeModel.Kind.NUMBER) {
+                if (scalable(node) && ScreenDraw.isWithin((int) mouseX, (int) mouseY,
+                        scaleX(valueRight), y + 1, SCALE_WIDTH, ROW_HEIGHT - 2)) {
+                    openScalePicker(node);
+                    return true;
+                }
                 if (ScreenDraw.isWithin((int) mouseX, (int) mouseY, valueRight - STEP_WIDTH * 2 - 4, y + 1,
                         STEP_WIDTH, ROW_HEIGHT - 2)) {
                     stepNumber(node, -1);

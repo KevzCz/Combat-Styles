@@ -10,6 +10,8 @@ public final class StyleIds {
     public static final String CONDITION_PREFIX = "combat_styles.condition.";
     public static final String RARITY_PREFIX = "combat_styles.rarity.";
     public static final String SCHOOL_PREFIX = "combat_styles.school.";
+    public static final String DAMAGE_TYPE_PREFIX = "damage_type.";
+    public static final String DAMAGE_TYPE_TAG_PREFIX = "damage_type_tag.";
 
     private StyleIds() {
     }

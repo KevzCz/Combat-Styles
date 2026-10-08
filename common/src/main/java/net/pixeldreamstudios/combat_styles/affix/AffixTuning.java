@@ -6,6 +6,7 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 
 import java.util.LinkedHashMap;
@@ -27,7 +28,7 @@ public record AffixTuning(Optional<Double> costModifier,
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-    public static final Codec<AffixTuning> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<AffixTuning> CODEC = Customs.wrap(AffixTuning.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.DOUBLE.optionalFieldOf("cost_modifier").forGetter(AffixTuning::costModifier),
             Codec.DOUBLE.optionalFieldOf("damage_multiplier").forGetter(AffixTuning::damageMultiplier),
             Codec.DOUBLE.optionalFieldOf("chance").forGetter(AffixTuning::chance),
@@ -38,7 +39,7 @@ public record AffixTuning(Optional<Double> costModifier,
             StyleAffix.AppliesTo.CODEC.optionalFieldOf("applies_to").forGetter(AffixTuning::appliesTo),
             AffixEffects.OnHit.CODEC.optionalFieldOf("on_hit").forGetter(AffixTuning::onHit),
             AffixEffects.OnHit.CODEC.optionalFieldOf("on_swing").forGetter(AffixTuning::onSwing)
-    ).apply(instance, AffixTuning::new));
+    ).apply(instance, AffixTuning::new)));
 
     public static final Codec<Map<String, AffixTuning>> MAP_CODEC =
             Codec.unboundedMap(Codec.STRING, CODEC);
@@ -84,7 +85,7 @@ public record AffixTuning(Optional<Double> costModifier,
                 () -> AffixEffects.tune(affix.onHit(), chance, cooldown));
         AffixEffects.OnHit swing = onSwing.orElseGet(
                 () -> AffixEffects.tune(affix.onSwing(), chance, cooldown));
-        return new StyleAffix(
+        return Customs.copy(affix, new StyleAffix(
                 affix.id(),
                 weight.orElse(affix.weight()),
                 rarity.orElse(affix.rarity()),
@@ -95,6 +96,6 @@ public record AffixTuning(Optional<Double> costModifier,
                 costModifier.orElse(affix.costModifier()),
                 damageMultiplier.orElse(affix.damageMultiplier()),
                 affix.behaviour(),
-                affix.damageBonus());
+                affix.damageBonus()));
     }
 }

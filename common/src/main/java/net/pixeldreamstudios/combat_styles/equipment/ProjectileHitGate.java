@@ -7,6 +7,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -17,7 +19,7 @@ public record ProjectileHitGate(boolean enabled, List<String> entities, boolean 
     public static final ProjectileHitGate ANY = new ProjectileHitGate(false, List.of(), true,
             Optional.empty(), Optional.empty(), DealtGate.ANY, SpellProjectileGate.ANY);
 
-    public static final Codec<ProjectileHitGate> CODEC = RecordCodecBuilder.create(
+    public static final Codec<ProjectileHitGate> CODEC = Customs.wrap(ProjectileHitGate.class, RecordCodecBuilder.create(
             instance -> instance.group(
                     Codec.BOOL.optionalFieldOf("enabled", Boolean.TRUE)
                             .forGetter(ProjectileHitGate::enabled),
@@ -33,7 +35,7 @@ public record ProjectileHitGate(boolean enabled, List<String> entities, boolean 
                     SpellProjectileGate.CODEC.codec()
                             .optionalFieldOf("spell_projectile", SpellProjectileGate.ANY)
                             .forGetter(ProjectileHitGate::spellProjectile)
-            ).apply(instance, ProjectileHitGate::new));
+            ).apply(instance, ProjectileHitGate::new)));
 
     public ProjectileHitGate {
         entities = entities == null ? List.of() : List.copyOf(entities);

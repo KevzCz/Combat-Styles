@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.entity.Entity;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.entity.MobFilter;
 
 import java.util.List;
@@ -13,11 +14,11 @@ public record AbilityGrant(GrantTarget appliesTo, MobFilter filter, SummonCadenc
     public static final String KEY = "grant_abilities";
     public static final String KEY_APPLIES_TO = "applies_to";
 
-    public static final Codec<AbilityGrant> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<AbilityGrant> CODEC = Customs.wrap(AbilityGrant.class, RecordCodecBuilder.create(instance -> instance.group(
             GrantTarget.CODEC.optionalFieldOf(KEY_APPLIES_TO, GrantTarget.BOTH).forGetter(AbilityGrant::appliesTo),
             MobFilter.MAP_CODEC.forGetter(AbilityGrant::filter),
             SummonCadence.MAP_CODEC.forGetter(AbilityGrant::cadence)
-    ).apply(instance, AbilityGrant::new));
+    ).apply(instance, AbilityGrant::new)));
 
     public static final AbilityGrant EMPTY = new AbilityGrant(GrantTarget.BOTH, MobFilter.ANY, SummonCadence.NONE);
 

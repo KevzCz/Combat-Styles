@@ -112,9 +112,12 @@ public class EquipmentListScreen extends PanelScreen {
         EquipmentDefinition existing = held.get(ModComponents.STACK_EQUIPMENT.get());
         EquipmentDefinition base = existing != null ? existing : blankForStack(held);
         minecraft.setScreen(new EquipmentDetailScreen(this, base, saved -> {
-            NetworkManager.sendApplyStackEquipment(new ApplyStackEquipmentPayload(saved));
+            NetworkManager.sendApplyStackEquipment(ApplyStackEquipmentPayload.applying(saved));
             minecraft.setScreen(this);
-        }, true));
+        }, true).clearingWith(held.has(ModComponents.STACK_EQUIPMENT.get()) ? () -> {
+            NetworkManager.sendApplyStackEquipment(ApplyStackEquipmentPayload.clearing());
+            minecraft.setScreen(this);
+        } : null));
     }
 
     private EquipmentDefinition blankForStack(ItemStack stack) {

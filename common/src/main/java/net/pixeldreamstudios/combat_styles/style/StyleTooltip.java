@@ -4,6 +4,7 @@ import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.ResourceLocation;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.AffixText;
@@ -34,6 +35,12 @@ public final class StyleTooltip {
     private static final String KEY_AFFIX_TOTAL = "tooltip.combat_styles.affix_cost_total";
     private static final String KEY_CATEGORY = "tooltip.combat_styles.category";
     private static final String KEY_HITBOX = "tooltip.combat_styles.hitbox";
+    private static final String KEY_SOURCE = "tooltip.combat_styles.style_source";
+    private static final String KEY_ALSO_ON = "tooltip.combat_styles.style_also_on";
+    private static final String KEY_STYLE_ID = "tooltip.combat_styles.style_id";
+    private static final String KEY_AND_MORE = "tooltip.combat_styles.style_and_more";
+    private static final String NAME_SEPARATOR = ", ";
+    private static final int MAX_LISTED_SOURCES = 3;
     private static final String KEY_SOUND = "tooltip.combat_styles.sound";
     private static final String KEY_ANGLE = "tooltip.combat_styles.angle";
     private static final String KEY_REQUIRES = "tooltip.combat_styles.requires";
@@ -237,6 +244,8 @@ public final class StyleTooltip {
         tooltip.add(labelled(KEY_ANGLE, Component.literal(
                 StyleText.formatDegrees(page.angle()))));
         tooltip.add(labelled(KEY_HITBOX, StyleText.hitboxName(page.hitbox())));
+        appendSources(page, tooltip);
+        tooltip.add(labelled(KEY_STYLE_ID, Component.literal(page.styleId())));
 
         String soundId = soundOverride == null || soundOverride.isBlank()
                 ? page.swingSoundId()
@@ -274,6 +283,36 @@ public final class StyleTooltip {
 
     public static Component expandHint() {
         return Component.translatable(KEY_EXPAND).withStyle(DIM);
+    }
+
+    private static void appendSources(StylePage page, List<Component> tooltip) {
+        ResourceLocation source = page.sourceWeapon();
+        if (source == null) {
+            return;
+        }
+        tooltip.add(labelled(KEY_SOURCE, StyleText.registryName(source.toString())));
+        List<ResourceLocation> others = new ArrayList<>();
+        for (StylePage member : StyleRegistry.familyOf(page.styleId())) {
+            ResourceLocation weapon = member.sourceWeapon();
+            if (weapon != null && !weapon.equals(source) && !others.contains(weapon)) {
+                others.add(weapon);
+            }
+        }
+        if (others.isEmpty()) {
+            return;
+        }
+        MutableComponent listed = Component.empty();
+        int shown = Math.min(MAX_LISTED_SOURCES, others.size());
+        for (int index = 0; index < shown; index++) {
+            if (index > 0) {
+                listed.append(Component.literal(NAME_SEPARATOR));
+            }
+            listed.append(StyleText.registryName(others.get(index).toString()));
+        }
+        Component value = others.size() > shown
+                ? Component.translatable(KEY_AND_MORE, listed, others.size() - shown)
+                : listed;
+        tooltip.add(labelled(KEY_ALSO_ON, value));
     }
 
     private static MutableComponent labelled(String labelKey, Component value) {

@@ -83,7 +83,7 @@ final class AffixSlashWaves {
     }
 
     private static float swingReachOf(Player player, WeaponAttributes.Attack attack) {
-        WeaponAttributes attributes = WeaponRegistryAccess.rawAttributesFor(AffixDamageDealer.swingingWeapon(player));
+        WeaponAttributes attributes = WeaponRegistryAccess.rawAttributesFor(CombatEffectDealer.swingingWeapon(player));
         double base = player.getAttributeValue(Attributes.ENTITY_INTERACTION_RANGE);
         double combined = attributes == null
                 ? base
@@ -107,13 +107,13 @@ final class AffixSlashWaves {
             return;
         }
         PENDING_WAVES.add(new PendingWave(player, affix, wave, total, resolved,
-                level.getGameTime() + delay, AffixDamageDealer.attackOf(player)));
+                level.getGameTime() + delay, CombatEffectDealer.attackOf(player)));
     }
 
     private static void releaseSlashWave(ServerLevel level, Player player, StyleAffix affix,
                                          AffixEffects.SlashWave wave, float total,
                                          ResolvedAffixes resolved) {
-        releaseSlashWave(level, player, affix, wave, total, resolved, AffixDamageDealer.attackOf(player));
+        releaseSlashWave(level, player, affix, wave, total, resolved, CombatEffectDealer.attackOf(player));
     }
 
     private static void releaseSlashWave(ServerLevel level, Player player, StyleAffix affix,
@@ -227,7 +227,7 @@ final class AffixSlashWaves {
     }
 
     private static String animationOf(Player player) {
-        WeaponAttributes.Attack attack = AffixDamageDealer.swingAttackOf(player);
+        WeaponAttributes.Attack attack = CombatEffectDealer.swingAttackOf(player);
         return attack == null ? null : attack.animation();
     }
 
@@ -236,7 +236,7 @@ final class AffixSlashWaves {
         if (!followsSwing) {
             return 0.0F;
         }
-        WeaponAttributes.Attack attack = swung == null ? AffixDamageDealer.swingAttackOf(player) : swung;
+        WeaponAttributes.Attack attack = swung == null ? CombatEffectDealer.swingAttackOf(player) : swung;
         if (attack == null) {
             return 0.0F;
         }

@@ -230,7 +230,7 @@ public final class EquipmentHints {
         return match.trigger().slotIndex().isPresent()
                 || match.trigger().slots().isPresent()
                 || match.trigger().slotBand().isPresent()
-                || match.trigger().lastSlot().orElse(false)
+                || match.trigger().lastSlot().isPresent()
                 || match.trigger().hitbox().isPresent()
                 || match.trigger().styleId().isPresent()
                 || match.trigger().affixId().isPresent()

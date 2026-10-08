@@ -8,6 +8,8 @@ import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 public record ProjectileSpawn(SpawnAnchor anchor, float forward, float up, float right,
                               float yaw, float pitch, SpreadMode mode, float arc,
                               float inheritMotion, boolean aimAtTarget,
@@ -25,7 +27,7 @@ public record ProjectileSpawn(SpawnAnchor anchor, float forward, float up, float
             SpawnAnchor.EYES, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
             SpreadMode.RANDOM, 0.0F, 0.0F, false, ProjectileVelocity.DEFAULT);
 
-    public static final Codec<ProjectileSpawn> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<ProjectileSpawn> CODEC = Customs.wrap(ProjectileSpawn.class, RecordCodecBuilder.create(instance -> instance.group(
             SpawnAnchor.CODEC.optionalFieldOf("anchor", SpawnAnchor.EYES)
                     .forGetter(ProjectileSpawn::anchor),
             Codec.FLOAT.optionalFieldOf("forward", 0.0F).forGetter(ProjectileSpawn::forward),
@@ -42,7 +44,7 @@ public record ProjectileSpawn(SpawnAnchor anchor, float forward, float up, float
                     .forGetter(ProjectileSpawn::aimAtTarget),
             ProjectileVelocity.CODEC.optionalFieldOf("velocity", ProjectileVelocity.DEFAULT)
                     .forGetter(ProjectileSpawn::velocity)
-    ).apply(instance, ProjectileSpawn::new));
+    ).apply(instance, ProjectileSpawn::new)));
 
     public ProjectileSpawn {
         anchor = anchor == null ? SpawnAnchor.EYES : anchor;

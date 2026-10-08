@@ -149,9 +149,12 @@ public class EquipmentEditorScreen extends PanelScreen {
                 ? blankForStack(held)
                 : withStackId(existing, held);
         minecraft.setScreen(new EquipmentDetailScreen(this, base, saved -> {
-            NetworkManager.sendApplyStackEquipment(new ApplyStackEquipmentPayload(saved));
+            NetworkManager.sendApplyStackEquipment(ApplyStackEquipmentPayload.applying(saved));
             minecraft.setScreen(this);
-        }, true));
+        }, true).clearingWith(held.has(ModComponents.STACK_EQUIPMENT.get()) ? () -> {
+            NetworkManager.sendApplyStackEquipment(ApplyStackEquipmentPayload.clearing());
+            minecraft.setScreen(this);
+        } : null));
     }
 
     private EquipmentDefinition withStackId(EquipmentDefinition source, ItemStack stack) {
@@ -165,7 +168,8 @@ public class EquipmentEditorScreen extends PanelScreen {
                 source.offHandPose(), source.poseTuning(), source.items(), source.itemTags(),
                 source.weaponCategories(), source.excludedItems(), source.excludedTags(),
                 source.excludedCategories(), source.use(), source.weaponCategory(),
-                source.activeIn());
+                source.activeIn(), source.swings(), source.hideScopeTooltip(), source.hideRarity(),
+                source.projectiles(), source.summonProfiles());
     }
 
     private EquipmentDefinition blankForStack(ItemStack stack) {

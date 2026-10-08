@@ -1,11 +1,19 @@
 package net.pixeldreamstudios.combat_styles.equipment;
 
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import net.pixeldreamstudios.combat_styles.entity.AbilityPick;
+import net.pixeldreamstudios.combat_styles.entity.ScriptedAbilities;
+import net.pixeldreamstudios.combat_styles.entity.ScriptedAbility;
 import net.pixeldreamstudios.combat_styles.entity.SummonTargeting;
 import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.ChatFormatting;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.damage.DamageBonus;
@@ -16,6 +24,7 @@ import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.affix.AffixText;
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+import net.pixeldreamstudios.combat_styles.affix.EffectLines;
 import net.pixeldreamstudios.combat_styles.affix.EquipmentAffix;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
@@ -71,6 +80,7 @@ public final class EquipmentTooltip {
     private static final String KEY_WINDOW = "tooltip.combat_styles.equip_window";
     private static final String KEY_WINDOW_USES = "tooltip.combat_styles.equip_window_uses";
     private static final String KEY_WINDOW_FULL = "tooltip.combat_styles.equip_window_full";
+    private static final String KEY_WINDOW_SPAN = "tooltip.combat_styles.equip_window_span";
     private static final String KEY_WINDOW_REFRESH = "tooltip.combat_styles.equip_window_refresh";
     private static final String KEY_SET_CHARGED = "tooltip.combat_styles.equip_set_charged";
     private static final String KEY_SET_RECHARGES = "tooltip.combat_styles.equip_set_recharges";
@@ -79,7 +89,6 @@ public final class EquipmentTooltip {
     private static final String KEY_REPLACE_MAX = "tooltip.combat_styles.replace_max";
     private static final String KEY_REPLACE_DAMAGE = "tooltip.combat_styles.replace_damage";
     private static final String KEY_REPLACE_LIFE = "tooltip.combat_styles.replace_life";
-    private static final String KEY_REPLACE_ORDER = "tooltip.combat_styles.replace_order";
     private static final String KEY_SUMMON_RECAST = "tooltip.combat_styles.summon_recast";
     private static final String KEY_SUMMON_PICK = "tooltip.combat_styles.summon_pick.";
     private static final String KEY_SUMMON_AIM = "tooltip.combat_styles.summon_aim";
@@ -129,6 +138,8 @@ public final class EquipmentTooltip {
     private static final String KEY_DAY = "tooltip.combat_styles.while_day";
     private static final String KEY_DAMAGED_WITHIN = "tooltip.combat_styles.damaged_within";
     private static final String KEY_HAS_SPELL = "tooltip.combat_styles.has_spell";
+    private static final String KEY_HAS_SPELL_SCHOOL = "tooltip.combat_styles.has_spell_school";
+    private static final String KEY_SCHOOL_JOIN = "tooltip.combat_styles.school_join";
     private static final String KEY_CASTING_SPELL = "tooltip.combat_styles.casting_spell";
     private static final String KEY_CASTING_NAMED = "tooltip.combat_styles.casting_named";
     private static final String KEY_CAST_SPELL = "tooltip.combat_styles.cast_spell";
@@ -140,8 +151,13 @@ public final class EquipmentTooltip {
     private static final String KEY_DAMAGE_DEALT_TYPE =
             "tooltip.combat_styles.damage_dealt_type";
     private static final String KEY_AGAINST = "tooltip.combat_styles.against";
-    private static final String KEY_SLOT = "tooltip.combat_styles.when_slot";
+    private static final String KEY_AGAINST_AFFLICTED = "tooltip.combat_styles.against_afflicted";
     private static final String KEY_LAST_SLOT = "tooltip.combat_styles.when_last_slot";
+    private static final String KEY_NOT_LAST_SLOT = "tooltip.combat_styles.when_not_last_slot";
+    private static final String KEY_SLOT_FROM_LAST = "tooltip.combat_styles.slot_from_last";
+    private static final String KEY_SLOT_EXCEPT = "tooltip.combat_styles.slot_except";
+    private static final String KEY_SLOTS_EVERY = "tooltip.combat_styles.equip_slots_every";
+    private static final String KEY_SLOTS_EVERY_EXCEPT = "tooltip.combat_styles.equip_slots_every_except";
     private static final String KEY_SLOTS = "tooltip.combat_styles.equip_slots";
     private static final String KEY_SLOT_RANGE = "tooltip.combat_styles.slot_range";
     private static final String KEY_SLOT_AND = "tooltip.combat_styles.slot_list_and";
@@ -182,7 +198,7 @@ public final class EquipmentTooltip {
     private static final String KEY_HURT_BELOW = "tooltip.combat_styles.hurt_below";
     private static final String KEY_HURT_TOTAL = "tooltip.combat_styles.hurt_total";
     private static final String KEY_HURT_BY = "tooltip.combat_styles.hurt_by";
-    private static final String KEY_FROM_SUMMON = "tooltip.combat_styles.from_summon";
+    private static final String KEY_NOT_FROM_SUMMON = "tooltip.combat_styles.not_from_summon";
     private static final String KEY_FULLY_BLOCKED = "tooltip.combat_styles.fully_blocked";
     private static final String KEY_PARTLY_BLOCKED = "tooltip.combat_styles.partly_blocked";
     private static final String KEY_USE_HELD_ABOVE = "tooltip.combat_styles.use_held_above";
@@ -196,6 +212,28 @@ public final class EquipmentTooltip {
     private static final String KEY_SPELL_PROJECTILE_NAMED =
             "tooltip.combat_styles.spell_projectile_named";
     private static final String KEY_DELAY = "tooltip.combat_styles.equip_delay";
+
+    private static final String SECTION_JOIN = "/";
+    private static final String SECTION_WORN = "worn";
+    private static final String SECTION_HEADER = TooltipOverride.HEADER_SECTION;
+    private static final String SECTION_ATTRIBUTES = "attributes";
+    private static final String SECTION_TUNED = "tuned";
+    private static final String SECTION_SUBSTITUTE = "substitute";
+    private static final String SECTION_SUBSTITUTION = "substitution";
+    private static final String SECTION_GRANTS = "grants";
+    private static final String SECTION_SPELLS = "spells";
+    private static final String SECTION_DAMAGE_BONUS = "damage_bonus";
+    private static final String SECTION_SELF = "self_effects";
+    private static final String SECTION_OWN = "own";
+    private static final String SECTION_EVENTS = "events";
+    private static final String SECTION_CUSTOM = "custom";
+    private static final String SECTION_AUGMENT = "augment";
+    private static final String SECTION_ECHO = "echo";
+    private static final String SECTION_REPEAT = "repeat";
+    private static final String SECTION_DIVE = "summon_dive";
+    private static final String SECTION_GATE = "gate";
+    private static final String SECTION_STACKING = "stacking";
+    private static final String SECTION_DELAY = "delay";
     private static final String KEY_HOLD_WHILE_ACTIVE = "tooltip.combat_styles.equip_hold_while_active";
     private static final String KEY_SUMMONS_ENTITY = "item.combat_styles.effect.summons";
     private static final String KEY_SUMMON_ANCHORED = "item.combat_styles.effect.summon_anchored";
@@ -234,6 +272,8 @@ public final class EquipmentTooltip {
     private static final double PERCENT = 100.0D;
 
     private static final String INDENT = "  ";
+    private static final String DESCRIPTION_JOIN = ": ";
+    private static final String KEY_STACKING = "tooltip.combat_styles.stacking";
     private static final int SECOND = 20;
     private static final double SURE = 0.9995D;
     private static final int MAX_HEADER_ICONS = 3;
@@ -304,13 +344,23 @@ public final class EquipmentTooltip {
             shown = true;
         }
         if (shown && !TooltipContextAccess.expanded()) {
-            tooltip.add(ItemTooltip.hint());
+            tooltip.add(ItemTooltip.equipmentHint());
         }
+    }
+
+    private static boolean showsActiveIn(EquipmentDefinition definition) {
+        return !definition.hideScopeTooltip() && definition.activeIn() != ActiveIn.ANY;
+    }
+
+    private static boolean reachesBothHands(EquipmentDefinition definition) {
+        return !definition.hideScopeTooltip() && definition.swings() == SwingHands.ANY
+                && definition.activeIn() != ActiveIn.WORN;
     }
 
     public static boolean describes(EquipmentDefinition definition) {
         return definition != null && (!definition.effects().isEmpty()
-                || definition.activeIn() != ActiveIn.ANY
+                || showsActiveIn(definition)
+                || reachesBothHands(definition)
                 || definition.use().channels()
                 || !definition.use().cooldown().isEmpty());
     }
@@ -318,9 +368,13 @@ public final class EquipmentTooltip {
     private static boolean appendDefinitionLines(EquipmentDefinition definition,
                                                  List<Component> tooltip) {
         List<Component> lines = new ArrayList<>();
-        if (definition.activeIn() != ActiveIn.ANY) {
+        if (showsActiveIn(definition)) {
             lines.add(TooltipGem.NOTE.bullet(Component.translatable(
                     definition.activeIn().tooltipKey()).withStyle(COND)));
+        }
+        if (reachesBothHands(definition)) {
+            lines.add(TooltipGem.NOTE.bullet(Component.translatable(
+                    definition.swings().tooltipKey()).withStyle(COND)));
         }
         appendUse(definition.use(), lines);
         if (lines.isEmpty()) {
@@ -443,9 +497,11 @@ public final class EquipmentTooltip {
                 StyleText.formatDecimal(dive.damageShare())).withStyle(BODY));
         List<Component> always = new ArrayList<>();
         List<Component> order = new ArrayList<>();
-        dive.ability().filter(ability -> !ability.isBlank()).ifPresent(ability ->
-                always.add(TooltipGem.SUMMON.bullet(Component.translatable(
-                        KEY_SUMMON_DIVE_ABILITY, abilityName(ability)).withStyle(BODY))));
+        dive.ability().filter(ability -> !ability.isBlank()).ifPresent(ability -> {
+            always.add(TooltipGem.SUMMON.bullet(Component.translatable(
+                    KEY_SUMMON_DIVE_ABILITY, abilityName(ability)).withStyle(BODY)));
+            appendAbilityDescriptions(List.of(ability), always);
+        });
         if (dive.targeting() != SummonTargeting.ALL) {
             order.add(TooltipGem.SUMMON.bullet(Component.translatable(KEY_SUMMON_DIVE_WHO,
                     Component.translatable(KEY_TARGETING_PREFIX + dive.targeting().key()))
@@ -471,7 +527,9 @@ public final class EquipmentTooltip {
         if (replacement == null || !replacement.replacesSummons()) {
             return;
         }
-        tooltip.add(Component.empty());
+        if (!tooltip.isEmpty()) {
+            tooltip.add(Component.empty());
+        }
         tooltip.add(Component.translatable(KEY_REPLACE_HEADER).withStyle(HEADER));
         tooltip.add(TooltipGem.SUMMON.bullet(Component.translatable(KEY_REPLACE_ALL,
                 StyleText.registryName(replacement.entity().orElse(""))).withStyle(BODY)));
@@ -490,10 +548,12 @@ public final class EquipmentTooltip {
                 Component.translatable(KEY_REPLACE_LIFE,
                         StyleText.formatDecimal(ticks / (double) SECOND)).withStyle(BODY))));
 
-        if (!replacement.abilities().isEmpty()) {
-            tooltip.add(TooltipGem.SUMMON.bullet(Component.translatable(KEY_REPLACE_ORDER,
-                    abilityNames(replacement.abilities())).withStyle(COND)));
-        }
+        appendCadence(replacement.cadence(), replacement.abilities(), tooltip);
+        replacement.finale().filter(finale -> !finale.isBlank()).ifPresent(finale -> {
+            tooltip.add(TooltipGem.SUMMON.bullet(Component.translatable(
+                    KEY_SUMMON_FINALE, abilityName(finale)).withStyle(BODY)));
+            appendAbilityDescriptions(List.of(finale), tooltip);
+        });
     }
 
     private static void appendCadence(SummonCadence cadence, List<String> abilities,
@@ -506,6 +566,7 @@ public final class EquipmentTooltip {
                     StyleText.formatDecimal(recast / (double) SECOND),
                     Component.translatable(KEY_SUMMON_PICK + pick.getSerializedName()))
                     .withStyle(BODY)));
+            appendAbilityDescriptions(abilities, tooltip);
         }
         for (SummonPassive passive : cadence.passives()) {
             if (passive.ability().isBlank()) {
@@ -527,6 +588,7 @@ public final class EquipmentTooltip {
                         .withStyle(FRAME));
             }
             tooltip.add(TooltipGem.SUMMON.bullet(line.withStyle(BODY)));
+            appendAbilityDescriptions(List.of(passive.ability()), tooltip);
         }
         cadence.aim().ifPresent(aim -> tooltip.add(TooltipGem.SUMMON.bullet(
                 Component.translatable(KEY_SUMMON_AIM,
@@ -535,26 +597,86 @@ public final class EquipmentTooltip {
     }
 
     private static final String ABILITY_NAME_PREFIX = "ability.";
+    private static final String ABILITY_NAME_SUFFIX = ".name";
+    private static final String ABILITY_DESC_SUFFIX = ".desc";
 
-    private static Component abilityName(String ability) {
+    private static StyleAffix affixAbility(String ability) {
         String key = AbilityConfig.key(ability);
         StyleAffix affix = ability != null && ability.contains(":")
                 ? AffixRegistry.get(ability)
                 : null;
-        if (affix == null) {
-            for (StyleAffix candidate : AffixRegistry.all()) {
-                if (AbilityConfig.key(candidate.serializedId()).equals(key)) {
-                    affix = candidate;
-                    break;
-                }
+        if (affix != null) {
+            return affix;
+        }
+        for (StyleAffix candidate : AffixRegistry.all()) {
+            if (AbilityConfig.key(candidate.serializedId()).equals(key)) {
+                return candidate;
             }
         }
+        return null;
+    }
+
+    private static List<String> abilityLangKeys(String ability, String suffix) {
+        String key = AbilityConfig.key(ability);
+        List<String> keys = new ArrayList<>();
+        ResourceLocation id = ability == null ? null : ResourceLocation.tryParse(ability.trim());
+        if (id != null && ability.contains(":")) {
+            keys.add(ABILITY_NAME_PREFIX + id.getNamespace() + "." + id.getPath() + suffix);
+        }
+        keys.add(ABILITY_NAME_PREFIX + CombatStyles.MOD_ID + "." + key + suffix);
+        return keys;
+    }
+
+    private static Optional<String> presentLangKey(List<String> keys) {
+        Language language = Language.getInstance();
+        return keys.stream().filter(language::has).findFirst();
+    }
+
+    private static Component abilityName(String ability) {
+        StyleAffix affix = affixAbility(ability);
         if (affix != null) {
             return Component.translatableWithFallback(affix.nameKey(), affix.fallbackName());
         }
+        List<String> keys = abilityLangKeys(ability, ABILITY_NAME_SUFFIX);
         return Component.translatableWithFallback(
-                ABILITY_NAME_PREFIX + CombatStyles.MOD_ID + "." + key + ".name",
-                StyleText.prettify(key));
+                presentLangKey(keys).orElse(keys.get(keys.size() - 1)),
+                StyleText.prettify(AbilityConfig.key(ability)));
+    }
+
+    private static Optional<Component> abilityDescription(String ability) {
+        if (ability == null || ability.isBlank()) {
+            return Optional.empty();
+        }
+        ScriptedAbility scripted = ScriptedAbilities.get(ability);
+        if (scripted != null && scripted.description().isPresent()) {
+            return Optional.of(TooltipOverride.text(scripted.description().get()));
+        }
+        StyleAffix affix = affixAbility(ability);
+        List<String> keys = affix == null
+                ? abilityLangKeys(ability, ABILITY_DESC_SUFFIX)
+                : List.of(affix.descriptionKey());
+        return presentLangKey(keys).map(Component::translatable);
+    }
+
+    private static void appendAbilityDescriptions(List<String> abilities, List<Component> tooltip) {
+        List<Component> described = new ArrayList<>();
+        for (String ability : abilities) {
+            abilityDescription(ability).ifPresent(text -> described.add(TooltipGem.detail(
+                    Component.empty().append(abilityName(ability).copy().withStyle(BODY))
+                            .append(Component.literal(DESCRIPTION_JOIN).withStyle(FRAME))
+                            .append(text.copy().withStyle(FRAME)))));
+        }
+        if (described.isEmpty()) {
+            return;
+        }
+        if (!ItemTooltip.detailed()) {
+            int last = tooltip.size() - 1;
+            if (last >= 0) {
+                tooltip.set(last, ItemTooltip.marked(tooltip.get(last)));
+            }
+            return;
+        }
+        tooltip.addAll(described);
     }
 
     private static MutableComponent abilityNames(List<String> abilities) {
@@ -580,69 +702,154 @@ public final class EquipmentTooltip {
         return merged;
     }
 
-    private static boolean rewrites(EquipmentDefinition definition, String affixId) {
-        for (TriggeredEffect entry : definition.triggered()) {
-            AffixTuning tuning = entry.effect().tuneAffixes().get(affixId);
-            if (tuning != null && (tuning.onHit().isPresent() || tuning.onSwing().isPresent()
-                    || tuning.appliesTo().isPresent() || tuning.cooldown().isPresent()
-                    || tuning.chance().isPresent() || tuning.damageMultiplier().isPresent()
-                    || tuning.costModifier().isPresent())) {
-                return true;
-            }
-        }
-        return false;
+    private static boolean rewrites(AffixTuning tuning) {
+        return tuning != null && (tuning.onHit().isPresent() || tuning.onSwing().isPresent()
+                || tuning.appliesTo().isPresent() || tuning.cooldown().isPresent()
+                || tuning.chance().isPresent() || tuning.damageMultiplier().isPresent()
+                || tuning.costModifier().isPresent());
     }
 
+    public record EditableLine(String key, Component line) {
+    }
+
+    public static List<EditableLine> editableLines(EquipmentDefinition definition, String name,
+                                                   TriggeredEffect entry) {
+        EffectLines lines = new EffectLines();
+        generateEffect(definition, entry, !definition.isPermanent(name, entry), lines);
+        List<String> keys = lines.keys();
+        List<EditableLine> editable = new ArrayList<>(lines.size());
+        for (int index = 0; index < lines.size(); index++) {
+            editable.add(new EditableLine(keys.get(index), lines.get(index)));
+        }
+        return editable;
+    }
+
+    public static List<Component> shownLines(EquipmentDefinition definition, String name,
+                                             TriggeredEffect entry) {
+        if (entry.hideTooltip()) {
+            return List.of();
+        }
+        List<Component> lines = new ArrayList<>();
+        appendEffect(definition, entry, !definition.isPermanent(name, entry), lines,
+                entry.trigger().chance().orElse(EffectGroup.ALWAYS));
+        return lines;
+    }
+
+    public static Component rewritten(String raw) {
+        return rewritten(raw, null, List.of(), null);
+    }
+
+    public static Component rewritten(String raw, Component original, List<Component> generated) {
+        return rewritten(raw, original, generated, null);
+    }
+
+    public static Component rewritten(String raw, Component original, List<Component> generated,
+                                      String icon) {
+        MutableComponent body = TooltipOverride.filled(raw, original, generated);
+        if (icon != null) {
+            Component styled = original == null
+                    ? body.withStyle(BODY)
+                    : Component.empty().withStyle(TooltipOverride.bodyOf(original).getStyle()).append(body);
+            return TooltipGem.iconLine(icon, styled);
+        }
+        Component kept = original == null ? null : TooltipOverride.keepingStructure(original, body);
+        return kept != null ? kept : TooltipGem.CUSTOM.bullet(body.withStyle(BODY));
+    }
     private static boolean appendEffect(EquipmentDefinition definition, TriggeredEffect entry,
                                         boolean conditional,
                                         List<Component> tooltip, double odds) {
-        EquipmentEffect effect = entry.effect();
+        EffectLines lines = new EffectLines();
+        boolean headed = generateEffect(definition, entry, conditional, lines);
+        TooltipOverride override = entry.tooltip();
+        int headerAt = lines.keys().indexOf(TooltipOverride.HEADER_KEY);
+        int oddsAt = headerAt < 0 ? 0 : shownIndex(lines, override, headerAt);
+        List<Component> shown = override.apply(lines, EquipmentTooltip::rewritten);
         int start = tooltip.size();
+        tooltip.addAll(shown);
+        markOdds(tooltip, start + oddsAt, odds);
+        return headed && !(headerAt >= 0 && override.hides(TooltipOverride.HEADER_KEY));
+    }
+
+    private static int shownIndex(EffectLines lines, TooltipOverride override, int generated) {
+        List<String> keys = lines.keys();
+        int shown = 0;
+        for (int index = 0; index < generated; index++) {
+            if (!override.hides(keys.get(index))) {
+                shown++;
+            }
+        }
+        return shown;
+    }
+
+    private static boolean generateEffect(EquipmentDefinition definition, TriggeredEffect entry,
+                                          boolean conditional, EffectLines tooltip) {
+        EquipmentEffect effect = entry.effect();
         Component when = entry.tooltipHeader().isBlank()
                 ? triggerOf(entry.trigger())
                 : TooltipOverride.text(entry.tooltipHeader());
-        if (!entry.tooltipLines().isEmpty()) {
-            if (when != null) {
-                tooltip.add(headerLine(entry.trigger(), when));
-            }
-            for (String line : entry.tooltipLines()) {
-                tooltip.add(TooltipGem.CUSTOM.bullet(TooltipOverride.text(line).withStyle(BODY)));
-            }
-            markOdds(tooltip, start, odds);
-            return when != null;
-        }
-        appendWornAttributes(definition, effect, entry.cooldownTicks(), !conditional, tooltip);
-        boolean headed = tooltip.size() > start || when != null;
-        int oddsAt = tooltip.size();
+        List<Component> tuned = tunedAffixes(effect);
+        tooltip.section(SECTION_WORN);
+        appendWornAttributes(effect, entry.cooldownTicks(), !conditional,
+                conditional ? List.of() : tuned, tooltip);
+        boolean headed = !tooltip.isEmpty() || when != null;
         if (when != null) {
+            tooltip.section(SECTION_HEADER);
             tooltip.add(headerLine(entry.trigger(), when));
         }
         if (conditional) {
+            tooltip.section(SECTION_ATTRIBUTES);
             appendConditionalAttributes(effect, entry.cooldownTicks(), tooltip);
+            tooltip.section(SECTION_TUNED);
+            tooltip.addAll(tuned);
         }
+        tooltip.section(SECTION_SUBSTITUTE);
         appendSubstitute(effect, tooltip);
+        tooltip.section(SECTION_SUBSTITUTION);
         appendSubstitution(effect, tooltip);
+        tooltip.section(SECTION_GRANTS);
         appendGrants(definition, effect, tooltip);
+        tooltip.section(SECTION_SPELLS);
         appendSpellLocks(effect.spells(), tooltip);
+        tooltip.section(SECTION_DAMAGE_BONUS);
         for (DamageBonus bonus : effect.damageBonus()) {
             tooltip.add(TooltipGem.DAMAGE.bullet(bonus.describe().withStyle(BODY)));
         }
+        tooltip.section(SECTION_SELF);
         appendSelfEffects(entry.selfEffects(), tooltip);
+        tooltip.section(SECTION_OWN);
         appendOwnEffects(definition, effect, tooltip);
-        appendEventEffects(definition, effect, tooltip);
+        tooltip.section(SECTION_EVENTS);
+        appendEventEffects(definition, effect, entry.trigger(), tooltip);
+        tooltip.section(SECTION_CUSTOM);
+        for (Component line : Customs.tooltip(CustomScopes.EQUIPMENT_EFFECT, effect)) {
+            tooltip.add(TooltipGem.EFFECT.bullet(line.copy().withStyle(BODY)));
+        }
         if (TooltipContextAccess.expanded()) {
+            tooltip.section(SECTION_AUGMENT);
             appendAugment(effect.augment().orElse(null), tooltip);
+            tooltip.section(SECTION_ECHO);
             appendEcho(echoOf(effect), tooltip);
+            tooltip.section(SECTION_REPEAT);
             appendRepeat(effect, tooltip);
-            appendSummonReplacement(effect.summonProfile().orElse(null), tooltip);
+            tooltip.section(SECTION_DIVE);
             appendSummonDive(effect.summonDive().orElse(null), tooltip);
         }
+        tooltip.section(SECTION_GATE);
         appendGate(entry.cooldown(), tooltip);
+        tooltip.section(SECTION_STACKING);
+        entry.stacking().ifPresent(stacking -> {
+            Player viewer = TooltipContextAccess.viewer();
+            int now = viewer == null ? stacking.minStacks() : stacking.count(viewer);
+            tooltip.add(TooltipGem.NOTE.bullet(Component.translatable(KEY_STACKING, now,
+                    StyleText.formatCompact(stacking.per()),
+                    StyleText.scalingSourceName(stacking.source()), stacking.maxStacks())
+                    .withStyle(FRAME)));
+        });
+        tooltip.section(SECTION_DELAY);
         if (entry.delayTicks() > 0) {
             tooltip.add(TooltipGem.NOTE.bullet(Component.translatable(KEY_DELAY,
                     seconds(entry.delayTicks())).withStyle(FRAME)));
         }
-        markOdds(tooltip, oddsAt < tooltip.size() ? oddsAt : start, odds);
         return headed;
     }
 
@@ -741,7 +948,7 @@ public final class EquipmentTooltip {
         if (gate == null || gate.isEmpty()) {
             return;
         }
-        if (gate.holdWhileActive()) {
+        if (gate.holdWhileActive() && !gate.windowed()) {
             tooltip.add(TooltipGem.NOTE.bullet(Component.translatable(KEY_HOLD_WHILE_ACTIVE,
                     seconds(gate.ticks())).withStyle(FRAME)));
             return;
@@ -756,7 +963,7 @@ public final class EquipmentTooltip {
         Component summary = gate.limited()
                 ? Component.translatable(gate.uses() == 1 ? KEY_WINDOW : KEY_WINDOW_USES,
                         gate.uses(), span)
-                : Component.translatable(KEY_COOLDOWN, span);
+                : Component.translatable(KEY_WINDOW_SPAN, span);
         if (!ItemTooltip.detailed()) {
             tooltip.add(TooltipGem.NOTE.bullet(ItemTooltip.marked(summary.copy().withStyle(FRAME))));
             return;
@@ -857,6 +1064,16 @@ public final class EquipmentTooltip {
                 parts.add(Component.translatable(KEY_DAMAGED_WITHIN, seconds(ticks))));
         state.hasSpell().ifPresent(value ->
                 parts.add(Component.translatable(value ? KEY_HAS_SPELL : KEY_NO_SPELL)));
+        if (!state.heldSpellSchools().isEmpty()) {
+            MutableComponent schools = Component.empty();
+            for (String school : state.heldSpellSchools()) {
+                if (!schools.getSiblings().isEmpty()) {
+                    schools.append(Component.translatable(KEY_SCHOOL_JOIN));
+                }
+                schools.append(StyleText.schoolName(school));
+            }
+            parts.add(Component.translatable(KEY_HAS_SPELL_SCHOOL, schools));
+        }
         state.castingSpell().ifPresent(value ->
                 parts.add(Component.translatable(value ? KEY_CASTING_SPELL : KEY_NOT_CASTING)));
         state.summonsActive().ifPresent(count ->
@@ -880,6 +1097,10 @@ public final class EquipmentTooltip {
         }
         if (!dealt.targets().isEmpty()) {
             parts.add(Component.translatable(KEY_AGAINST, entityNamesOf(dealt.targets())));
+        }
+        if (!dealt.targetEffects().isEmpty()) {
+            parts.add(Component.translatable(KEY_AGAINST_AFFLICTED,
+                    entityNamesOf(dealt.targetEffects())));
         }
     }
 
@@ -912,8 +1133,8 @@ public final class EquipmentTooltip {
     }
 
     private static void projectileParts(ProjectileHitGate hit, List<Component> parts) {
-        if (hit.fromSummon()) {
-            parts.add(Component.translatable(KEY_FROM_SUMMON));
+        if (!hit.fromSummon()) {
+            parts.add(Component.translatable(KEY_NOT_FROM_SUMMON));
         }
         hit.distanceAbove().ifPresent(blocks -> parts.add(Component.translatable(
                 KEY_PROJECTILE_FAR, StyleText.formatDecimal(blocks))));
@@ -1082,8 +1303,8 @@ public final class EquipmentTooltip {
         if (trigger.activation().reactsToShoot()) {
             parts.add(detailed(KEY_ON_SHOOT, KEY_ON_SHOOT_TYPED,
                     entityNamesOf(trigger.activation().shoot().entities())));
-            if (trigger.activation().shoot().fromSummon()) {
-                parts.add(Component.translatable(KEY_FROM_SUMMON));
+            if (!trigger.activation().shoot().fromSummon()) {
+                parts.add(Component.translatable(KEY_NOT_FROM_SUMMON));
             }
         }
         if (trigger.activation().reactsToBlock()) {
@@ -1127,15 +1348,13 @@ public final class EquipmentTooltip {
         }
         stateParts(trigger.phase().state(), parts);
         dealtParts(trigger.activation().dealt(), parts);
-        if (trigger.lastSlot().orElse(false)) {
-            parts.add(Component.translatable(KEY_LAST_SLOT));
-        }
+        trigger.lastSlot().ifPresent(last ->
+                parts.add(Component.translatable(last ? KEY_LAST_SLOT : KEY_NOT_LAST_SLOT)));
         trigger.slotBand().ifPresent(band ->
                 parts.add(Component.translatable(band.translationKey())));
-        trigger.slots().ifPresent(selection ->
-                parts.add(Component.translatable(KEY_SLOTS, slotsName(selection))));
+        trigger.slots().ifPresent(selection -> parts.add(slotsPart(selection)));
         trigger.slotIndex().ifPresent(index ->
-                parts.add(Component.translatable(KEY_SLOT, index + 1)));
+                parts.add(Component.translatable(KEY_SLOTS, slotName(index))));
         trigger.everyNthSwing().ifPresent(every ->
                 parts.add(Component.translatable(KEY_NTH, every)));
         trigger.idleTicks().ifPresent(ticks ->
@@ -1144,16 +1363,16 @@ public final class EquipmentTooltip {
         HealthGate health = trigger.health();
         health.selfAbove().ifPresent(ratio ->
                 parts.add(Component.translatable(KEY_SELF_ABOVE,
-                        StyleText.formatDecimal(ratio * 100.0D))));
+                        StyleText.formatCompact(ratio * 100.0D))));
         health.selfBelow().ifPresent(ratio ->
                 parts.add(Component.translatable(KEY_SELF_BELOW,
-                        StyleText.formatDecimal(ratio * 100.0D))));
+                        StyleText.formatCompact(ratio * 100.0D))));
         health.targetAbove().ifPresent(ratio ->
                 parts.add(Component.translatable(KEY_TARGET_ABOVE,
-                        StyleText.formatDecimal(ratio * 100.0D))));
+                        StyleText.formatCompact(ratio * 100.0D))));
         health.targetBelow().ifPresent(ratio ->
                 parts.add(Component.translatable(KEY_TARGET_BELOW,
-                        StyleText.formatDecimal(ratio * 100.0D))));
+                        StyleText.formatCompact(ratio * 100.0D))));
         if (trigger.requiresAffix().orElse(false)) {
             parts.add(Component.translatable(KEY_NEEDS_AFFIX));
         }
@@ -1236,7 +1455,7 @@ public final class EquipmentTooltip {
             if (state.damagedWithin().isPresent()) {
                 icons.add(TooltipIcon.DAMAGED);
             }
-            if (state.hasSpell().orElse(false)) {
+            if (state.hasSpell().orElse(false) || !state.heldSpellSchools().isEmpty()) {
                 icons.add(TooltipIcon.HAS_SPELL);
             }
             if (state.castingSpell().orElse(false)) {
@@ -1257,13 +1476,31 @@ public final class EquipmentTooltip {
         }
     }
 
+    private static Component slotsPart(SlotSelection selection) {
+        if (selection.range().isPresent()) {
+            SlotSelection.Range range = selection.range().get();
+            if (range.from() == SlotSelection.FIRST && range.to() == SlotSelection.LAST) {
+                return range.except().isEmpty()
+                        ? Component.translatable(KEY_SLOTS_EVERY)
+                        : Component.translatable(KEY_SLOTS_EVERY_EXCEPT, slotList(range.except()));
+            }
+        }
+        return Component.translatable(KEY_SLOTS, slotsName(selection));
+    }
+
     private static Component slotsName(SlotSelection selection) {
         if (selection.range().isPresent()) {
             SlotSelection.Range range = selection.range().get();
-            return Component.translatable(KEY_SLOT_RANGE,
+            Component span = Component.translatable(KEY_SLOT_RANGE,
                     slotName(range.from()), slotName(range.to()));
+            return range.except().isEmpty()
+                    ? span
+                    : Component.translatable(KEY_SLOT_EXCEPT, span, slotList(range.except()));
         }
-        List<Integer> indices = selection.indices();
+        return slotList(selection.indices());
+    }
+
+    private static Component slotList(List<Integer> indices) {
         if (indices.isEmpty()) {
             return Component.empty();
         }
@@ -1275,10 +1512,16 @@ public final class EquipmentTooltip {
     }
 
     private static Component slotName(int index) {
-        if (index < 0) {
+        if (index == SlotSelection.LAST) {
             return Component.translatable(KEY_SLOT_LAST);
         }
-        int ordinal = index + 1;
+        if (index < SlotSelection.LAST) {
+            return Component.translatable(KEY_SLOT_FROM_LAST, ordinalName(-index));
+        }
+        return ordinalName(index + 1);
+    }
+
+    private static Component ordinalName(int ordinal) {
         return switch (ordinal) {
             case 1 -> Component.translatable(KEY_ORDINAL_1);
             case 2 -> Component.translatable(KEY_ORDINAL_2);
@@ -1297,34 +1540,35 @@ public final class EquipmentTooltip {
     }
 
     private static void appendOwnEffects(EquipmentDefinition definition, EquipmentEffect effect,
-                                         List<Component> tooltip) {
+                                         EffectLines tooltip) {
         if (effect.onHit().isEmpty() && effect.onSwing().isEmpty()) {
             return;
         }
-        List<Component> lines = new ArrayList<>();
+        EffectLines lines = new EffectLines();
         AffixText.appendEffects(EquipmentAffix.of(new EquipmentRuntime.Match(
                 definition, new TriggeredEffect(EquipmentTrigger.ALWAYS, effect, EffectCooldown.NONE, false),
                 definition.id())), lines, false);
-        for (Component line : lines) {
-            tooltip.add(TooltipGem.EFFECT.place(line));
-        }
+        tooltip.addNested(lines.tagged(), TooltipGem.EFFECT::place);
     }
 
     private static void appendEventEffects(EquipmentDefinition definition, EquipmentEffect effect,
-                                           List<Component> tooltip) {
+                                           EquipmentTrigger trigger, EffectLines tooltip) {
         for (EventKind kind : EventKind.values()) {
-            for (AffixEffects.OnHit payload : effect.events().get(kind)) {
-                tooltip.add(TooltipGem.EFFECT.bullet(Component.translatable(kind.labelKey())
-                        .withStyle(BODY)));
-                List<Component> lines = new ArrayList<>();
+            List<AffixEffects.OnHit> payloads = effect.events().get(kind);
+            for (int index = 0; index < payloads.size(); index++) {
+                tooltip.section(SECTION_EVENTS + SECTION_JOIN + kind.serializedName()
+                        + SECTION_JOIN + index);
+                if (!kind.heardBy(trigger)) {
+                    tooltip.add(TooltipGem.EFFECT.bullet(Component.translatable(kind.labelKey())
+                            .withStyle(BODY)));
+                }
+                EffectLines lines = new EffectLines();
                 EquipmentEffect alone = EquipmentEffects.withOnHit(EquipmentEffect.EMPTY,
-                        Optional.of(payload));
+                        Optional.of(payloads.get(index)));
                 AffixText.appendEffects(EquipmentAffix.of(new EquipmentRuntime.Match(definition,
                         new TriggeredEffect(EquipmentTrigger.ALWAYS, alone, EffectCooldown.NONE,
                                 false), definition.id())), lines, false);
-                for (Component line : lines) {
-                    tooltip.add(TooltipGem.hangPlace(line));
-                }
+                tooltip.addNested(lines.tagged(), TooltipGem::hangPlace);
             }
         }
     }
@@ -1466,32 +1710,9 @@ public final class EquipmentTooltip {
         }
     }
 
-    private static void appendWornAttributes(EquipmentDefinition definition,
-                                             EquipmentEffect effect, int cooldownTicks,
-                                             boolean includeSet, List<Component> tooltip) {
-        List<Component> rewritten = new ArrayList<>();
-        for (String id : effect.tuneAffixes().keySet()) {
-            StyleAffix affix = AffixRegistry.get(id);
-            if (affix == null || !rewrites(definition, id)) {
-                continue;
-            }
-            MutableComponent line = TooltipGem.of(affix.rarity()).bullet(
-                    AffixText.name(affix).copy().withStyle(affix.rarity().color()));
-            AffixPlates.attach(line, Component.translatable(KEY_CHANGED), PLATE_COLOUR);
-            AffixTuning tuning = tuningFor(definition, id);
-            List<Component> diff = new ArrayList<>();
-            appendTunedScalars(affix, tuning, diff);
-            AffixText.appendTuned(affix, tuning.applyTo(affix), diff, true);
-            rewritten.add(diff.isEmpty() || ItemTooltip.detailed()
-                    ? line
-                    : ItemTooltip.marked(line));
-            if (!ItemTooltip.detailed()) {
-                continue;
-            }
-            for (Component changed : diff) {
-                rewritten.add(TooltipGem.hangPlace(changed));
-            }
-        }
+    private static void appendWornAttributes(EquipmentEffect effect, int cooldownTicks,
+                                             boolean includeSet, List<Component> rewritten,
+                                             List<Component> tooltip) {
         Map<String, AttackAttribute> set = new LinkedHashMap<>();
         for (Map.Entry<String, AttributeBonus> entry : effect.attributes().entrySet()) {
             AttributeBonus bonus = entry.getValue();
@@ -1509,6 +1730,33 @@ public final class EquipmentTooltip {
             appendAttributes(set, tooltip);
         }
         tooltip.addAll(rewritten);
+    }
+
+    private static List<Component> tunedAffixes(EquipmentEffect effect) {
+        List<Component> rewritten = new ArrayList<>();
+        for (Map.Entry<String, AffixTuning> tuned : effect.tuneAffixes().entrySet()) {
+            StyleAffix affix = AffixRegistry.get(tuned.getKey());
+            AffixTuning tuning = tuned.getValue();
+            if (affix == null || !rewrites(tuning) || effect.grantAffixes().contains(tuned.getKey())) {
+                continue;
+            }
+            MutableComponent line = TooltipGem.of(affix.rarity()).bullet(
+                    AffixText.name(affix).copy().withStyle(affix.rarity().color()));
+            AffixPlates.attach(line, Component.translatable(KEY_CHANGED), PLATE_COLOUR);
+            List<Component> diff = new ArrayList<>();
+            appendTunedScalars(affix, tuning, diff);
+            AffixText.appendTuned(affix, tuning.applyTo(affix), diff, true);
+            rewritten.add(diff.isEmpty() || ItemTooltip.detailed()
+                    ? line
+                    : ItemTooltip.marked(line));
+            if (!ItemTooltip.detailed()) {
+                continue;
+            }
+            for (Component changed : diff) {
+                rewritten.add(TooltipGem.hangPlace(changed));
+            }
+        }
+        return rewritten;
     }
 
     private static MutableComponent stat(String labelKey, double value) {
@@ -1590,6 +1838,10 @@ public final class EquipmentTooltip {
             }
         });
         effect.summonProfile().ifPresent(profile -> {
+            if (profile.replacesSummons()) {
+                appendSummonReplacement(profile, tooltip);
+                return;
+            }
             List<Component> always = new ArrayList<>();
             List<Component> summon = new ArrayList<>();
             Component head = profile.companion()
@@ -1618,9 +1870,11 @@ public final class EquipmentTooltip {
                 appendProfileStats(profile, always, summon);
             }
             appendCadence(profile.cadence(), profile.abilities(), always);
-            profile.finale().filter(finale -> !finale.isBlank()).ifPresent(finale ->
-                    summon.add(TooltipGem.SUMMON.bullet(Component.translatable(
-                            KEY_SUMMON_FINALE, abilityName(finale)).withStyle(BODY))));
+            profile.finale().filter(finale -> !finale.isBlank()).ifPresent(finale -> {
+                summon.add(TooltipGem.SUMMON.bullet(Component.translatable(
+                        KEY_SUMMON_FINALE, abilityName(finale)).withStyle(BODY)));
+                appendAbilityDescriptions(List.of(finale), summon);
+            });
             appendUnder(head, always, summon, tooltip);
         });
         effect.grantAbilities().ifPresent(grant -> {
@@ -1629,6 +1883,7 @@ public final class EquipmentTooltip {
             if (!grant.actives().isEmpty() && grant.cadence().recastTicks().isEmpty()) {
                 granted.add(TooltipGem.SUMMON.bullet(Component.translatable(KEY_GRANT_ACTIVES,
                         abilityNames(grant.cadence().carriedAbilities())).withStyle(BODY)));
+                appendAbilityDescriptions(grant.cadence().carriedAbilities(), granted);
             }
             if (granted.isEmpty()) {
                 return;

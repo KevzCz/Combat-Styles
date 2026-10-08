@@ -8,18 +8,21 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
 
-import net.pixeldreamstudios.combat_styles.api.CombatScheduler;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.AffixImpacts;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.EquipmentAffix;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 import java.util.function.Predicate;
 
@@ -27,19 +30,30 @@ public final class EquipmentActivation {
 
     private static final int OWNER_DEPTH = 4;
 
-    private static boolean firing;
+    private static final Set<String> FIRING = new HashSet<>();
+    private static final ThreadLocal<Entity> CURRENT_SHOT = new ThreadLocal<>();
+    private static final ThreadLocal<UseEvent> CURRENT_USE = new ThreadLocal<>();
 
     private EquipmentActivation() {
     }
 
     public static void shot(Player player, Entity projectile, boolean viaSummon) {
-        if (projectile == null) {
+        if (projectile == null || ProjectileCopies.isCopy(projectile)) {
             return;
         }
         ItemStack weapon = player == null ? ItemStack.EMPTY : player.getMainHandItem();
         ShotEvent event = new ShotEvent(projectile, weapon, viaSummon);
-        react(player, EquipmentContext.shotBy(player, event),
-                trigger -> trigger.activation().reactsToShoot(), "shot");
+        CURRENT_SHOT.set(projectile);
+        try {
+            react(player, EquipmentContext.shotBy(player, event),
+                    trigger -> trigger.activation().reactsToShoot(), "shot");
+        } finally {
+            CURRENT_SHOT.remove();
+        }
+    }
+
+    public static Entity currentShot() {
+        return CURRENT_SHOT.get();
     }
 
     public static void blocked(Player player, BlockEvent event) {
@@ -54,8 +68,17 @@ public final class EquipmentActivation {
         if (event == null) {
             return;
         }
-        react(player, EquipmentContext.usedBy(player, event),
-                trigger -> trigger.activation().usesItem(), "use");
+        CURRENT_USE.set(event);
+        try {
+            react(player, EquipmentContext.usedBy(player, event),
+                    trigger -> trigger.activation().usesItem(), "use");
+        } finally {
+            CURRENT_USE.remove();
+        }
+    }
+
+    public static UseEvent currentUse() {
+        return CURRENT_USE.get();
     }
 
     public static void cast(Player player, SpellCastEvent event) {
@@ -99,13 +122,13 @@ public final class EquipmentActivation {
 
     private static void react(Player player, EquipmentContext context,
                               Predicate<EquipmentTrigger> wanted, String label) {
-        if (player == null || player.level().isClientSide() || firing) {
+        if (player == null || player.level().isClientSide() || FIRING.contains(label)) {
             return;
         }
         if (EquipmentRegistry.isEmpty() || EquipmentProviders.isEmpty()) {
             return;
         }
-        firing = true;
+        FIRING.add(label);
         try {
             EventKind kind = EventKind.activationOf(context);
             List<EquipmentRuntime.Match> heard = new ArrayList<>();
@@ -118,8 +141,9 @@ public final class EquipmentActivation {
                 List<AffixEffects.OnHit> payloads = match.effect().events().get(kind);
                 boolean arming = EffectWindows.arms(match)
                         && match.trigger().eventFiring(context);
+                boolean hooked = Customs.has(match.entry()) || Customs.has(match.effect());
                 if (!arming && payloads.isEmpty()
-                        && match.entry().selfEffects().isEmpty()) {
+                        && match.entry().selfEffects().isEmpty() && !hooked) {
                     continue;
                 }
                 try {
@@ -130,7 +154,7 @@ public final class EquipmentActivation {
                             }
                             sync(player, match);
                         }
-                        if (payloads.isEmpty()) {
+                        if (payloads.isEmpty() && !hooked) {
                             continue;
                         }
                     }
@@ -143,24 +167,26 @@ public final class EquipmentActivation {
                     }
                     sync(player, match);
                     LivingEntity target = context.target();
+                    ItemStack owner = match.stackOf(player);
+                    float damage = context.reactionDamage()
+                            * EffectStacking.multiplier(player, match.entry(), owner);
                     Runnable fire = () -> {
+                        Customs.apply(CustomScopes.TRIGGERED_EFFECT, match.entry(), player, player, target);
+                        Customs.apply(CustomScopes.EQUIPMENT_EFFECT, match.effect(), player, player, target);
                         AffixImpacts.applySelfEffects(player, match.entry().selfEffects());
                         for (AffixEffects.OnHit payload : payloads) {
-                            AffixDamageDealer.applyHurtReaction(player, target, affix,
-                                    payload, 0.0F);
+                            CombatEffectDealer.applyHurtReaction(player, target, affix,
+                                    payload, damage);
                         }
                     };
-                    if (!CombatScheduler.after(player, match.entry().delayTicks(),
-                            match.id(), fire)) {
-                        fire.run();
-                    }
+                    EffectStacking.fire(player, match.entry(), owner, match.id(), fire);
                 } catch (Throwable throwable) {
                     CombatStyles.LOGGER.error("Failed to apply {} reaction {}",
                             label, match.id(), throwable);
                 }
             }
         } finally {
-            firing = false;
+            FIRING.remove(label);
         }
     }
 

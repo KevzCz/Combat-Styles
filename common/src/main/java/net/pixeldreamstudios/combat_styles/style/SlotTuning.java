@@ -5,6 +5,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -34,14 +35,14 @@ public record SlotTuning(List<Integer> slots, List<String> affixes,
                             ? Either.left(list.getFirst())
                             : Either.right(list));
 
-    public static final Codec<SlotTuning> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<SlotTuning> CODEC = Customs.wrap(SlotTuning.class, RecordCodecBuilder.create(instance -> instance.group(
             SLOTS_CODEC.optionalFieldOf("slot", List.of()).forGetter(SlotTuning::slots),
             AFFIX_CODEC.optionalFieldOf("affixes", List.of()).forGetter(SlotTuning::affixes),
             AttackOverride.CODEC.optionalFieldOf("attack").forGetter(SlotTuning::attack),
             AffixTuning.MAP_CODEC.optionalFieldOf("affix_tuning", Map.of())
                     .forGetter(SlotTuning::affixTuning),
             Codec.STRING.optionalFieldOf("mode", MODE_ADD).forGetter(SlotTuning::mode)
-    ).apply(instance, SlotTuning::new));
+    ).apply(instance, SlotTuning::new)));
 
     public SlotTuning {
         slots = slots == null ? List.of() : List.copyOf(slots);

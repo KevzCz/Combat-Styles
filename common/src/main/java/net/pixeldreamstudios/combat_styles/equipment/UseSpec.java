@@ -12,6 +12,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.Locale;
 import java.util.Optional;
 
@@ -39,7 +41,7 @@ public record UseSpec(UseKind kind, int holdTicks, int thresholdTicks,
             IMMEDIATE, NO_CHANNEL, DEFAULT_POSE,
             Optional.empty(), Optional.empty(), EffectCooldown.NONE);
 
-    public static final Codec<UseSpec> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<UseSpec> CODEC = Customs.wrap(UseSpec.class, RecordCodecBuilder.create(instance -> instance.group(
             UseKind.CODEC.optionalFieldOf("mode", UseKind.PRESS).forGetter(UseSpec::kind),
             Codec.INT.optionalFieldOf("hold_ticks", NO_HOLD).forGetter(UseSpec::holdTicks),
             Codec.INT.optionalFieldOf("threshold_ticks", NO_THRESHOLD)
@@ -55,7 +57,7 @@ public record UseSpec(UseKind kind, int holdTicks, int thresholdTicks,
                     .forGetter(UseSpec::releaseAnimation),
             EffectCooldown.CODEC.optionalFieldOf("cooldown", EffectCooldown.NONE)
                     .forGetter(UseSpec::cooldown)
-    ).apply(instance, UseSpec::new));
+    ).apply(instance, UseSpec::new)));
 
     public static final StreamCodec<ByteBuf, UseSpec> STREAM_CODEC =
             ByteBufCodecs.STRING_UTF8.map(

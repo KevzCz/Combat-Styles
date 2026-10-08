@@ -35,7 +35,7 @@ public class AttackPickerScreen extends PickerScreen<StylePage> {
     public AttackPickerScreen(Screen parent, BiConsumer<StylePage, AttackOverride> onPick) {
         super(Component.translatable(KEY_TITLE), parent);
         this.onPick = onPick;
-        all.addAll(StyleRegistry.all());
+        all.addAll(StyleRegistry.distinct());
         all.sort(Comparator.comparing(AttackPickerScreen::labelOf)
                 .thenComparing(StylePage::styleId));
     }

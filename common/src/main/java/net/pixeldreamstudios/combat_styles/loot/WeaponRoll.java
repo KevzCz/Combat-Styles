@@ -6,6 +6,7 @@ import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 
 import java.util.List;
@@ -14,7 +15,7 @@ import java.util.Optional;
 
 public record WeaponRoll(List<String> items, List<String> categories, List<String> tables,
                          List<String> tags,
-                         float chance, int minSlots, int maxSlots,
+                         float weight, int minSlots, int maxSlots,
                          float affixChance, int maxAffixes,
                          List<StyleEntry> styles, Map<String, String> names,
                          Optional<Integer> slotLimit, String mode,
@@ -42,7 +43,7 @@ public record WeaponRoll(List<String> items, List<String> categories, List<Strin
                             ? Either.left(entry.styleId())
                             : Either.right(entry));
 
-    private static final float DEFAULT_CHANCE = 0.05F;
+    private static final float DEFAULT_WEIGHT = 1.0F;
     private static final int DEFAULT_MIN_SLOTS = 1;
     private static final int DEFAULT_MAX_SLOTS = 3;
     private static final float DEFAULT_AFFIX_CHANCE = 0.25F;
@@ -65,7 +66,7 @@ public record WeaponRoll(List<String> items, List<String> categories, List<Strin
     }
 
     private record Targeting(List<String> items, List<String> categories, List<String> tables,
-                             List<String> tags, float chance, int minSlots, int maxSlots,
+                             List<String> tags, float weight, int minSlots, int maxSlots,
                              float affixChance, int maxAffixes) {
     }
 
@@ -81,7 +82,7 @@ public record WeaponRoll(List<String> items, List<String> categories, List<Strin
                     .forGetter(Targeting::categories),
             Codec.STRING.listOf().optionalFieldOf("tables", List.of()).forGetter(Targeting::tables),
             Codec.STRING.listOf().optionalFieldOf("tags", List.of()).forGetter(Targeting::tags),
-            Codec.FLOAT.optionalFieldOf("chance", DEFAULT_CHANCE).forGetter(Targeting::chance),
+            Codec.FLOAT.optionalFieldOf("weight", DEFAULT_WEIGHT).forGetter(Targeting::weight),
             Codec.INT.optionalFieldOf("min_slots", DEFAULT_MIN_SLOTS).forGetter(Targeting::minSlots),
             Codec.INT.optionalFieldOf("max_slots", DEFAULT_MAX_SLOTS).forGetter(Targeting::maxSlots),
             Codec.FLOAT.optionalFieldOf("affix_chance", DEFAULT_AFFIX_CHANCE)
@@ -108,18 +109,18 @@ public record WeaponRoll(List<String> items, List<String> categories, List<Strin
             Codec.STRING.optionalFieldOf("name").forGetter(Content::name)
     ).apply(instance, Content::new));
 
-    public static final Codec<WeaponRoll> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<WeaponRoll> CODEC = Customs.wrap(WeaponRoll.class, RecordCodecBuilder.create(instance -> instance.group(
             TARGETING_CODEC.forGetter(roll -> new Targeting(roll.items(), roll.categories(),
-                    roll.tables(), roll.tags(), roll.chance(), roll.minSlots(), roll.maxSlots(),
+                    roll.tables(), roll.tags(), roll.weight(), roll.minSlots(), roll.maxSlots(),
                     roll.affixChance(), roll.maxAffixes())),
             CONTENT_CODEC.forGetter(roll -> new Content(roll.styles(), roll.names(),
                     roll.slotLimit(), roll.mode(), roll.slots(), roll.affixes(), roll.name()))
     ).apply(instance, (targeting, content) -> new WeaponRoll(
             targeting.items(), targeting.categories(), targeting.tables(), targeting.tags(),
-            targeting.chance(),
+            targeting.weight(),
             targeting.minSlots(), targeting.maxSlots(), targeting.affixChance(),
             targeting.maxAffixes(), content.styles(), content.names(), content.slotLimit(),
-            content.mode(), content.slots(), content.affixes(), content.name())));
+            content.mode(), content.slots(), content.affixes(), content.name()))));
 
     private static final String SAMPLE_ITEM = "minecraft:iron_sword";
     private static final String SAMPLE_CATEGORY = "sword";
@@ -127,10 +128,11 @@ public record WeaponRoll(List<String> items, List<String> categories, List<Strin
     private static final String SAMPLE_TAG = "minecraft:swords";
     private static final String SAMPLE_STYLE = "bettercombat:one_handed_stab";
     private static final String SAMPLE_NAME = "Rolled Thrust";
+    private static final float SAMPLE_WEIGHT = 5.0F;
 
     public static final WeaponRoll SAMPLE = new WeaponRoll(List.of(SAMPLE_ITEM),
             List.of(SAMPLE_CATEGORY), List.of(SAMPLE_TABLE), List.of(SAMPLE_TAG),
-            0.1F, 2, 4, 0.5F, 2, List.of(StyleEntry.of(SAMPLE_STYLE)),
+            SAMPLE_WEIGHT, 2, 4, 0.5F, 2, List.of(StyleEntry.of(SAMPLE_STYLE)),
             Map.of(SAMPLE_STYLE, SAMPLE_NAME), Optional.of(4), MODE_REPLACE, List.of(0, 1),
             List.of(""), Optional.of(SAMPLE_NAME));
 }

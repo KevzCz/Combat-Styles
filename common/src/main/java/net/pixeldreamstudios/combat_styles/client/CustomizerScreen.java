@@ -161,6 +161,7 @@ public class CustomizerScreen extends PanelScreen {
     private static final String KEY_SHORTCUTS = "screen.combat_styles.shortcuts";
     private static final int MIN_GROUP_SIZE = 2;
     private static final int GROUP_INDENT = 8;
+    private static final String MEMBER_SEPARATOR = " · ";
     private static final float HINT_DEPTH = 400.0F;
     private static final String KEY_ALREADY_ETCHED = "message.combat_styles.already_etched";
 
@@ -311,17 +312,26 @@ public class CustomizerScreen extends PanelScreen {
     }
 
     private record LibraryRow(StylePage page, StyleAffix affix, boolean expandable,
-                              StyleEntry variant, String groupAnimation, int groupSize) {
+                              StyleEntry variant, String groupAnimation, int groupSize,
+                              boolean member) {
         LibraryRow(StylePage page, StyleAffix affix, boolean expandable) {
-            this(page, affix, expandable, null, null, 0);
+            this(page, affix, expandable, null, null, 0, false);
         }
 
         LibraryRow(StylePage page, StyleAffix affix, boolean expandable, StyleEntry variant) {
-            this(page, affix, expandable, variant, null, 0);
+            this(page, affix, expandable, variant, null, 0, false);
         }
 
         static LibraryRow group(String animation, StylePage sample, int size) {
-            return new LibraryRow(sample, null, false, null, animation, size);
+            return new LibraryRow(sample, null, false, null, animation, size, false);
+        }
+
+        static LibraryRow memberOf(StylePage page) {
+            return new LibraryRow(page, null, false, null, null, 0, true);
+        }
+
+        LibraryRow expandableCopy() {
+            return new LibraryRow(page, affix, true, variant, groupAnimation, groupSize, member);
         }
 
         boolean isGroup() {
@@ -361,7 +371,34 @@ public class CustomizerScreen extends PanelScreen {
                 .thenComparing(row -> rowLabel(row).toLowerCase(Locale.ROOT))
                 .thenComparing(row -> row.page().styleId()));
         applyAnimationGrouping();
+        applyFamilies();
         libraryScroll = Math.clamp(libraryScroll, 0, maxLibraryScroll());
+    }
+
+    private void applyFamilies() {
+        List<LibraryRow> out = new ArrayList<>(libraryRows.size());
+        for (LibraryRow row : libraryRows) {
+            if (row.isGroup() || row.isVariant() || row.affix() != null || row.member()) {
+                out.add(row);
+                continue;
+            }
+            List<StylePage> family = StyleRegistry.familyOf(row.page().styleId());
+            if (family.size() < MIN_GROUP_SIZE) {
+                out.add(row);
+                continue;
+            }
+            out.add(row.expandableCopy());
+            if (!expanded.contains(row.page().styleId())) {
+                continue;
+            }
+            for (StylePage member : family) {
+                if (!member.styleId().equals(row.page().styleId())) {
+                    out.add(LibraryRow.memberOf(member));
+                }
+            }
+        }
+        libraryRows.clear();
+        libraryRows.addAll(out);
     }
 
     private void applyAnimationGrouping() {
@@ -447,6 +484,13 @@ public class CustomizerScreen extends PanelScreen {
                 : (row.affix() == null
                         ? state.ownsPlain(row.page().styleId())
                         : state.canUse(row.page().styleId()));
+    }
+
+    private static String memberLabel(StylePage page) {
+        return page.sourceWeapon() == null
+                ? page.styleId()
+                : StyleText.registryName(page.sourceWeapon().toString()).getString()
+                        + MEMBER_SEPARATOR + page.styleId();
     }
 
     private String rowLabel(LibraryRow row) {
@@ -1138,7 +1182,7 @@ public class CustomizerScreen extends PanelScreen {
                 graphics.fill(x + 2, y, x + 3, y + ROW_HEIGHT, COLOR_ACCENT);
             }
 
-            int textLeft = x + 7 + rowIndent + (variant ? 8 : 0);
+            int textLeft = x + 7 + rowIndent + (variant || row.member() ? GROUP_INDENT : 0);
             if (row.expandable()) {
                 graphics.drawString(font, expanded.contains(page.styleId()) ? "-" : "+",
                         x + 6, y + 3, COLOR_ACCENT, false);
@@ -1176,7 +1220,10 @@ public class CustomizerScreen extends PanelScreen {
                     : (row.isVariant()
                             ? StyleText.affixedName(row.variant(), page).getString()
                             : StyleText.name(page).getString());
-            if (page.isConditional()) {
+            if (row.member()) {
+                label = memberLabel(page);
+            }
+            if (page.isConditional() && !row.member()) {
                 label = label + " " + MARKER_CONDITIONAL;
             }
             int nameColor = !usable ? COLOR_LOCKED : (affordable && spare ? COLOR_TEXT : COLOR_BAD);

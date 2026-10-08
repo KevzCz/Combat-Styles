@@ -4,6 +4,8 @@ import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.List;
 
 public record InheritGroups(InheritMode shape, InheritMode meta, InheritMode timing,
@@ -29,13 +31,13 @@ public record InheritGroups(InheritMode shape, InheritMode meta, InheritMode tim
                     legacy -> legacy ? InheritMode.PARENT : InheritMode.OWN),
             Either::left);
 
-    public static final Codec<InheritGroups> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<InheritGroups> CODEC = Customs.wrap(InheritGroups.class, RecordCodecBuilder.create(instance -> instance.group(
             MODE_CODEC.optionalFieldOf(KEY_SHAPE, InheritMode.PARENT).forGetter(InheritGroups::shape),
             MODE_CODEC.optionalFieldOf(KEY_META, InheritMode.PARENT).forGetter(InheritGroups::meta),
             MODE_CODEC.optionalFieldOf(KEY_TIMING, InheritMode.PARENT).forGetter(InheritGroups::timing),
             MODE_CODEC.optionalFieldOf(KEY_BEHAVIOUR, InheritMode.PARENT).forGetter(InheritGroups::behaviour),
             MODE_CODEC.optionalFieldOf(KEY_AFFIXES, InheritMode.PARENT).forGetter(InheritGroups::affixes)
-    ).apply(instance, InheritGroups::new));
+    ).apply(instance, InheritGroups::new)));
 
     public InheritGroups {
         shape = shape == null ? InheritMode.PARENT : shape;

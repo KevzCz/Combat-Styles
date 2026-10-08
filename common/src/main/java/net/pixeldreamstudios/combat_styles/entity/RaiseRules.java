@@ -3,6 +3,7 @@ package net.pixeldreamstudios.combat_styles.entity;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.equipment.SummonProfile;
 
 import java.util.List;
@@ -28,7 +29,7 @@ public record RaiseRules(MobFilter filter, int lifespanTicks, boolean keepGear, 
     public static final RaiseRules DEFAULT = new RaiseRules(MobFilter.ANY, DEFAULT_LIFESPAN, true, false,
             Optional.empty(), ALWAYS, RaiseProfile.MATCHING, List.of());
 
-    public static final Codec<RaiseRules> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<RaiseRules> CODEC = Customs.wrap(RaiseRules.class, RecordCodecBuilder.create(instance -> instance.group(
             MobFilter.MAP_CODEC.forGetter(RaiseRules::filter),
             Codec.INT.optionalFieldOf(KEY_LIFESPAN_TICKS, DEFAULT_LIFESPAN).forGetter(RaiseRules::lifespanTicks),
             Codec.BOOL.optionalFieldOf(KEY_KEEP_GEAR, true).forGetter(RaiseRules::keepGear),
@@ -37,7 +38,7 @@ public record RaiseRules(MobFilter filter, int lifespanTicks, boolean keepGear, 
             Codec.FLOAT.optionalFieldOf(KEY_CHANCE, ALWAYS).forGetter(RaiseRules::chance),
             RaiseProfile.CODEC.optionalFieldOf(KEY_PROFILE, RaiseProfile.MATCHING).forGetter(RaiseRules::profile),
             PROFILES_CODEC.optionalFieldOf(KEY_PROFILES, List.of()).forGetter(RaiseRules::profiles)
-    ).apply(instance, RaiseRules::new));
+    ).apply(instance, RaiseRules::new)));
 
     public RaiseRules {
         filter = filter == null ? MobFilter.ANY : filter;

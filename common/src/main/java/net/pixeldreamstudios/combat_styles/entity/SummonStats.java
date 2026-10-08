@@ -9,6 +9,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
 import net.pixeldreamstudios.combat_styles.equipment.StackAttributes;
 
@@ -21,8 +22,8 @@ public record SummonStats(Map<String, AttributeBonus> bonuses) {
 
     public static final SummonStats NONE = new SummonStats(Map.of());
 
-    public static final Codec<SummonStats> CODEC = Codec.unboundedMap(Codec.STRING, AttributeBonus.CODEC)
-            .xmap(SummonStats::new, SummonStats::bonuses);
+    public static final Codec<SummonStats> CODEC = Customs.wrap(SummonStats.class, Codec.unboundedMap(Codec.STRING, AttributeBonus.CODEC)
+            .xmap(SummonStats::new, SummonStats::bonuses));
 
     public SummonStats {
         bonuses = bonuses == null ? Map.of() : Map.copyOf(bonuses);

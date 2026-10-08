@@ -5,6 +5,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.RandomSource;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.style.AttackAttribute;
 import net.pixeldreamstudios.combat_styles.style.AttackDrag;
 import net.pixeldreamstudios.combat_styles.style.AttackOverride;
@@ -53,7 +54,7 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
 
     public record Range(double min, double max) {
 
-        public static final Codec<Range> CODEC = Codec.either(
+        public static final Codec<Range> CODEC = Customs.wrap(Range.class, Codec.either(
                         Codec.DOUBLE,
                         RecordCodecBuilder.<Range>create(instance -> instance.group(
                                 Codec.DOUBLE.fieldOf("min").forGetter(Range::min),
@@ -62,7 +63,7 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
                 .xmap(either -> either.map(fixed -> new Range(fixed, fixed), range -> range),
                         range -> range.min() == range.max()
                                 ? Either.left(range.min())
-                                : Either.right(range));
+                                : Either.right(range)));
 
         public double sample(RandomSource random) {
             if (min >= max) {
@@ -75,12 +76,12 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
     public record RolledAttribute(Range amount, String operation, boolean stacks) {
 
         public static final Codec<RolledAttribute> CODEC =
-                RecordCodecBuilder.create(instance -> instance.group(
+                Customs.wrap(RolledAttribute.class, RecordCodecBuilder.create(instance -> instance.group(
                         Range.CODEC.fieldOf("amount").forGetter(RolledAttribute::amount),
                         Codec.STRING.optionalFieldOf("operation", "add_value")
                                 .forGetter(RolledAttribute::operation),
                         Codec.BOOL.optionalFieldOf("stacks", true).forGetter(RolledAttribute::stacks)
-                ).apply(instance, RolledAttribute::new));
+                ).apply(instance, RolledAttribute::new)));
 
         public AttackAttribute sample(RandomSource random) {
             return new AttackAttribute(amount.sample(random),
@@ -92,11 +93,11 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
                              Optional<Boolean> trail) {
 
         public static final Codec<RolledDrag> CODEC =
-                RecordCodecBuilder.create(instance -> instance.group(
+                Customs.wrap(RolledDrag.class, RecordCodecBuilder.create(instance -> instance.group(
                         Range.CODEC.optionalFieldOf("ticks").forGetter(RolledDrag::ticks),
                         Range.CODEC.optionalFieldOf("max_targets").forGetter(RolledDrag::maxTargets),
                         Codec.BOOL.optionalFieldOf("trail").forGetter(RolledDrag::trail)
-                ).apply(instance, RolledDrag::new));
+                ).apply(instance, RolledDrag::new)));
 
         public AttackDrag sample(RandomSource random) {
             return new AttackDrag(true,
@@ -119,7 +120,7 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Map.of());
 
-        public static final Codec<Rolled> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Rolled> CODEC = Customs.wrap(Rolled.class, RecordCodecBuilder.create(instance -> instance.group(
                 Range.CODEC.optionalFieldOf("damage_multiplier").forGetter(Rolled::damageMultiplier),
                 Range.CODEC.optionalFieldOf("angle").forGetter(Rolled::angle),
                 Range.CODEC.optionalFieldOf("upswing").forGetter(Rolled::upswing),
@@ -131,7 +132,7 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
                 RolledDrag.CODEC.optionalFieldOf("drag").forGetter(Rolled::drag),
                 Codec.unboundedMap(Codec.STRING, RolledAttribute.CODEC)
                         .optionalFieldOf("attributes", Map.of()).forGetter(Rolled::attributes)
-        ).apply(instance, Rolled::new));
+        ).apply(instance, Rolled::new)));
 
         public boolean isEmpty() {
             return damageMultiplier.isEmpty() && angle.isEmpty() && upswing.isEmpty()
@@ -202,7 +203,7 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
         private static final float DEFAULT_CHANCE = 1.0F;
 
         public static final Codec<AffixSlot> CODEC =
-                RecordCodecBuilder.create(instance -> instance.group(
+                Customs.wrap(AffixSlot.class, RecordCodecBuilder.create(instance -> instance.group(
                         Codec.STRING.optionalFieldOf("id").forGetter(AffixSlot::id),
                         Codec.FLOAT.optionalFieldOf("chance", DEFAULT_CHANCE)
                                 .forGetter(AffixSlot::chance),
@@ -210,7 +211,7 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
                         Codec.INT.optionalFieldOf("max", 1).forGetter(AffixSlot::max),
                         WeightedAffix.CODEC.listOf().optionalFieldOf("affixes", List.of())
                                 .forGetter(AffixSlot::affixes)
-                ).apply(instance, AffixSlot::new));
+                ).apply(instance, AffixSlot::new)));
 
         public AffixSlot {
             min = Math.max(0, min);
@@ -225,7 +226,7 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
 
     public record WeightedAffix(int weight, List<String> affixes) {
 
-        public static final Codec<WeightedAffix> CODEC = Codec.either(
+        public static final Codec<WeightedAffix> CODEC = Customs.wrap(WeightedAffix.class, Codec.either(
                         Codec.STRING,
                         RecordCodecBuilder.<WeightedAffix>create(instance -> instance.group(
                                 Codec.INT.optionalFieldOf("weight", 1)
@@ -236,19 +237,19 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
                 .xmap(either -> either.map(id -> new WeightedAffix(1, List.of(id)), entry -> entry),
                         entry -> entry.weight() == 1 && entry.affixes().size() == 1
                                 ? Either.left(entry.affixes().getFirst())
-                                : Either.right(entry));
+                                : Either.right(entry)));
     }
 
     public record Weighted(int weight, StyleEntry entry, Rolled roll) {
 
-        public static final Codec<Weighted> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Weighted> CODEC = Customs.wrap(Weighted.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.optionalFieldOf("weight", 1).forGetter(Weighted::weight),
                 StyleEntry.CODEC.fieldOf("entry").forGetter(Weighted::entry),
                 Rolled.CODEC.optionalFieldOf("roll", Rolled.NONE).forGetter(Weighted::roll)
-        ).apply(instance, Weighted::new));
+        ).apply(instance, Weighted::new)));
     }
 
-    public static final Codec<BookRoll> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<BookRoll> CODEC = Customs.wrap(BookRoll.class, RecordCodecBuilder.create(instance -> instance.group(
             StyleRarity.CODEC.optionalFieldOf("rarity", StyleRarity.COMMON).forGetter(BookRoll::rarity),
             Codec.INT.optionalFieldOf("min_attacks", DEFAULT_MIN).forGetter(BookRoll::minAttacks),
             Codec.INT.optionalFieldOf("max_attacks", DEFAULT_MAX).forGetter(BookRoll::maxAttacks),
@@ -271,7 +272,7 @@ public record BookRoll(StyleRarity rarity, int minAttacks, int maxAttacks,
                     .forGetter(BookRoll::declaredAffixPool),
             AffixSlot.CODEC.listOf().optionalFieldOf("affix_pools", List.of())
                     .forGetter(BookRoll::affixPools)
-    ).apply(instance, BookRoll::new));
+    ).apply(instance, BookRoll::new)));
 
     public List<WeightedAffix> declaredAffixPool() {
         return affixPool;

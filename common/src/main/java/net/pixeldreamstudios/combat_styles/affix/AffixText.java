@@ -3,6 +3,10 @@ package net.pixeldreamstudios.combat_styles.affix;
 import net.pixeldreamstudios.combat_styles.damage.DamageBonus;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
+import net.pixeldreamstudios.combat_styles.damage.ScaledNumber;
+import net.pixeldreamstudios.combat_styles.damage.ScaledNumbers;
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -68,6 +72,10 @@ public final class AffixText {
             "affix.combat_styles.effect.cast_spell_damage";
     private static final String KEY_SPEC_FLAT = "affix.combat_styles.spec.flat";
     private static final String KEY_SPEC_RATIO = "affix.combat_styles.spec.ratio";
+    private static final String KEY_ONLY_TARGET_EFFECTS = "affix.combat_styles.effect.only_target_effects";
+    private static final String KEY_ONLY_TARGET_BURNING = "affix.combat_styles.effect.only_target_burning";
+    private static final String KEY_ONLY_TARGET_NOT_BURNING = "affix.combat_styles.effect.only_target_not_burning";
+    private static final String EFFECT_SEPARATOR = ", ";
     private static final String KEY_SPEC_OF_HIT = "affix.combat_styles.spec.of_hit";
     private static final String KEY_SPEC_MAX_HEALTH = "affix.combat_styles.spec.max_health";
     private static final String KEY_SPEC_MISSING_HEALTH =
@@ -79,6 +87,22 @@ public final class AffixText {
     private static final String KEY_SPEC_SCALE_DIVISOR = "affix.combat_styles.spec.scale_divisor";
     private static final String KEY_SPEC_SCALE_CAP = "affix.combat_styles.spec.scale_cap";
     private static final String KEY_SPEC_STRONGEST = "affix.combat_styles.spec.strongest";
+    private static final String KEY_SPEC_OR = "affix.combat_styles.spec.or";
+    private static final String KEY_SCALES_WITH = "affix.combat_styles.effect.scales_with";
+    private static final String KEY_WITH_BONUS = "affix.combat_styles.effect.with_bonus";
+    private static final String KEY_WITH_MULTIPLIER = "affix.combat_styles.effect.with_multiplier";
+    private static final double PERCENT_SCALE = 100.0D;
+    private static final String KEY_DAMAGE_MULTIPLIED = "affix.combat_styles.effect.damage_multiplied";
+    private static final String KEY_DAMAGE_FIELD = "damage";
+    private static final String KEY_DAMAGES_FIELD = "damages";
+    private static final String PATH_JOIN = "/";
+    private static final String KEY_SCALING_SCOPE = "scaling";
+    private static final String KEY_ANY_SPELL_POWER = "affix.combat_styles.spec.any_spell_power";
+    private static final String KEY_STRONGEST_SCHOOL = "affix.combat_styles.effect.strongest_school";
+    private static final String KEY_BONUS_SCALED = "affix.combat_styles.effect.bonus_scaled";
+    private static final String PERCENT = "%";
+    private static final String SPELL_POWER_PREFIX = SpellPowerAccess.MOD_ID + ":";
+    private static final int GROUPED_SCHOOLS_MIN = 2;
     private static final String KEY_SPEC_MULTIPLIED = "affix.combat_styles.spec.multiplied";
     private static final String KEY_SPEC_AND = "affix.combat_styles.spec.and";
     private static final String KEY_EFFECT = "affix.combat_styles.effect.status";
@@ -137,6 +161,8 @@ public final class AffixText {
     private static final String TAG_MARK = "#";
     private static final String KEY_HASTEN = "affix.combat_styles.effect.hasten";
     private static final String KEY_ORDERS = "affix.combat_styles.effect.orders";
+    private static final String KEY_QUICKEN = "affix.combat_styles.effect.quicken";
+    private static final String KEY_QUICKEN_CHANCE = "affix.combat_styles.effect.quicken_chance";
     private static final String KEY_ORDERS_TARGETS = "affix.combat_styles.effect.orders_targets";
     private static final String KEY_TARGETING = "affix.combat_styles.targeting.";
     private static final String KEY_SLOT_AT = "affix.combat_styles.effect.slot_at";
@@ -403,22 +429,72 @@ public final class AffixText {
     }
 
     public static void appendEffects(StyleAffix affix, List<Component> lines, boolean headings) {
-        for (DamageBonus bonus : affix.damageBonus()) {
+        StyleAffix shown = liveFor(affix);
+        for (DamageBonus bonus : shown.damageBonus()) {
             lines.add(bonus.describe().withStyle(BODY));
         }
-        boolean both = !affix.onSwing().isEmpty() && !affix.onHit().isEmpty();
+        boolean both = !shown.onSwing().isEmpty() && !shown.onHit().isEmpty();
         if (both) {
-            appendBothPhases(affix, lines, headings);
+            appendBothPhases(shown, lines, headings);
+        } else {
+            if (!shown.onSwing().isEmpty()) {
+                phaseOf(lines, PHASE_SWING);
+                appendTrigger(shown, shown.onSwing(), lines);
+            }
+            if (!shown.onHit().isEmpty()) {
+                phaseOf(lines, PHASE_HIT);
+                appendTrigger(shown, shown.onHit(), lines);
+            }
+        }
+        appendScaling(affix, lines);
+    }
+
+    private static StyleAffix liveFor(StyleAffix affix) {
+        Player viewer = TooltipContextAccess.viewer();
+        if (ItemTooltip.detailed() || viewer == null
+                || (!ScaledNumbers.has(affix.onHit()) && !ScaledNumbers.has(affix.onSwing()))) {
+            return affix;
+        }
+        return affix.withPayloads(ScaledNumbers.resolved(affix.onHit(), viewer),
+                ScaledNumbers.resolved(affix.onSwing(), viewer));
+    }
+
+    private static String percentOf(float ratio) {
+        return StyleText.formatDecimal(ratio * PERCENT_SCALE) + PERCENT;
+    }
+
+    private static String scaledPercent(AffixEffects.Damage damage) {
+        Player viewer = TooltipContextAccess.viewer();
+        float base = Math.max(0.0F, damage.ratio());
+        if (damage.scaling().isEmpty() || viewer == null) {
+            return percentOf(base);
+        }
+        float now = AffixImpacts.ratioOf(viewer, damage);
+        if (!ItemTooltip.detailed() || now == base) {
+            return percentOf(now);
+        }
+        return Component.translatable(KEY_WITH_BONUS, percentOf(base), percentOf(now - base)).getString();
+    }
+
+    private static void appendScaling(StyleAffix affix, List<Component> lines) {
+        List<String> sources = new ArrayList<>(ScaledNumbers.sourcesOf(affix.onSwing()));
+        for (String source : ScaledNumbers.sourcesOf(affix.onHit())) {
+            if (!sources.contains(source)) {
+                sources.add(source);
+            }
+        }
+        if (sources.isEmpty()) {
             return;
         }
-        if (!affix.onSwing().isEmpty()) {
-            phaseOf(lines, PHASE_SWING);
-            appendTrigger(affix, affix.onSwing(), lines);
+        scopeOf(lines, KEY_SCALING_SCOPE);
+        MutableComponent names = Component.empty();
+        for (int index = 0; index < sources.size(); index++) {
+            if (index > 0) {
+                names.append(Component.literal(", "));
+            }
+            names.append(StyleText.scalingSourceName(sources.get(index)));
         }
-        if (!affix.onHit().isEmpty()) {
-            phaseOf(lines, PHASE_HIT);
-            appendTrigger(affix, affix.onHit(), lines);
-        }
+        lines.add(TooltipGem.detail(Component.translatable(KEY_SCALES_WITH, names).withStyle(FRAME)));
     }
 
     private static void appendBothPhases(StyleAffix affix, List<Component> lines,
@@ -864,6 +940,14 @@ public final class AffixText {
         condition.onMiss().filter(Boolean::booleanValue).ifPresent(value ->
                 gates.add(Component.translatable(KEY_ONLY_ON_MISS)
                         .withStyle(COND)));
+        if (!condition.targetEffects().isEmpty()) {
+            gates.add(Component.translatable(KEY_ONLY_TARGET_EFFECTS,
+                            effectNames(condition.targetEffects()))
+                    .withStyle(COND));
+        }
+        condition.targetBurning().ifPresent(burning -> gates.add(Component.translatable(
+                        burning ? KEY_ONLY_TARGET_BURNING : KEY_ONLY_TARGET_NOT_BURNING)
+                .withStyle(COND)));
         for (Component part : ItemGateText.parts(condition.state())) {
             gates.add(Component.translatable(KEY_ONLY_STATE, part).withStyle(COND));
         }
@@ -906,8 +990,19 @@ public final class AffixText {
                 "ability." + CombatStyles.MOD_ID + "." + key + ".name", StyleText.prettify(key));
     }
 
-    private static String damageTypeNames(List<String> types) {
-        List<String> names = new ArrayList<>(types.size());
+    private static Component effectNames(List<String> effects) {
+        MutableComponent joined = Component.empty();
+        for (int index = 0; index < effects.size(); index++) {
+            if (index > 0) {
+                joined.append(Component.literal(EFFECT_SEPARATOR));
+            }
+            joined.append(StyleText.registryName(effects.get(index)));
+        }
+        return joined;
+    }
+
+    public static String damageTypeNames(List<String> types) {
+        Set<String> names = new LinkedHashSet<>();
         for (String type : types) {
             String trimmed = type == null ? "" : type.trim();
             if (trimmed.isEmpty()) {
@@ -915,8 +1010,9 @@ public final class AffixText {
             }
             boolean tag = trimmed.startsWith(TAG_MARK);
             String body = tag ? trimmed.substring(TAG_MARK.length()) : trimmed;
-            int colon = body.indexOf(':');
-            names.add(StyleText.prettify(colon < 0 ? body : body.substring(colon + 1)));
+            names.add(tag
+                    ? StyleText.damageTypeTagName(body).getString()
+                    : StyleText.damageTypeName(body).getString());
         }
         return String.join(TYPE_SEPARATOR, names);
     }
@@ -931,19 +1027,31 @@ public final class AffixText {
         int allDamageAt = 0;
         for (AffixEffects.Damage damage : onHit.allDamage()) {
             scopeOf(lines, "allDamage", allDamageAt++);
-            String percent = StyleText.formatDecimal(damage.ratio() * 100.0D) + "%";
+            String percent = scaledPercent(damage);
 
             String school = attunedSchool(damage);
+            boolean typed = school != null || !damage.damageType().isBlank();
+            boolean scaledOnly = !damage.converts() && damage.ratio() <= 0.0F
+                    && damage.scaling().isPresent() && ItemTooltip.detailed();
             String damageKey = damage.converts()
                     ? KEY_CONVERTS
                     : damage.amplifies()
                             ? KEY_AMPLIFIES
-                            : (school == null ? KEY_BONUS : KEY_BONUS_SCHOOL);
-            Component line = damage.converts() || (!damage.amplifies() && school != null)
-                    ? Component.translatable(damageKey, percent, StyleText.schoolName(school))
-                    : Component.translatable(damageKey, percent);
+                            : (typed ? KEY_BONUS_SCHOOL : KEY_BONUS);
+            Component line = scaledOnly
+                    ? scaledBonusLine(damage.scaling().get(), typed
+                            ? dealtAs(damage, school)
+                            : StyleText.schoolName(null))
+                    : damage.converts() || (!damage.amplifies() && typed)
+                            ? Component.translatable(damageKey, percent, dealtAs(damage, school))
+                            : Component.translatable(damageKey, percent);
+            if (!ItemTooltip.detailed() && damage.multiplier() != AffixEffects.Damage.NO_MULTIPLIER) {
+                line = Component.translatable(KEY_WITH_MULTIPLIER, line,
+                        StyleText.formatDecimal(damage.multiplier()));
+            }
             Component styled = line.copy().withStyle(damage.converts() ? COND : BAD);
-            boolean hasDetail = damage.ignoresArmour() || damage.scaling().isPresent();
+            boolean hasDetail = damage.ignoresArmour() || damage.scaling().isPresent()
+                    || damage.multiplier() != AffixEffects.Damage.NO_MULTIPLIER;
             if (!ItemTooltip.detailed()) {
                 lines.add(hasDetail ? ItemTooltip.marked(styled) : styled);
                 continue;
@@ -952,7 +1060,14 @@ public final class AffixText {
             if (damage.ignoresArmour()) {
                 lines.add(TooltipGem.detail(Component.translatable(KEY_ARMOUR).withStyle(FRAME)));
             }
-            damage.scaling().ifPresent(scaling -> lines.add(TooltipGem.detail(scalingLine(scaling))));
+            if (!scaledOnly) {
+                damage.scaling().ifPresent(scaling -> lines.add(TooltipGem.detail(scalingLine(scaling))));
+            }
+            Component multiplied = multiplierLine(onHit, allDamageAt - 1, damage,
+                    typed ? dealtAs(damage, school) : StyleText.schoolName(null));
+            if (multiplied != null) {
+                lines.add(TooltipGem.detail(multiplied.copy().withStyle(COND)));
+            }
         }
 
         scopeOf(lines, "ignite");
@@ -995,7 +1110,12 @@ public final class AffixText {
                         .withStyle(COND)));
 
         AffixEffects.Order order = onHit.mechanics().order();
-        if (!order.isEmpty()) {
+        order.quicken().ifPresent(quicken -> lines.add(Component.translatable(
+                        quicken.chance() < 1.0F ? KEY_QUICKEN_CHANCE : KEY_QUICKEN,
+                        StyleText.formatDecimal(quicken.ratio() * 100.0D),
+                        StyleText.formatDecimal(quicken.chance() * 100.0D))
+                .withStyle(COND)));
+        if (order.ordersAbility()) {
             lines.add(Component.translatable(KEY_ORDERS,
                             abilityName(order.ability()),
                             StyleText.formatDecimal(order.damageRatio() * 100.0D) + "%",
@@ -1035,6 +1155,9 @@ public final class AffixText {
                                         : specAmount(spec, 0.0F))
                         .withStyle(COND)));
             }
+            for (Component custom : Customs.tooltip(CustomScopes.PROJECTILE, projectile)) {
+                lines.add(TooltipGem.detail(custom.copy().withStyle(COND)));
+            }
         }
 
         int castsAt = 0;
@@ -1069,6 +1192,10 @@ public final class AffixText {
         }
     }
 
+    public static Component specText(DamageSpec spec) {
+        return specAmount(spec, DamageSpec.NO_HIT_RATIO);
+    }
+
     private static Component specAmount(DamageSpec spec, float fallbackRatio) {
         if (ItemTooltip.detailed() || spec == null) {
             return specFormula(spec, fallbackRatio);
@@ -1093,12 +1220,14 @@ public final class AffixText {
     }
 
     private static MutableComponent withSpecSchool(MutableComponent line, DamageSpec spec) {
-        String named = spec.school().orElseGet(() -> spec.damageType().orElse(null));
-        if (named == null || named.isBlank()) {
+        Component named = spec.school().isPresent()
+                ? StyleText.schoolName(spec.school().get())
+                : spec.damageType().filter(type -> !type.isBlank()).map(StyleText::damageTypeName).orElse(null);
+        if (named == null) {
             return line;
         }
         return line.append(Component.literal(" "))
-                .append(Component.translatable(KEY_AS_SCHOOL, StyleText.schoolName(named)));
+                .append(Component.translatable(KEY_AS_SCHOOL, named));
     }
 
     private static boolean hasHiddenTerms(DamageSpec spec) {
@@ -1159,7 +1288,7 @@ public final class AffixText {
             line = join(line, Component.translatable(KEY_SPEC_SELF_MISSING,
                     StyleText.formatDecimal(spec.ofSelfMissingHealth() * 100.0D)));
         }
-        if (line == null) {
+        if (line == null && spec.scaling().isEmpty()) {
             line = Component.translatable(KEY_SPEC_RATIO,
                     StyleText.formatDecimal(fallbackRatio * 100.0D));
         }
@@ -1175,6 +1304,11 @@ public final class AffixText {
 
     private static Component scalingDetail(DamageSpec spec) {
         List<DamageSpec.ScalingEntry> entries = spec.scaling();
+        if (entries.size() > 1 && spec.scalingMode() == DamageSpec.ScalingMode.STRONGEST
+                && sharesOneRate(entries)) {
+            return Component.translatable(KEY_SPEC_STRONGEST, scalingEntry(entries.getFirst(),
+                    groupedSources(entries)));
+        }
         MutableComponent joined = null;
         for (DamageSpec.ScalingEntry entry : entries) {
             joined = joined == null
@@ -1189,8 +1323,49 @@ public final class AffixText {
                 : joined;
     }
 
+    private static boolean sharesOneRate(List<DamageSpec.ScalingEntry> entries) {
+        DamageSpec.ScalingEntry first = entries.getFirst();
+        for (DamageSpec.ScalingEntry entry : entries) {
+            if (entry.mode() != first.mode() || entry.perPoint() != first.perPoint()
+                    || !entry.cap().equals(first.cap()) || entry.baseline() != first.baseline()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Component groupedSources(List<DamageSpec.ScalingEntry> entries) {
+        List<Component> names = new ArrayList<>();
+        int schools = 0;
+        for (DamageSpec.ScalingEntry entry : entries) {
+            if (entry.source().startsWith(SPELL_POWER_PREFIX)) {
+                schools++;
+            }
+        }
+        boolean grouped = schools >= GROUPED_SCHOOLS_MIN;
+        boolean groupAdded = false;
+        for (DamageSpec.ScalingEntry entry : entries) {
+            if (grouped && entry.source().startsWith(SPELL_POWER_PREFIX)) {
+                if (!groupAdded) {
+                    names.add(Component.translatable(KEY_ANY_SPELL_POWER));
+                    groupAdded = true;
+                }
+                continue;
+            }
+            names.add(StyleText.scalingSourceName(entry.source()));
+        }
+        MutableComponent joined = names.getFirst().copy();
+        for (Component name : names.subList(1, names.size())) {
+            joined = Component.translatable(KEY_SPEC_OR, joined, name);
+        }
+        return joined;
+    }
+
     private static Component scalingEntry(DamageSpec.ScalingEntry entry) {
-        Component source = StyleText.scalingSourceName(entry.source());
+        return scalingEntry(entry, StyleText.scalingSourceName(entry.source()));
+    }
+
+    private static Component scalingEntry(DamageSpec.ScalingEntry entry, Component source) {
         Component detail = switch (entry.mode()) {
             case MULTIPLIER -> Component.translatable(KEY_SPEC_SCALE_MULTIPLIER,
                     StyleText.formatDecimal(entry.perPoint() * 100.0D), source);
@@ -1258,9 +1433,74 @@ public final class AffixText {
         return Component.translatable(KEY_SCALES_SCHOOL, perPoint, schools).withStyle(COND);
     }
 
+    private static Component multiplierLine(AffixEffects.OnHit onHit, int index,
+                                            AffixEffects.Damage damage, Component dealt) {
+        boolean single = onHit.damage().isPresent();
+        String entry = single && index == 0
+                ? KEY_DAMAGE_FIELD
+                : KEY_DAMAGES_FIELD + PATH_JOIN + (single ? index - 1 : index);
+        Optional<ScaledNumber> scaled = ScaledNumbers.at(onHit,
+                entry + PATH_JOIN + AffixEffects.Damage.KEY_MULTIPLIER);
+        if (scaled.isPresent()) {
+            AffixEffects.Scaling scaling = scalingOf(scaled.get());
+            return scaling == null ? null : scaledBonusLine(scaling, dealt);
+        }
+        if (damage.multiplier() == AffixEffects.Damage.NO_MULTIPLIER) {
+            return null;
+        }
+        return Component.translatable(KEY_DAMAGE_MULTIPLIED, dealt,
+                StyleText.formatDecimal(damage.multiplier()));
+    }
+
+    private static AffixEffects.Scaling scalingOf(ScaledNumber number) {
+        if (number.by().isEmpty()) {
+            return null;
+        }
+        DamageSpec.ScalingEntry first = number.by().getFirst();
+        for (DamageSpec.ScalingEntry entry : number.by()) {
+            if (entry.perPoint() != first.perPoint() || entry.mode() != DamageSpec.ScalingKind.PER_POINT) {
+                return null;
+            }
+        }
+        Optional<Float> cap = number.max().map(max -> max - number.base());
+        return new AffixEffects.Scaling(number.sources(), first.perPoint(), cap,
+                number.mode() == DamageSpec.ScalingMode.STRONGEST);
+    }
+
+    private static Component scaledBonusLine(AffixEffects.Scaling scaling, Component dealt) {
+        String perPoint = StyleText.formatDecimal(scaling.perPoint() * 100.0D);
+        Component sources;
+        if (scaling.strongest() && scaling.sources().size() > 1) {
+            sources = Component.translatable(KEY_STRONGEST_SCHOOL);
+        } else {
+            MutableComponent joined = Component.empty();
+            for (int index = 0; index < scaling.sources().size(); index++) {
+                if (index > 0) {
+                    joined.append(Component.literal(", "));
+                }
+                joined.append(StyleText.scalingSourceName(scaling.sources().get(index)));
+            }
+            sources = joined;
+        }
+        Component line = Component.translatable(KEY_BONUS_SCALED, perPoint, dealt, sources);
+        return scaling.cap()
+                .map(limit -> (Component) Component.translatable(KEY_SPEC_SCALE_CAP, line,
+                        StyleText.formatDecimal(limit * 100.0D) + PERCENT))
+                .orElse(line);
+    }
+
+    private static Component dealtAs(AffixEffects.Damage damage, String school) {
+        return school == null && !damage.damageType().isBlank()
+                ? StyleText.damageTypeName(damage.damageType())
+                : StyleText.schoolName(school);
+    }
+
     private static String attunedSchool(AffixEffects.Damage damage) {
         String declared = damage.school().orElse(null);
         AffixEffects.Scaling scaling = damage.scaling().orElse(null);
+        if (!damage.damageType().isBlank()) {
+            return declared;
+        }
         if (scaling == null || !scaling.strongest() || scaling.sources().size() < 2) {
             return declared;
         }

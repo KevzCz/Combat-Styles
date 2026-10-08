@@ -88,7 +88,9 @@ public final class NetworkManager {
         if (stack.isEmpty()) {
             return;
         }
-        stack.set(ModComponents.STACK_EQUIPMENT.get(), payload.definition());
+        payload.definition().ifPresentOrElse(
+                definition -> stack.set(ModComponents.STACK_EQUIPMENT.get(), definition),
+                () -> stack.remove(ModComponents.STACK_EQUIPMENT.get()));
     }
 
     @ExpectPlatform

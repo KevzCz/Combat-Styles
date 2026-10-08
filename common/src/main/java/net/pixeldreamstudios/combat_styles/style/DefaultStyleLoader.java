@@ -16,6 +16,7 @@ import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.item.Item;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.platform.WeaponRegistryAccess;
 
 import java.util.ArrayList;
@@ -42,7 +43,7 @@ public class DefaultStyleLoader extends SimpleJsonResourceReloadListener {
                         .forGetter(Sequence::entries)
         ).apply(instance, Sequence::new));
 
-        public static final Codec<Sequence> CODEC = MAP_CODEC.codec();
+        public static final Codec<Sequence> CODEC = Customs.wrap(Sequence.class, MAP_CODEC.codec());
 
         public Sequence {
             entries = entries == null ? List.of() : List.copyOf(entries);
@@ -70,7 +71,7 @@ public class DefaultStyleLoader extends SimpleJsonResourceReloadListener {
                 Codec.BOOL.optionalFieldOf("any", false).forGetter(Applies::any)
         ).apply(instance, Applies::new));
 
-        public static final Codec<Applies> CODEC = MAP_CODEC.codec();
+        public static final Codec<Applies> CODEC = Customs.wrap(Applies.class, MAP_CODEC.codec());
 
         public boolean isEmpty() {
             return items.isEmpty() && tags.isEmpty() && categories.isEmpty() && !any;
@@ -87,7 +88,7 @@ public class DefaultStyleLoader extends SimpleJsonResourceReloadListener {
                              int priority, boolean locked, boolean keepThroughRolls,
                              Optional<String> nameKey) {
 
-        public static final Codec<Definition> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Definition> CODEC = Customs.wrap(Definition.class, RecordCodecBuilder.create(instance -> instance.group(
                 Applies.CODEC.optionalFieldOf("applies_to", Applies.NONE).forGetter(Definition::applies),
                 Sequence.CODEC.optionalFieldOf("sequence", Sequence.NONE).forGetter(Definition::sequence),
                 SlotTuning.CODEC.listOf().optionalFieldOf("tune", List.of()).forGetter(Definition::tune),
@@ -96,7 +97,7 @@ public class DefaultStyleLoader extends SimpleJsonResourceReloadListener {
                 Codec.BOOL.optionalFieldOf("keep_through_rolls", false)
                         .forGetter(Definition::keepThroughRolls),
                 Codec.STRING.optionalFieldOf("name_key").forGetter(Definition::nameKey)
-        ).apply(instance, Definition::new));
+        ).apply(instance, Definition::new)));
 
         public Definition {
             tune = tune == null ? List.of() : List.copyOf(tune);

@@ -5,6 +5,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.List;
 
 public record AccessoryMatch(String slot, ItemMatch match) {
@@ -12,10 +14,10 @@ public record AccessoryMatch(String slot, ItemMatch match) {
     public static final String SLOT = "slot";
     public static final String ANY_SLOT = "*";
 
-    public static final Codec<AccessoryMatch> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<AccessoryMatch> CODEC = Customs.wrap(AccessoryMatch.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf(SLOT, "").forGetter(AccessoryMatch::slot),
             ItemMatch.MAP_CODEC.forGetter(AccessoryMatch::match)
-    ).apply(instance, AccessoryMatch::new));
+    ).apply(instance, AccessoryMatch::new)));
 
     public AccessoryMatch {
         slot = slot == null ? "" : slot;

@@ -36,13 +36,8 @@ public class WeaponRollLoader extends SimpleJsonResourceReloadListener {
                 rejected++;
                 continue;
             }
-            if (roll.chance() <= 0.0F) {
-                CombatStyles.LOGGER.warn("Weapon roll {} has chance <= 0 and will never fire",
-                        file.getKey());
-            }
-            if (roll.items().isEmpty() && roll.categories().isEmpty() && roll.tables().isEmpty()
-                    && roll.tags().isEmpty()) {
-                CombatStyles.LOGGER.warn("Weapon roll {} has no filters and matches every weapon",
+            if (roll.weight() <= 0.0F) {
+                CombatStyles.LOGGER.warn("Weapon roll {} has weight <= 0 and will never be drawn",
                         file.getKey());
             }
             if ((roll.rewritesSlots() || roll.affixesOnly()) && roll.slots().isEmpty()) {

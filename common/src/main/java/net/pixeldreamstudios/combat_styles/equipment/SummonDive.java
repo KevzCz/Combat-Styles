@@ -3,6 +3,7 @@ package net.pixeldreamstudios.combat_styles.equipment;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.entity.SummonAim;
 import net.pixeldreamstudios.combat_styles.entity.SummonTargeting;
 
@@ -19,7 +20,7 @@ public record SummonDive(float damageShare, int maxDiving, List<String> entities
     private static final float SAMPLE_SHARE = 0.5F;
     public static final AbilityTuning SAMPLE_TUNING = AbilityTuning.NONE;
 
-    public static final Codec<SummonDive> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<SummonDive> CODEC = Customs.wrap(SummonDive.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.FLOAT.optionalFieldOf("damage_share", DEFAULT_SHARE)
                     .forGetter(SummonDive::damageShare),
             Codec.INT.optionalFieldOf("max_diving", ALL_DIVING)
@@ -31,7 +32,7 @@ public record SummonDive(float damageShare, int maxDiving, List<String> entities
                     .forGetter(SummonDive::targeting),
             AbilityTuning.CODEC.optionalFieldOf("tuning").forGetter(SummonDive::tuning),
             SummonAim.CODEC.optionalFieldOf(SummonCadence.KEY_AIM).forGetter(SummonDive::aim)
-    ).apply(instance, SummonDive::new));
+    ).apply(instance, SummonDive::new)));
 
     public static final SummonDive SAMPLE =
             new SummonDive(SAMPLE_SHARE, 1, List.of(""),

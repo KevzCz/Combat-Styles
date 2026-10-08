@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,7 @@ public record ProfileVariant(List<ProfileCondition> conditions,
                              Map<String, AbilityTuning> tuning,
                              SummonCadence cadence) {
 
-    public static final Codec<ProfileVariant> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<ProfileVariant> CODEC = Customs.wrap(ProfileVariant.class, RecordCodecBuilder.create(instance -> instance.group(
             ProfileCondition.LIST_CODEC.optionalFieldOf("conditions", List.of())
                     .forGetter(ProfileVariant::conditions),
             Codec.STRING.optionalFieldOf("finale").forGetter(ProfileVariant::finale),
@@ -35,7 +36,7 @@ public record ProfileVariant(List<ProfileCondition> conditions,
                     .optionalFieldOf("tuning", Map.of())
                     .forGetter(ProfileVariant::tuning),
             SummonCadence.MAP_CODEC.forGetter(variant -> variant.cadence().carrying(variant.abilities()))
-    ).apply(instance, ProfileVariant::new));
+    ).apply(instance, ProfileVariant::new)));
 
     public ProfileVariant(List<ProfileCondition> conditions, Optional<String> finale,
                           Map<String, String> swaps, List<String> abilities,

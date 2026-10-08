@@ -6,6 +6,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.style.AttackAttribute;
 
 import java.util.List;
@@ -31,11 +32,11 @@ public record AttributeBonus(double amount, AttributeModifier.Operation operatio
                     Codec.STRING.optionalFieldOf("slot").forGetter(AttributeBonus::slot)
             ).apply(instance, AttributeBonus::new));
 
-    public static final Codec<AttributeBonus> CODEC = Codec.either(Codec.DOUBLE, EXPANDED)
+    public static final Codec<AttributeBonus> CODEC = Customs.wrap(AttributeBonus.class, Codec.either(Codec.DOUBLE, EXPANDED)
             .xmap(either -> either.map(AttributeBonus::flat, value -> value),
                     value -> value.isPlain()
                             ? Either.left(value.amount())
-                            : Either.right(value));
+                            : Either.right(value)));
 
     public static AttributeBonus flat(double amount) {
         return new AttributeBonus(amount, AttributeModifier.Operation.ADD_VALUE,

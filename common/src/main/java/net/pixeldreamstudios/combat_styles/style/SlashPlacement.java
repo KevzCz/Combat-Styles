@@ -10,6 +10,8 @@ import com.mojang.serialization.RecordBuilder;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.bettercombat.api.fx.ParticlePlacement;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -76,7 +78,7 @@ public record SlashPlacement(String particleType, float x, float y, float z,
         }
     };
 
-    public static final Codec<SlashPlacement> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<SlashPlacement> CODEC = Customs.wrap(SlashPlacement.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf("particle_type", "").forGetter(SlashPlacement::particleType),
             Codec.FLOAT.optionalFieldOf("x", 0.0F).forGetter(SlashPlacement::x),
             Codec.FLOAT.optionalFieldOf("y", 0.0F).forGetter(SlashPlacement::y),
@@ -88,7 +90,7 @@ public record SlashPlacement(String particleType, float x, float y, float z,
             SlashMode.CODEC.optionalFieldOf("mode", SlashMode.PARTICLE).forGetter(SlashPlacement::mode),
             ExtraAttack.CODEC.optionalFieldOf("attack").forGetter(SlashPlacement::attack),
             ANCHOR_FIELD.forGetter(SlashPlacement::anchor)
-    ).apply(instance, SlashPlacement::new));
+    ).apply(instance, SlashPlacement::new)));
 
     public SlashPlacement withParticleType(String value) {
         return new SlashPlacement(value == null ? "" : value, x, y, z,

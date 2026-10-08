@@ -9,6 +9,7 @@ import java.util.function.Consumer;
 public final class ItemTooltip {
 
     private static final String KEY_EXPAND = "tooltip.combat_styles.expand_hint";
+    private static final String KEY_EQUIPMENT_EXPAND = "tooltip.combat_styles.equipment_expand_hint";
     private static final String KEY_DETAIL_MARK = "tooltip.combat_styles.detail_mark";
 
     private ItemTooltip() {
@@ -30,6 +31,11 @@ public final class ItemTooltip {
     public static void expandable(List<Component> tooltip,
                                   Consumer<List<Component>> details,
                                   Consumer<List<Component>> collapsed) {
+        expandable(tooltip, details, collapsed, hint());
+    }
+
+    private static void expandable(List<Component> tooltip, Consumer<List<Component>> details,
+                                   Consumer<List<Component>> collapsed, Component shownHint) {
         if (TooltipContextAccess.expanded()) {
             details.accept(tooltip);
             return;
@@ -39,7 +45,15 @@ public final class ItemTooltip {
             return;
         }
         tooltip.add(Component.empty());
-        tooltip.add(hint());
+        tooltip.add(shownHint);
+    }
+
+    public static void equipmentExpandable(List<Component> tooltip, Consumer<List<Component>> details) {
+        expandable(tooltip, details, null, equipmentHint());
+    }
+
+    public static Component equipmentHint() {
+        return Component.translatable(KEY_EQUIPMENT_EXPAND).withStyle(ChatFormatting.DARK_GRAY);
     }
 
     public static void expandable(List<Component> tooltip, Consumer<List<Component>> details) {

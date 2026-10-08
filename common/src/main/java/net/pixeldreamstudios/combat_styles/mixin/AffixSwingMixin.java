@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.equipment.PendingExtraHit;
 import net.pixeldreamstudios.combat_styles.equipment.SwingDrag;
@@ -60,7 +60,7 @@ public class AffixSwingMixin {
                 CombatStyles.LOGGER.info("[EXTRA] packet raw={} combo={} extra={} reach={}",
                         request.comboCount(), combo, extra, SwingDrag.allowance());
             }
-            AffixDamageDealer.armSweepAttributes(player, combo);
+            CombatEffectDealer.armSweepAttributes(player, combo);
             return;
         }
         PendingExtraHit.push(SwingDrag.NO_EXTRA);
@@ -73,15 +73,15 @@ public class AffixSwingMixin {
                         SequenceSlots.sequenceComboOf(player, combo),
                         SwingDrag.dragFor(player, combo).enabled());
             }
-            AffixDamageDealer.armSweepAttributes(player, combo);
+            CombatEffectDealer.armSweepAttributes(player, combo);
             return;
         }
         SwingDrag.endSweep(player);
-        AffixDamageDealer.captureSwungAttack(player, combo);
+        CombatEffectDealer.captureSwungAttack(player, combo);
         SwingDrag.begin(player, combo);
-        AffixDamageDealer.latchSwingCharges(player, combo);
-        AffixDamageDealer.armSwing(player, combo);
-        server.execute(() -> AffixDamageDealer.onPlayerSwing(player, combo));
+        CombatEffectDealer.latchSwingCharges(player, combo);
+        CombatEffectDealer.armSwing(player, combo);
+        server.execute(() -> CombatEffectDealer.onPlayerSwing(player, combo));
     }
 
 }

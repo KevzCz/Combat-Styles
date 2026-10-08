@@ -61,7 +61,11 @@ public final class ClientStyleData {
     }
 
     public static int copies(String styleId) {
-        return styleId == null ? 0 : COPIES.getOrDefault(styleId, 0);
+        if (styleId == null) {
+            return 0;
+        }
+        Integer own = COPIES.get(styleId);
+        return own != null ? own : COPIES.getOrDefault(StyleRegistry.representativeOf(styleId), 0);
     }
 
     public static int count() {

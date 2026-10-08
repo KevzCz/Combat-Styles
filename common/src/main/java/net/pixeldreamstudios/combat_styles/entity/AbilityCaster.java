@@ -31,6 +31,7 @@ public final class AbilityCaster {
     private Vec3 castStart;
     private final Map<String, Long> readyAt = new HashMap<>();
     private long nextRecastAt = UNSCHEDULED;
+    private int recastInterval;
     private int step;
     private int slot = UNBOUND_SLOT;
     private String profileKey;
@@ -131,12 +132,21 @@ public final class AbilityCaster {
         }
         if (nextRecastAt == UNSCHEDULED) {
             nextRecastAt = now + interval;
+            recastInterval = interval;
             return false;
         }
         return now >= nextRecastAt;
     }
 
+    public void quicken(long now, float ratio) {
+        if (nextRecastAt == UNSCHEDULED || recastInterval <= 0 || ratio <= 0.0F) {
+            return;
+        }
+        nextRecastAt = Math.max(now, nextRecastAt - Math.round(recastInterval * ratio));
+    }
+
     public void scheduleRecast(long now, int interval) {
+        recastInterval = Math.max(0, interval);
         nextRecastAt = interval <= 0 ? UNSCHEDULED : now + interval;
     }
 

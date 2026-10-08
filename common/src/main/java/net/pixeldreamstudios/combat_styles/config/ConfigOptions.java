@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class ConfigOptions {
@@ -160,9 +161,17 @@ public final class ConfigOptions {
     }
 
     public static List<Option> statusEffects() {
+        return statusEffects(StatusEffectConfig::get);
+    }
+
+    public static List<Option> statusEffectDefaults() {
+        return statusEffects(StatusEffectConfig::defaultOf);
+    }
+
+    private static List<Option> statusEffects(Function<String, StatusEffectConfig.Entry> source) {
         List<Option> options = new ArrayList<>();
         for (String id : StatusEffectConfig.all().keySet()) {
-            StatusEffectConfig.Entry entry = StatusEffectConfig.get(id);
+            StatusEffectConfig.Entry entry = source.apply(id);
             String group = STATUS_EFFECTS;
             options.add(bool(id + ".enabled", "Enabled",
                     () -> entry.enabled, value -> entry.enabled = value).in(group));
@@ -317,50 +326,59 @@ public final class ConfigOptions {
     }
 
     public static List<Option> summons() {
+        return summons(SummonTuning::get);
+    }
+
+    public static List<Option> summonDefaults() {
+        SummonTuning.Values defaults = new SummonTuning.Values();
+        return summons(() -> defaults);
+    }
+
+    private static List<Option> summons(Supplier<SummonTuning.Values> source) {
         List<Option> options = new ArrayList<>();
         options.add(decimal("summons.follow_start_distance", "Follow start distance",
-                () -> SummonTuning.get().followStartDistance,
-                value -> SummonTuning.get().followStartDistance = value)
+                () -> source.get().followStartDistance,
+                value -> source.get().followStartDistance = value)
                 .describedAs("Summons walk back to you once they are this many blocks away.")
                 .in(SUMMONS));
         options.add(decimal("summons.follow_stop_distance", "Follow stop distance",
-                () -> SummonTuning.get().followStopDistance,
-                value -> SummonTuning.get().followStopDistance = value)
+                () -> source.get().followStopDistance,
+                value -> source.get().followStopDistance = value)
                 .describedAs("Summons stop following once they are this close to you.")
                 .in(SUMMONS));
         options.add(decimal("summons.teleport_distance", "Teleport distance",
-                () -> SummonTuning.get().teleportDistance,
-                value -> SummonTuning.get().teleportDistance = value)
+                () -> source.get().teleportDistance,
+                value -> source.get().teleportDistance = value)
                 .describedAs("Summons teleport next to you past this distance, even mid-fight. 0 never teleports.")
                 .in(SUMMONS));
         options.add(decimal("summons.hunt_range", "Hunt range",
-                () -> SummonTuning.get().huntRange,
-                value -> SummonTuning.get().huntRange = value)
+                () -> source.get().huntRange,
+                value -> source.get().huntRange = value)
                 .describedAs("Summons only chase targets within this many blocks.")
                 .in(SUMMONS));
         options.add(decimal("summons.aim_range", "Aim range",
-                () -> SummonTuning.get().aimRange,
-                value -> SummonTuning.get().aimRange = value)
+                () -> source.get().aimRange,
+                value -> source.get().aimRange = value)
                 .describedAs("How far summon abilities look for a target when they aim at the nearest, weakest, looked-at or last-hit enemy.")
                 .in(SUMMONS));
         options.add(decimal("summons.roster_radius", "Roster radius",
-                () -> SummonTuning.get().rosterRadius,
-                value -> SummonTuning.get().rosterRadius = value)
+                () -> source.get().rosterRadius,
+                value -> source.get().rosterRadius = value)
                 .describedAs("How far around you summons count for commands and limits.")
                 .in(SUMMONS));
         options.add(bool("summons.recall_strays", "Recall strays",
-                () -> SummonTuning.get().recallStrays,
-                value -> SummonTuning.get().recallStrays = value)
+                () -> source.get().recallStrays,
+                value -> source.get().recallStrays = value)
                 .describedAs("Bring summons back when they wander past the roster radius.")
                 .in(SUMMONS));
         options.add(integer("summons.max_commanded_per_order", "Max commanded per order",
-                () -> SummonTuning.get().maxCommandedPerOrder,
-                value -> SummonTuning.get().maxCommandedPerOrder = value)
+                () -> source.get().maxCommandedPerOrder,
+                value -> source.get().maxCommandedPerOrder = value)
                 .describedAs("Most summons a single recall or focus order moves.")
                 .in(SUMMONS));
         options.add(decimal("summons.minimum_damage", "Minimum damage",
-                () -> (double) SummonTuning.get().minimumDamage,
-                value -> SummonTuning.get().minimumDamage = value.floatValue())
+                () -> (double) source.get().minimumDamage,
+                value -> source.get().minimumDamage = value.floatValue())
                 .describedAs("Summon hits below this damage are skipped.")
                 .in(SUMMONS));
         return options;

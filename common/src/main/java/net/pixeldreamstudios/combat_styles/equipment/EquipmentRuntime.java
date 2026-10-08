@@ -1,12 +1,13 @@
 package net.pixeldreamstudios.combat_styles.equipment;
 
+import net.bettercombat.api.AttackHand;
 import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.util.Mth;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.network.AlignComboPayload;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
@@ -20,7 +21,6 @@ import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -137,8 +137,8 @@ public final class EquipmentRuntime {
             }
             boolean opened = false;
             for (Map.Entry<String, EffectGroup> named : definition.groups().entrySet()) {
-                opened |= GroupWindows.openOnSwing(player, worn.owner(), named.getKey(),
-                        named.getValue(), context);
+                opened |= OwnerScope.test(worn.stack(), () -> GroupWindows.openOnSwing(player,
+                        worn.owner(), named.getKey(), named.getValue(), context));
             }
             if (opened && player instanceof ServerPlayer served) {
                 NetworkManager.syncCooldowns(served, definition.id());
@@ -588,6 +588,11 @@ public final class EquipmentRuntime {
             this(definition, entry, key, 0);
         }
 
+        public ItemStack stackOf(Player player) {
+            WornEquipment worn = WornEquipment.find(player, definition.id(), copy);
+            return worn == null ? ItemStack.EMPTY : worn.stack();
+        }
+
         public String owner() {
             return EffectKeys.ownerOf(definition.id(), copy);
         }
@@ -627,16 +632,32 @@ public final class EquipmentRuntime {
         }
         List<Match> matched = new ArrayList<>();
         for (WornEquipment worn : WornEquipment.of(player)) {
+            if (!swingsWith(player, context, worn)) {
+                continue;
+            }
             EquipmentDefinition definition = worn.definition();
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 TriggeredEffect entry = named.getValue();
-                if (entry.trigger().matches(context, entry.cooldown())
-                        || summonPayloadMatches(context, entry)) {
+                if (OwnerScope.test(worn.stack(), () -> (entry.trigger().matches(context, entry.cooldown())
+                        || summonPayloadMatches(context, entry))
+                        && EffectStacking.allows(player, entry))) {
                     matched.add(new Match(definition, entry, named.getKey(), worn.copy()));
                 }
             }
         }
         return matched;
+    }
+
+    private static boolean swingsWith(Player player, EquipmentContext context, WornEquipment worn) {
+        if (context == null || !context.fromSwing() || worn.definition().swings() == SwingHands.ANY) {
+            return true;
+        }
+        AttackHand hand = CombatState.swungHand(player);
+        if (hand == null) {
+            return true;
+        }
+        ItemStack otherHand = hand.isOffHand() ? player.getMainHandItem() : player.getOffhandItem();
+        return worn.stack() != otherHand;
     }
 
     private static boolean summonPayloadMatches(EquipmentContext context, TriggeredEffect entry) {
@@ -1394,7 +1415,7 @@ public final class EquipmentRuntime {
         if (running != null) {
             armed.addAll(running);
         }
-        if (player != null && !AffixDamageDealer.swingInProgress(player)) {
+        if (player != null && !CombatEffectDealer.swingInProgress(player)) {
             for (String id : readySubstitutions(player)) {
                 armPass(player, id);
                 armed.add(id);
@@ -1554,7 +1575,8 @@ public final class EquipmentRuntime {
             EquipmentDefinition definition = worn.definition();
             for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
                 TriggeredEffect entry = named.getValue();
-                if (!liveAtRest(player, definition, worn.copy(), named.getKey(), entry)) {
+                if (!OwnerScope.test(worn.stack(),
+                        () -> liveAtRest(player, definition, worn.copy(), named.getKey(), entry))) {
                     continue;
                 }
                 if (!Cooldowns.active(player, definition.id(), named.getKey(), 0,

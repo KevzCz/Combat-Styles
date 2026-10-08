@@ -6,6 +6,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.List;
 
@@ -25,13 +26,13 @@ public record AttackDrag(boolean enabled, int ticks, int maxTargets, boolean tra
     public static final AttackDrag ENABLED =
             new AttackDrag(true, DEFAULT_TICKS, DEFAULT_MAX_TARGETS, true);
 
-    public static final Codec<AttackDrag> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<AttackDrag> CODEC = Customs.wrap(AttackDrag.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.BOOL.optionalFieldOf("enabled", Boolean.TRUE).forGetter(AttackDrag::enabled),
             Codec.INT.optionalFieldOf("ticks", DEFAULT_TICKS).forGetter(AttackDrag::ticks),
             Codec.INT.optionalFieldOf("max_targets", DEFAULT_MAX_TARGETS)
                     .forGetter(AttackDrag::maxTargets),
             Codec.BOOL.optionalFieldOf("trail", Boolean.TRUE).forGetter(AttackDrag::trail)
-    ).apply(instance, AttackDrag::new));
+    ).apply(instance, AttackDrag::new)));
 
     public AttackDrag {
         ticks = Math.clamp(ticks, 1, MAX_TICKS);

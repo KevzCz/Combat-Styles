@@ -70,7 +70,7 @@ public final class ModItems {
         for (StyleRarity rarity : StyleRarity.values()) {
             output.accept(new ItemStack(bookFor(rarity)));
         }
-        for (StylePage page : StyleRegistry.all()) {
+        for (StylePage page : StyleRegistry.distinct()) {
             output.accept(StylePageItem.of(page.styleId()));
         }
     }

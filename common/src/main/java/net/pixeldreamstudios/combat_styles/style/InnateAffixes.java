@@ -7,6 +7,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,11 +24,11 @@ public final class InnateAffixes {
                 Codec.STRING.fieldOf("affix").forGetter(Slot::affix)
         ).apply(instance, Slot::new));
 
-        public static final Codec<Slot> CODEC = Codec.either(Codec.STRING, FULL)
+        public static final Codec<Slot> CODEC = Customs.wrap(Slot.class, Codec.either(Codec.STRING, FULL)
                 .xmap(either -> either.map(id -> new Slot(Optional.empty(), id), slot -> slot),
                         slot -> slot.slot().isPresent()
                                 ? Either.right(slot)
-                                : Either.left(slot.affix()));
+                                : Either.left(slot.affix())));
     }
 
     private static final Map<String, List<String>> FROM_EQUIPMENT = new LinkedHashMap<>();

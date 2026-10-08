@@ -152,6 +152,10 @@ public final class EquipmentDropConfig {
         write(ConfigPaths.root().resolve(FILE), loaded);
     }
 
+    public static void restoreDefaults() {
+        loaded = defaults();
+    }
+
     public static Map<String, Rarity> rarities() {
         return loaded.rarities == null ? Map.of() : loaded.rarities;
     }

@@ -8,7 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.AffixTrails;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
 import net.pixeldreamstudios.combat_styles.attribute.ModAttributes;
@@ -20,9 +20,11 @@ import net.pixeldreamstudios.combat_styles.config.EquipmentDropConfig;
 import net.pixeldreamstudios.combat_styles.config.SpellCompatState;
 import net.pixeldreamstudios.combat_styles.config.StatusEffectConfig;
 import net.pixeldreamstudios.combat_styles.config.SummonTuning;
+import net.pixeldreamstudios.combat_styles.custom.CustomChoices;
 import net.pixeldreamstudios.combat_styles.entity.AbilityChoices;
 import net.pixeldreamstudios.combat_styles.entity.ModEntities;
 import net.pixeldreamstudios.combat_styles.entity.RaiseDead;
+import net.pixeldreamstudios.combat_styles.equipment.EnchantmentChoices;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
@@ -63,6 +65,8 @@ public final class CombatStyles {
         StatusEffectConfig.load();
         AbilityConfig.load();
         OptionSources.register(new AbilityChoices());
+        OptionSources.register(new CustomChoices());
+        OptionSources.register(new EnchantmentChoices());
         RaiseDead.register();
         SummonTuning.load();
         ModComponents.register();
@@ -73,7 +77,7 @@ public final class CombatStyles {
         RandomStyleFunction.register();
         ModEvents.register();
         AffixTrails.register();
-        MissTracker.setHandler(AffixDamageDealer::applyMissEquipment);
+        MissTracker.setHandler(CombatEffectDealer::applyMissEquipment);
         SpellEngineCompat.init();
     }
 

@@ -71,6 +71,28 @@ public final class AbilityHosts {
                 missing -> new MobHost(mob, owner.getUUID(), grantDamageOf(mob), true));
     }
 
+    public static int quicken(Player owner, float ratio) {
+        if (owner == null || ratio <= 0.0F) {
+            return 0;
+        }
+        long now = owner.level().getGameTime();
+        int quickened = 0;
+        for (ConfigurableSummon summon : SummonRoster.of(owner)) {
+            AbilityCaster caster = summon.caster();
+            if (caster != null) {
+                caster.quicken(now, ratio);
+                quickened++;
+            }
+        }
+        for (MobHost host : HOSTS.values()) {
+            if (owner.getUUID().equals(host.ownerId) && host.alive()) {
+                host.caster.quicken(now, ratio);
+                quickened++;
+            }
+        }
+        return quickened;
+    }
+
     public static boolean hosts(Entity entity) {
         return entity != null && HOSTS.containsKey(entity.getUUID());
     }

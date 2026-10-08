@@ -1,5 +1,6 @@
 package net.pixeldreamstudios.combat_styles.client;
 
+import com.google.gson.JsonObject;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -27,6 +28,7 @@ public class ConfigScreen extends PanelScreen {
     private static final String KEY_SEARCH = "screen.combat_styles.config.search";
     private static final String KEY_HUD_MOVE = "screen.combat_styles.hud_move";
     private static final String KEY_RESET = "screen.combat_styles.config.reset";
+    private static final String KEY_RESET_HINT = "screen.combat_styles.config.reset.hint";
     private static final String KEY_TOGGLE_ON = "screen.combat_styles.config.on";
     private static final String KEY_TOGGLE_OFF = "screen.combat_styles.config.off";
     private static final String KEY_BACK = "screen.combat_styles.config_back";
@@ -52,6 +54,7 @@ public class ConfigScreen extends PanelScreen {
     private static final int SUGGESTION_ROWS = 8;
     private static final int SUGGESTION_ROW = 10;
     private static final int SUGGESTION_WIDTH = 190;
+    private static final int DISCARD_PASSES = 2;
 
     private final Map<String, List<Option>> grouped = new LinkedHashMap<>();
     private final Map<Option, EditBox> boxes = new LinkedHashMap<>();
@@ -75,6 +78,8 @@ public class ConfigScreen extends PanelScreen {
     private int sidebarScroll;
 
     private final Set<EditConfigPayload> baseline = ConfigEdits.settings();
+    private final Map<String, String> snapshot = new LinkedHashMap<>();
+    private final JsonObject dropSnapshot = EquipmentDropConfig.toJson();
 
     public ConfigScreen(Screen parent) {
         super(Component.translatable(KEY_TITLE), parent);
@@ -103,16 +108,19 @@ public class ConfigScreen extends PanelScreen {
         ConfigOptions.suggestions((kind, typed) ->
                 DropSuggestions.matching(kind, typed, List.of(), SUGGESTION_LIMIT));
 
-        List<Option> all = new ArrayList<>();
-        all.addAll(ConfigOptions.of(CombatStylesConfig.get()));
-        all.addAll(ConfigOptions.statusEffects());
-        all.addAll(ConfigOptions.equipmentDrops());
-        all.addAll(ConfigOptions.summons());
+        List<Option> all = allOptions();
         all.add(ConfigOptions.action("hudMove",
                 Component.translatable(KEY_HUD_MOVE).getString(),
                 () -> minecraft.setScreen(new HudPlacementScreen(this)))
                 .describedAs("Drag the cooldown HUD to a new spot.")
                 .in(ConfigOptions.VISUALS));
+        if (snapshot.isEmpty()) {
+            for (Option option : all) {
+                if (!option.isAction()) {
+                    snapshot.put(option.key(), option.read());
+                }
+            }
+        }
 
         for (Option option : all) {
             grouped.computeIfAbsent(option.group(), key -> new ArrayList<>()).add(option);
@@ -143,6 +151,7 @@ public class ConfigScreen extends PanelScreen {
         addRenderableWidget(search);
 
         addRenderableWidget(PanelButton.of(Component.translatable(KEY_RESET), button -> reset())
+                .tooltip(Component.translatable(KEY_RESET_HINT))
                 .bounds(left + PAD, top + PANEL_HEIGHT - FOOTER + 4,
                         BUTTON_WIDTH, BUTTON_HEIGHT)
                 .build());
@@ -151,12 +160,69 @@ public class ConfigScreen extends PanelScreen {
                         top + PANEL_HEIGHT - FOOTER + 4, BUTTON_WIDTH, BUTTON_HEIGHT)
                 .build());
         addRenderableWidget(PanelButton.of(Component.translatable(KEY_CANCEL),
-                        button -> minecraft.setScreen(parent))
+                        button -> requestClose())
                 .bounds(left + PANEL_WIDTH - BUTTON_WIDTH - PAD,
                         top + PANEL_HEIGHT - FOOTER + 4, BUTTON_WIDTH, BUTTON_HEIGHT)
                 .build());
 
         refresh();
+    }
+
+    private static List<Option> allOptions() {
+        List<Option> all = new ArrayList<>();
+        all.addAll(ConfigOptions.of(CombatStylesConfig.get()));
+        all.addAll(ConfigOptions.statusEffects());
+        all.addAll(ConfigOptions.equipmentDrops());
+        all.addAll(ConfigOptions.summons());
+        return all;
+    }
+
+    private static List<Option> defaultOptions() {
+        List<Option> defaults = new ArrayList<>();
+        defaults.addAll(ConfigOptions.of(new CombatStylesConfig()));
+        defaults.addAll(ConfigOptions.statusEffectDefaults());
+        defaults.addAll(ConfigOptions.summonDefaults());
+        return defaults;
+    }
+
+    private boolean dirty() {
+        if (!dropSnapshot.equals(EquipmentDropConfig.toJson())) {
+            return true;
+        }
+        for (Map.Entry<Option, EditBox> entry : boxes.entrySet()) {
+            if (!entry.getValue().getValue().equals(entry.getKey().read())) {
+                return true;
+            }
+        }
+        for (Option option : allOptions()) {
+            String was = snapshot.get(option.key());
+            if (!option.isAction() && (was == null || !was.equals(option.read()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void requestClose() {
+        if (!dirty()) {
+            minecraft.setScreen(parent);
+            return;
+        }
+        commitValues();
+        minecraft.setScreen(new UnsavedChangesScreen(this, this::apply, this::discard));
+    }
+
+    private void discard() {
+        EquipmentDropConfig.accept(dropSnapshot.deepCopy());
+        for (int pass = 0; pass < DISCARD_PASSES; pass++) {
+            for (Option option : allOptions()) {
+                String was = snapshot.get(option.key());
+                if (!option.isAction() && was != null && !was.equals(option.read())) {
+                    option.write(was);
+                }
+            }
+        }
+        minecraft.setScreen(parent);
     }
 
     private void refresh() {
@@ -205,9 +271,25 @@ public class ConfigScreen extends PanelScreen {
     }
 
     private void reset() {
-        for (Map.Entry<Option, EditBox> entry : boxes.entrySet()) {
-            entry.getValue().setValue(entry.getKey().read());
+        Map<String, String> defaults = new LinkedHashMap<>();
+        for (Option option : defaultOptions()) {
+            if (!option.isAction()) {
+                defaults.put(option.key(), option.read());
+            }
         }
+        List<Option> targets = searching()
+                ? new ArrayList<>(visible)
+                : new ArrayList<>(grouped.getOrDefault(selected, List.of()));
+        for (Option option : targets) {
+            String fallback = defaults.get(option.key());
+            if (!option.isAction() && fallback != null) {
+                option.write(fallback);
+            }
+        }
+        if (!searching() && ConfigOptions.EQUIPMENT.equals(selected)) {
+            EquipmentDropConfig.restoreDefaults();
+        }
+        rebuild();
     }
 
     private boolean commitValues() {
@@ -364,6 +446,10 @@ public class ConfigScreen extends PanelScreen {
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (keyCode == KEY_ENTER || keyCode == KEY_NUMPAD_ENTER) {
             commit();
+            return true;
+        }
+        if (keyCode == KEY_ESCAPE) {
+            requestClose();
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -677,6 +763,6 @@ public class ConfigScreen extends PanelScreen {
 
     @Override
     public boolean isPauseScreen() {
-        return false;
+        return true;
     }
 }

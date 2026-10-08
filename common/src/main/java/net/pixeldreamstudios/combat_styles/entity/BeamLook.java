@@ -6,6 +6,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 public record BeamLook(String color, float width, float lift, BeamOrigin origin, int durationTicks,
                        float alpha) {
@@ -30,7 +31,7 @@ public record BeamLook(String color, float width, float lift, BeamOrigin origin,
     public static final BeamLook DEFAULT = new BeamLook(DEFAULT_COLOR, DEFAULT_WIDTH, NO_LIFT,
             BeamOrigin.ABILITY, DEFAULT_DURATION_TICKS, DEFAULT_ALPHA);
 
-    public static final Codec<BeamLook> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<BeamLook> CODEC = Customs.wrap(BeamLook.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf(KEY_COLOR, DEFAULT_COLOR).forGetter(BeamLook::color),
             Codec.FLOAT.optionalFieldOf(KEY_WIDTH, DEFAULT_WIDTH).forGetter(BeamLook::width),
             Codec.FLOAT.optionalFieldOf(KEY_LIFT, NO_LIFT).forGetter(BeamLook::lift),
@@ -38,7 +39,7 @@ public record BeamLook(String color, float width, float lift, BeamOrigin origin,
             Codec.INT.optionalFieldOf(KEY_DURATION_TICKS, DEFAULT_DURATION_TICKS)
                     .forGetter(BeamLook::durationTicks),
             Codec.FLOAT.optionalFieldOf(KEY_ALPHA, DEFAULT_ALPHA).forGetter(BeamLook::alpha)
-    ).apply(instance, BeamLook::new));
+    ).apply(instance, BeamLook::new)));
 
     public BeamLook {
         color = color == null || color.isBlank() ? DEFAULT_COLOR : color;

@@ -7,6 +7,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.phys.Vec3;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.Locale;
 
 public record ParticleShape(Form form, float radius, int points, float height, float turns,
@@ -54,7 +56,7 @@ public record ParticleShape(Form form, float radius, int points, float height, f
     public static final ParticleShape DEFAULT = new ParticleShape(Form.CLOUD, FROM_TUNING,
             POINTS_FROM_TUNING, DEFAULT_HEIGHT, DEFAULT_TURNS, NO_OFFSET, false);
 
-    public static final Codec<ParticleShape> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<ParticleShape> CODEC = Customs.wrap(ParticleShape.class, RecordCodecBuilder.create(instance -> instance.group(
             Form.CODEC.optionalFieldOf(KEY_FORM, Form.CLOUD).forGetter(ParticleShape::form),
             Codec.FLOAT.optionalFieldOf(KEY_RADIUS, FROM_TUNING).forGetter(ParticleShape::radius),
             Codec.INT.optionalFieldOf(KEY_POINTS, POINTS_FROM_TUNING).forGetter(ParticleShape::points),
@@ -62,7 +64,7 @@ public record ParticleShape(Form form, float radius, int points, float height, f
             Codec.FLOAT.optionalFieldOf(KEY_TURNS, DEFAULT_TURNS).forGetter(ParticleShape::turns),
             Codec.FLOAT.optionalFieldOf(KEY_Y_OFFSET, NO_OFFSET).forGetter(ParticleShape::yOffset),
             Codec.BOOL.optionalFieldOf(KEY_GROW, false).forGetter(ParticleShape::grow)
-    ).apply(instance, ParticleShape::new));
+    ).apply(instance, ParticleShape::new)));
 
     public ParticleShape {
         form = form == null ? Form.CLOUD : form;

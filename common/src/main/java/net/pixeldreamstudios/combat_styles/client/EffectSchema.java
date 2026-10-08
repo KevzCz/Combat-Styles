@@ -1,5 +1,6 @@
 package net.pixeldreamstudios.combat_styles.client;
 
+import net.pixeldreamstudios.combat_styles.equipment.DealtGate;
 import net.pixeldreamstudios.combat_styles.equipment.SummonCadence;
 import net.pixeldreamstudios.combat_styles.entity.BeamLook;
 import net.pixeldreamstudios.combat_styles.entity.RaiseProfile;
@@ -16,6 +17,7 @@ import net.pixeldreamstudios.combat_styles.entity.MobFilter;
 import net.pixeldreamstudios.combat_styles.entity.RaiseRules;
 import net.pixeldreamstudios.combat_styles.entity.PassiveTrigger;
 import net.pixeldreamstudios.combat_styles.entity.SummonAim;
+import net.pixeldreamstudios.combat_styles.entity.SummonTargeting;
 import net.pixeldreamstudios.combat_styles.entity.SummonCastTarget;
 import net.pixeldreamstudios.combat_styles.entity.ScriptedAbility;
 import net.pixeldreamstudios.combat_styles.entity.AbilityStacks;
@@ -37,6 +39,7 @@ import net.pixeldreamstudios.combat_styles.affix.CastSpell;
 import net.pixeldreamstudios.combat_styles.damage.DamageBonus;
 import net.pixeldreamstudios.combat_styles.damage.DamageBonusList;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
+import net.pixeldreamstudios.combat_styles.affix.LibraryRef;
 import net.pixeldreamstudios.combat_styles.affix.ProjectileSpawn;
 import net.pixeldreamstudios.combat_styles.affix.ProjectileVelocity;
 import net.pixeldreamstudios.combat_styles.affix.SpawnAnchor;
@@ -57,6 +60,9 @@ import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
 import net.pixeldreamstudios.combat_styles.equipment.AccessoryCompat;
 import net.pixeldreamstudios.combat_styles.equipment.AccessoryMatch;
+import net.pixeldreamstudios.combat_styles.equipment.EffectStacking;
+import net.pixeldreamstudios.combat_styles.equipment.EnchantLevels;
+import net.pixeldreamstudios.combat_styles.equipment.EnchantmentChoices;
 import net.pixeldreamstudios.combat_styles.equipment.ItemGate;
 import net.pixeldreamstudios.combat_styles.equipment.ItemMatch;
 import net.pixeldreamstudios.combat_styles.equipment.AbilityTuning;
@@ -75,13 +81,14 @@ import net.pixeldreamstudios.combat_styles.equipment.PhaseGate;
 import net.pixeldreamstudios.combat_styles.equipment.UseGate;
 import net.pixeldreamstudios.combat_styles.equipment.UsePhase;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+import net.pixeldreamstudios.combat_styles.custom.CustomUse;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.equipment.SpellChainTuning;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLaunchTuning;
 import net.pixeldreamstudios.combat_styles.equipment.SpellProjectileGate;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLocks;
 import net.pixeldreamstudios.combat_styles.equipment.SpellShot;
 import net.pixeldreamstudios.combat_styles.equipment.SpellTune;
-import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
 import net.pixeldreamstudios.combat_styles.equipment.SpellTuning;
 import net.pixeldreamstudios.combat_styles.equipment.StateGate;
 import net.pixeldreamstudios.combat_styles.loot.BookRoll;
@@ -141,7 +148,8 @@ public final class EffectSchema {
     private static final String KEY_ATTRIBUTES = "attributes";
     private static final Set<String> SPARSE_KEYS = Set.of(KEY_ITEMS, KEY_ATTRIBUTES,
             KEY_SUMMON_EQUIPMENT);
-    private static final Set<String> OPT_IN_KEYS = Set.of(ItemMatch.EMPTY);
+    private static final Set<String> OPT_IN_KEYS = Set.of(ItemMatch.EMPTY, Customs.KEY,
+            LibraryRef.PROJECTILE_KEY, LibraryRef.SUMMON_KEY);
     private static final String KEY_CAST_SPELLS = "cast_spells";
     private static final int DEFAULT_CHANNEL_DURATION = 40;
 
@@ -159,12 +167,16 @@ public final class EffectSchema {
     private static final float DEFAULT_VAULT_RADIUS = 2.0F;
     private static final float DEFAULT_VAULT_STRENGTH = 0.5F;
     private static final float DEFAULT_HASTEN_RATIO = 0.5F;
+    private static final float DEFAULT_QUICKEN_RATIO = 0.1F;
+    private static final String DEFAULT_TARGET_EFFECT = "minecraft:poison";
+    private static final String KEY_MIN = "min";
+    private static final String KEY_MAX = "max";
+    private static final int DEFAULT_ENCHANT_LEVEL = 1;
     private static final String DEFAULT_SUMMON_ENTITY = "minecraft:bee";
     private static final String DEFAULT_SUMMON_ITEM = "minecraft:iron_sword";
     private static final String KEY_COMPANION = "companion";
     private static final String KEY_FOLLOW = "follow";
     private static final String KEY_DAMAGE_SPEC = "damage_spec";
-    private static final String KEY_DAMAGE_TYPE = "damage_type";
     private static final String KEY_OWN_DAMAGE = "own_damage";
     public static final List<String> SUMMON_SLOTS = List.of("mainhand", "offhand", "head",
             "chest", "legs", "feet", "body");
@@ -180,6 +192,7 @@ public final class EffectSchema {
     public static final String ROOT_TRIGGER = "@trigger";
     public static final String ROOT_SUBSTITUTION = "@substitution";
     public static final String ROOT_SUMMON_PROFILE = SummonProfile.SCHEMA;
+    public static final String ROOT_DAMAGE_SPEC = DamageSpec.SCHEMA;
     public static final String ROOT_ATTRIBUTE_MAP = "@attribute_map";
     public static final String ROOT_CONDITIONAL_ATTRIBUTES = "@conditional_attributes";
     public static final String ROOT_SUMMON_DIVE = "@summon_dive";
@@ -187,15 +200,16 @@ public final class EffectSchema {
     public static final String ROOT_BEHAVIOUR = "@behaviour";
     public static final String ROOT_TUNING = "@tuning";
     public static final String ROOT_ECHO = "@echo";
+    public static final String ROOT_STACKING = "@stacking";
     public static final String ROOT_SPELLS = "@spells";
     public static final String ROOT_COOLDOWN = "@cooldown";
-    public static final String ROOT_TOOLTIP = "@tooltip";
     public static final String ROOT_SELF_EFFECTS = "@self_effects";
     public static final String ROOT_DAMAGE_BONUS = "@damage_bonus";
     public static final String ROOT_STYLE_BOOK = "@style_book";
     public static final String ROOT_WEAPON_ROLL = "@weapon_roll";
     public static final String ROOT_SUMMON_ABILITY = "@summon_ability";
     public static final String ROOT_ABILITY_TUNING = "@ability_tuning";
+    public static final String ROOT_PROJECTILE = "@projectile";
     private static final String PATH_SEPARATOR = "/";
 
     private static final String DEFAULT_TRAIL_COLOR = "#FFFFFF";
@@ -293,13 +307,64 @@ public final class EffectSchema {
         }
         TEMPLATES.computeIfAbsent(path, ignored -> new ArrayList<>())
                 .add(new Template(key, encoded));
+        String scope = Customs.scopeOf(codec);
+        if (scope != null) {
+            registerCustomRows(join(path, key), scope);
+        }
     }
 
-    private static final AffixEffects.Projectile SAMPLE_PROJECTILE = new AffixEffects.Projectile(
+    private static final Map<String, String> BOX_SCOPES = new LinkedHashMap<>();
+
+    private static void registerCustomRows(String boxPath, String scope) {
+        if (scope == null || BOX_SCOPES.containsKey(boxPath)) {
+            return;
+        }
+        BOX_SCOPES.put(boxPath, scope);
+        register(boxPath, Customs.KEY, CustomUse.CODEC.listOf(), List.of(CustomUse.SAMPLE));
+        String uses = join(boxPath, Customs.KEY);
+        register(uses, CustomUse.KEY_HOOK, Codec.STRING, "");
+        register(uses, CustomUse.KEY_OPTIONS, CustomUse.OPTIONS_CODEC, new JsonObject());
+    }
+
+    private static void registerRootCustoms() {
+        registerCustomRows(ROOT_EFFECT, Customs.scopeOf(AffixEffects.OnHit.CODEC));
+        registerCustomRows(ROOT_TRIGGER, Customs.scopeOf(EquipmentTrigger.CODEC));
+        registerCustomRows(ROOT_SUBSTITUTION, Customs.scopeOf(StyleSubstitution.CODEC));
+        registerCustomRows(ROOT_SUMMON_PROFILE, Customs.scopeOf(SummonProfile.CODEC));
+        registerCustomRows(ROOT_DAMAGE_SPEC, Customs.scopeOf(DamageSpec.CODEC));
+        registerCustomRows(ROOT_SUMMON_DIVE, Customs.scopeOf(SummonDive.CODEC));
+        registerCustomRows(ROOT_ABILITY_GRANT, Customs.scopeOf(AbilityGrant.CODEC));
+        registerCustomRows(ROOT_SUMMON_ABILITY, Customs.scopeOf(ScriptedAbility.CODEC));
+        registerCustomRows(ROOT_BEHAVIOUR, Customs.scopeOf(AttackBehaviour.CODEC));
+        registerCustomRows(ROOT_TUNING, Customs.scopeOf(AffixTuning.CODEC));
+        registerCustomRows(ROOT_ECHO, Customs.scopeOf(AffixEffects.Echo.CODEC));
+        registerCustomRows(ROOT_SPELLS, Customs.scopeOf(SpellLocks.CODEC));
+        registerCustomRows(ROOT_DAMAGE_BONUS, Customs.scopeOf(DamageBonusList.CODEC));
+        registerCustomRows(ROOT_STYLE_BOOK, Customs.scopeOf(BookRoll.CODEC));
+        registerCustomRows(ROOT_WEAPON_ROLL, Customs.scopeOf(WeaponRoll.CODEC));
+        registerCustomRows(ROOT_ABILITY_TUNING, Customs.scopeOf(AbilityTuning.CODEC));
+    }
+
+    public static String customScopeAt(String fullPath) {
+        ensureLoaded();
+        if (fullPath == null) {
+            return null;
+        }
+        String marker = PATH_SEPARATOR + Customs.KEY;
+        int cut = fullPath.lastIndexOf(marker + PATH_SEPARATOR);
+        if (cut < 0 && fullPath.endsWith(marker)) {
+            cut = fullPath.length() - marker.length();
+        }
+        String box = cut < 0 ? fullPath : fullPath.substring(0, cut);
+        return BOX_SCOPES.get(withoutIndex(box));
+    }
+
+    public static final AffixEffects.Projectile SAMPLE_PROJECTILE = new AffixEffects.Projectile(
             DEFAULT_PROJECTILE_ENTITY, 1, 1.5F, 0.0F, 0.0F, false, 1.0F, Optional.empty(),
             DEFAULT_PROJECTILE_LIFETIME, false, ProjectileSpawn.DEFAULT, SpellShot.NONE, "", false);
 
     private static void registerProjectileFields(String projectileRoot) {
+        register(projectileRoot, LibraryRef.PROJECTILE_KEY, Codec.STRING, "");
         register(projectileRoot, "entity", Codec.STRING, DEFAULT_PROJECTILE_ENTITY);
         register(projectileRoot, "name", Codec.STRING, "");
         register(projectileRoot, "ignore_iframes", Codec.BOOL, true);
@@ -355,6 +420,8 @@ public final class EffectSchema {
             register(itemsRoot, slot, ItemMatch.CODEC, ItemMatch.NONE);
             registerItemMatch(join(itemsRoot, slot));
         }
+        register(itemsRoot, ItemGate.SELF, ItemMatch.CODEC, ItemMatch.NONE);
+        registerItemMatch(join(itemsRoot, ItemGate.SELF));
         if (AccessoryCompat.isLoaded()) {
             register(itemsRoot, ItemGate.ACCESSORIES, AccessoryMatch.CODEC.listOf(),
                     List.of(new AccessoryMatch(AccessoryMatch.ANY_SLOT, ItemMatch.NONE)));
@@ -371,6 +438,14 @@ public final class EffectSchema {
             register(root, lists.categories(), Codec.STRING.listOf(), List.of());
         }
         register(root, ItemMatch.EMPTY, Codec.BOOL, true);
+        String enchantments = join(root, ItemMatch.ENCHANTMENTS);
+        register(root, ItemMatch.ENCHANTMENTS,
+                Codec.unboundedMap(Codec.STRING, EnchantLevels.Range.CODEC), Map.of());
+        keyedMap(enchantments, EnchantmentChoices.SELECTOR);
+        String range = join(enchantments, MAP_ENTRY);
+        register(range, KEY_MIN, Codec.INT, DEFAULT_ENCHANT_LEVEL);
+        register(range, KEY_MAX, Codec.INT, DEFAULT_ENCHANT_LEVEL);
+        register(root, ItemMatch.ENCHANTMENTS_ANY, Codec.BOOL, true);
     }
 
     public static ItemMatch.Lists matchListsAt(String path, String key) {
@@ -740,6 +815,7 @@ public final class EffectSchema {
                 List.of(new AffixEffects.Particles(DEFAULT_PARTICLE, 6, 0.35F, 0.0F)));
         register("", "projectiles", AffixEffects.Projectile.CODEC.listOf(), List.of(SAMPLE_PROJECTILE));
         registerProjectileFields(join("", "projectiles"));
+        registerProjectileFields(ROOT_PROJECTILE);
         if (SpellEngineCompat.isLoaded()) {
             registerCastSpells(ROOT_EFFECT);
         }
@@ -767,6 +843,18 @@ public final class EffectSchema {
                 AffixEffects.Control.NONE);
         register("mechanics", "spawn", AffixEffects.Spawn.CODEC,
                 AffixEffects.Spawn.NONE);
+        register("mechanics", "order", AffixEffects.Order.CODEC,
+                AffixEffects.Order.NONE);
+        register("mechanics/order", "ability", Codec.STRING, "");
+        register("mechanics/order", "damage_ratio", Codec.FLOAT, 0.0F);
+        register("mechanics/order", "chance", Codec.FLOAT, 1.0F);
+        register("mechanics/order", "targets", SummonTargeting.CODEC, SummonTargeting.ALL);
+        register("mechanics/order", SummonCadence.KEY_AIM, SummonAim.CODEC, SummonAim.HIT_TARGET);
+        register("mechanics/order", "tuning", AbilityTuning.CODEC, SummonDive.SAMPLE_TUNING);
+        registerAbilityTuning(join("mechanics/order", KEY_TUNING));
+        register("mechanics/order", "quicken", AffixEffects.Quicken.CODEC,
+                new AffixEffects.Quicken(DEFAULT_QUICKEN_RATIO, 1.0F));
+        register("mechanics/order", "delay_ticks", Codec.INT, 0);
         register("mechanics", "max_targets_per_swing", Codec.INT,
                 AffixEffects.Mechanics.UNLIMITED_TARGETS);
 
@@ -874,6 +962,9 @@ public final class EffectSchema {
                 List.of(DEFAULT_DAMAGE_TYPE));
         register("mechanics/condition", "taken_damage_type", Codec.STRING.listOf(),
                 List.of(DEFAULT_TAKEN_DAMAGE_TAG));
+        register("mechanics/condition", AffixEffects.Condition.KEY_TARGET_EFFECTS, Codec.STRING.listOf(),
+                List.of(DEFAULT_TARGET_EFFECT));
+        register("mechanics/condition", AffixEffects.Condition.KEY_TARGET_BURNING, Codec.BOOL, true);
 
         register("mechanics", "condition", AffixEffects.Condition.CODEC,
                 AffixEffects.Condition.NONE);
@@ -897,16 +988,19 @@ public final class EffectSchema {
         registerCooldown();
         registerAttributeMap();
         registerSummons();
+        registerDamageSpec(ROOT_DAMAGE_SPEC);
         registerSummonAbilities();
         registerAbilityTuning(ROOT_ABILITY_TUNING);
         registerBehaviour();
         registerTuning();
         registerEcho();
+        registerStacking();
         if (SpellEngineCompat.isLoaded()) {
             registerSpellLocks();
         }
         deriveAll();
         adoptRegistered();
+        registerRootCustoms();
         deriveSubFieldsFromTemplates();
         fillTemplatesFromSubFields();
         auditAll();
@@ -1035,6 +1129,7 @@ public final class EffectSchema {
         registerItemGate(root);
         if (SpellEngineCompat.isLoaded()) {
             register(root, "has_spell", Codec.BOOL, true);
+            register(root, StateGate.HAS_SPELL_SCHOOL, Codec.STRING.listOf(), List.of(DEFAULT_SCHOOL));
             register(root, CastGate.KEY, CastGate.CODEC, CastGate.of(true));
             String castRoot = join(root, CastGate.KEY);
             register(castRoot, "enabled", Codec.BOOL, true);
@@ -1048,6 +1143,7 @@ public final class EffectSchema {
         register(root, "damage_below", Codec.FLOAT, 5.0F);
         register(root, "damage_type", Codec.STRING.listOf(), List.of(DEFAULT_DAMAGE_TYPE));
         register(root, "target", Codec.STRING.listOf(), List.of(DEFAULT_SUMMON_ENTITY));
+        register(root, DealtGate.KEY_TARGET_EFFECTS, Codec.STRING.listOf(), List.of(DEFAULT_TARGET_EFFECT));
         register(root, "on_projectile_hit", ProjectileHitGate.CODEC, ProjectileHitGate.ANY);
         String projectileRoot = join(root, "on_projectile_hit");
         register(projectileRoot, "entity", Codec.STRING.listOf(),
@@ -1062,6 +1158,8 @@ public final class EffectSchema {
                 List.of(DEFAULT_DAMAGE_TYPE));
         register(projectileRoot, "target", Codec.STRING.listOf(),
                 List.of(DEFAULT_SUMMON_ENTITY));
+        register(projectileRoot, DealtGate.KEY_TARGET_EFFECTS, Codec.STRING.listOf(),
+                List.of(DEFAULT_TARGET_EFFECT));
         if (SpellEngineCompat.isLoaded()) {
             register(projectileRoot, "spell_projectile", SpellProjectileGate.CODEC.codec(),
                     new SpellProjectileGate(true, List.of(), List.of()));
@@ -1124,8 +1222,6 @@ public final class EffectSchema {
         register(ROOT_COOLDOWN, "duration", Codec.INT, EffectCooldown.DEFAULT_DURATION);
         register(ROOT_COOLDOWN, "refresh_on_use", Codec.BOOL, true);
         register(ROOT_COOLDOWN, "hold_while_active", Codec.BOOL, false);
-        register(ROOT_TOOLTIP, TriggeredEffect.TOOLTIP_HEADER, Codec.STRING, "");
-        register(ROOT_TOOLTIP, TriggeredEffect.TOOLTIP_LINES, Codec.STRING.listOf(), List.of(""));
     }
 
     private static void registerSubstitution() {
@@ -1175,6 +1271,7 @@ public final class EffectSchema {
                             Optional.empty(), false));
             register(root, "exempt", Codec.STRING.listOf(), List.of(""));
         }
+        register(ROOT_SUMMON_PROFILE, LibraryRef.SUMMON_KEY, Codec.STRING, "");
         register(ROOT_SUMMON_PROFILE, "entity", Codec.STRING, DEFAULT_SUMMON_ENTITY);
         register(ROOT_SUMMON_PROFILE, "anchored", Codec.INT, 1);
         register(ROOT_SUMMON_PROFILE, "finale", Codec.STRING, "");
@@ -1284,6 +1381,7 @@ public final class EffectSchema {
         register(ROOT_SUMMON_ABILITY, ScriptedAbility.KEY_CHANCE, Codec.FLOAT, DEFAULT_STEP_CHANCE);
         register(ROOT_SUMMON_ABILITY, "used_by", Codec.STRING.listOf(),
                 List.of(DEFAULT_SUMMON_ENTITY));
+        register(ROOT_SUMMON_ABILITY, ScriptedAbility.KEY_DESCRIPTION, Codec.STRING, "");
         register(ROOT_SUMMON_ABILITY, KEY_FOCUS, AbilityFocus.CODEC, AbilityFocus.TARGET);
         register(ROOT_SUMMON_ABILITY, KEY_TUNING, AbilityTuning.CODEC, AbilityTuning.NONE);
         registerAbilityTuning(join(ROOT_SUMMON_ABILITY, KEY_TUNING));
@@ -1473,6 +1571,16 @@ public final class EffectSchema {
         register(slashes, "roll", Codec.DOUBLE, 15.0D);
         register(slashes, "delay_ticks", Codec.INT, 2);
         register(slashes, "anchor", Codec.STRING, SlashAnchor.HITBOX.getSerializedName());
+    }
+
+    private static void registerStacking() {
+        register(ROOT_STACKING, EffectStacking.KEY_SOURCE, Codec.STRING, EffectStacking.SAMPLE_SOURCE);
+        register(ROOT_STACKING, EffectStacking.KEY_PER, Codec.DOUBLE, EffectStacking.DEFAULT_PER);
+        register(ROOT_STACKING, EffectStacking.KEY_MIN_STACKS, Codec.INT, EffectStacking.DEFAULT_MIN_STACKS);
+        register(ROOT_STACKING, EffectStacking.KEY_MAX_STACKS, Codec.INT, EffectStacking.DEFAULT_MAX_STACKS);
+        register(ROOT_STACKING, EffectStacking.KEY_DELAY_TICKS, Codec.INT, EffectStacking.NO_DELAY);
+        register(ROOT_STACKING, EffectStacking.KEY_MODE, EffectStacking.Mode.CODEC,
+                EffectStacking.Mode.REPEAT);
     }
 
     private static void registerEcho() {

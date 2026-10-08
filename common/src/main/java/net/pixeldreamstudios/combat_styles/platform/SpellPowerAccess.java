@@ -7,6 +7,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.player.Player;
 
+import net.pixeldreamstudios.combat_styles.equipment.EnchantLevels;
+import net.pixeldreamstudios.combat_styles.equipment.UseScope;
+
 import java.util.List;
 
 public final class SpellPowerAccess {
@@ -24,6 +27,12 @@ public final class SpellPowerAccess {
     public static double valueOf(Player player, String source) {
         if (player == null || source == null || source.isEmpty()) {
             return 0.0D;
+        }
+        if (EnchantLevels.isSource(source)) {
+            return EnchantLevels.sourceLevel(player, source);
+        }
+        if (UseScope.isSource(source)) {
+            return UseScope.valueOf(source);
         }
         if (source.startsWith(PREFIX)) {
             return spellPower(player, source.substring(PREFIX.length()));

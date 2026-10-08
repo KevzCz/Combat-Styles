@@ -1,7 +1,10 @@
 package net.pixeldreamstudios.combat_styles.style;
 
 import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class StyleIdRule {
 
@@ -25,6 +28,21 @@ public final class StyleIdRule {
 
     public static String idOf(String source, int slot) {
         return source + SLOT_SEPARATOR + slot;
+    }
+
+    public static List<Candidate> ordered(List<Candidate> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+        List<Candidate> sorted = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (Candidate candidate : candidates) {
+            if (candidate != null && seen.add(candidate.id())) {
+                sorted.add(candidate);
+            }
+        }
+        sorted.sort(ORDER);
+        return sorted;
     }
 
     public static Candidate canonical(List<Candidate> candidates) {

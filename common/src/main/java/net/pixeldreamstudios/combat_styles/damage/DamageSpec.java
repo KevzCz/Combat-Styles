@@ -7,6 +7,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ public record DamageSpec(float base, float ofHit, float ofTargetMaxHealth,
     public static final float NO_HIT_RATIO = 0.0F;
     public static final float NO_HEALTH_RATIO = 0.0F;
     public static final float FULL_MULTIPLIER = 1.0F;
+    public static final String SCHEMA = "@damage_spec";
     private static final float FULL_SHARE = 1.0F;
 
     public static final DamageSpec NONE = new DamageSpec(NO_BASE, NO_HIT_RATIO,
@@ -56,11 +59,11 @@ public record DamageSpec(float base, float ofHit, float ofTargetMaxHealth,
                     .forGetter(DamageSpec::multiplier)
     ).apply(instance, DamageSpec::new));
 
-    public static final Codec<DamageSpec> CODEC = Codec.either(Codec.FLOAT, FULL)
+    public static final Codec<DamageSpec> CODEC = Customs.wrap(DamageSpec.class, Codec.either(Codec.FLOAT, FULL)
             .xmap(either -> either.map(DamageSpec::ofFlat, spec -> spec),
                     spec -> spec.isFlatOnly()
                             ? Either.left(spec.base())
-                            : Either.right(spec));
+                            : Either.right(spec)));
 
     public static float resolve(Optional<DamageSpec> spec, Player player,
                                 float source, float fallbackRatio) {
@@ -92,15 +95,15 @@ public record DamageSpec(float base, float ofHit, float ofTargetMaxHealth,
     }
 
     public DamageSpec withDamageType(Optional<String> type) {
-        return new DamageSpec(base, ofHit, ofTargetMaxHealth, ofTargetMissingHealth,
+        return Customs.copy(this, new DamageSpec(base, ofHit, ofTargetMaxHealth, ofTargetMissingHealth,
                 ofSelfMissingHealth, type, school, scaling, scalingMode,
-                proportional, minimum, maximum, multiplier);
+                proportional, minimum, maximum, multiplier));
     }
 
     public DamageSpec withAmounts(float newBase, float newOfHit, float newMultiplier) {
-        return new DamageSpec(newBase, newOfHit, ofTargetMaxHealth, ofTargetMissingHealth,
+        return Customs.copy(this, new DamageSpec(newBase, newOfHit, ofTargetMaxHealth, ofTargetMissingHealth,
                 ofSelfMissingHealth, damageType, school, scaling, scalingMode,
-                proportional, minimum, maximum, newMultiplier);
+                proportional, minimum, maximum, newMultiplier));
     }
 
     public boolean retypes() {
@@ -133,6 +136,7 @@ public record DamageSpec(float base, float ofHit, float ofTargetMaxHealth,
                     : summedBonus(player, total);
         }
         total *= multiplier;
+        total = Customs.modifyDamage(CustomScopes.DAMAGE_SPEC, this, player, player, target, total);
 
         float clamped = Math.max(minimum.orElse(0.0F), total);
         if (maximum.isPresent()) {
@@ -238,7 +242,7 @@ public record DamageSpec(float base, float ofHit, float ofTargetMaxHealth,
 
         public static final float DEFAULT_BASELINE = 6.0F;
 
-        public static final Codec<ScalingEntry> CODEC = RecordCodecBuilder.create(
+        public static final Codec<ScalingEntry> CODEC = Customs.wrap(ScalingEntry.class, RecordCodecBuilder.create(
                 instance -> instance.group(
                         Codec.STRING.fieldOf("source").forGetter(ScalingEntry::source),
                         Codec.FLOAT.optionalFieldOf("per_point", 0.0F)
@@ -248,7 +252,7 @@ public record DamageSpec(float base, float ofHit, float ofTargetMaxHealth,
                                 .forGetter(ScalingEntry::mode),
                         Codec.FLOAT.optionalFieldOf("baseline", DEFAULT_BASELINE)
                                 .forGetter(ScalingEntry::baseline)
-                ).apply(instance, ScalingEntry::new));
+                ).apply(instance, ScalingEntry::new)));
 
         public float bonusFor(Player player, float total) {
             double value = SpellPowerAccess.valueOf(player, source);
@@ -267,10 +271,10 @@ public record DamageSpec(float base, float ofHit, float ofTargetMaxHealth,
     }
 
     public record Share(String damageType, float share) {
-        public static final Codec<Share> CODEC = RecordCodecBuilder.create(
+        public static final Codec<Share> CODEC = Customs.wrap(Share.class, RecordCodecBuilder.create(
                 instance -> instance.group(
                         Codec.STRING.fieldOf("type").forGetter(Share::damageType),
                         Codec.FLOAT.optionalFieldOf("share", FULL_SHARE).forGetter(Share::share)
-                ).apply(instance, Share::new));
+                ).apply(instance, Share::new)));
     }
 }

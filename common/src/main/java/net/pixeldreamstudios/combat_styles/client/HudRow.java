@@ -57,7 +57,7 @@ public record HudRow(ItemStack stack, String itemId, List<Lane> lanes,
                     continue;
                 }
                 claimed.add(effect);
-                if (!collapses) {
+                if (!collapses && timed(owner, effect, definition.effects().get(effect))) {
                     lanes.add(laneFor(owner, effect, definition.effects().get(effect)));
                 }
             }
@@ -66,7 +66,7 @@ public record HudRow(ItemStack stack, String itemId, List<Lane> lanes,
             }
         }
         for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
-            if (claimed.add(named.getKey())) {
+            if (claimed.add(named.getKey()) && timed(owner, named.getKey(), named.getValue())) {
                 lanes.add(laneFor(owner, named.getKey(), named.getValue()));
             }
         }
@@ -83,6 +83,11 @@ public record HudRow(ItemStack stack, String itemId, List<Lane> lanes,
                 : passive(entry) ? LaneState.PASSIVE : LaneState.READY;
         float fill = remaining <= 0 ? 0.0F : 1.0F - CooldownMirror.fill(key);
         return new Lane(name, colourOf(name), state, fill, remaining);
+    }
+
+    private static boolean timed(String owner, String name, TriggeredEffect entry) {
+        return !entry.cooldown().isEmpty()
+                || CooldownMirror.remaining(EffectKeys.of(owner, name)) > 0;
     }
 
     private static boolean passive(TriggeredEffect entry) {

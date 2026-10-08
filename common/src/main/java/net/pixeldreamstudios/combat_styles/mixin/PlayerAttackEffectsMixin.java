@@ -12,18 +12,18 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
-import net.pixeldreamstudios.combat_styles.affix.ResolvedAffixes;
 import net.pixeldreamstudios.combat_styles.equipment.PendingExtraHit;
 import net.pixeldreamstudios.combat_styles.equipment.SwingDrag;
 
 @Mixin(Player.class)
-public abstract class AffixDamageMixin {
+public abstract class PlayerAttackEffectsMixin {
 
     @Inject(method = "attack", at = @At("HEAD"), require = 1)
     private void combat_styles$markAlive(Entity target, CallbackInfo callback) {
         Player player = (Player) (Object) this;
+        CombatEffectDealer.consumeConverted();
         boolean server = !player.level().isClientSide();
         boolean extra = server && PendingExtraHit.index() >= 0;
         boolean swept = server && SwingDrag.claimSwept(player);
@@ -47,7 +47,7 @@ public abstract class AffixDamageMixin {
                     PendingExtraHit.index(), swept, restore);
         }
         DamageDealer.recordConnected(false);
-        AffixDamageDealer.markTargetAlive(target);
+        CombatEffectDealer.markTargetAlive(target);
     }
 
     @Unique
@@ -70,6 +70,7 @@ public abstract class AffixDamageMixin {
     @Inject(method = "attack", at = @At("TAIL"), require = 1)
     private void combat_styles$applyAffix(Entity target, CallbackInfo callback) {
         Player player = (Player) (Object) this;
+        boolean converted = CombatEffectDealer.consumeConverted();
         float dealt = DamageDealer.lastDealtDamage(
                 (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE));
 
@@ -79,14 +80,11 @@ public abstract class AffixDamageMixin {
         if (!DamageDealer.consumeConnected()) {
             return;
         }
-        AffixDamageDealer.recordLanded(player, dealt);
+        CombatEffectDealer.recordLanded(player, dealt);
 
-        ResolvedAffixes resolved =
-                AffixDamageDealer.affixesForCurrentAttack(player,
-                        AffixDamageDealer.swingingWeapon(player));
-        if (resolved.convertsDamage()) {
+        if (converted) {
             return;
         }
-        AffixDamageDealer.onPlayerHit(player, living, dealt);
+        CombatEffectDealer.onPlayerHit(player, living, dealt);
     }
 }

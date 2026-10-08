@@ -3,6 +3,7 @@ package net.pixeldreamstudios.combat_styles.style;
 import com.mojang.serialization.Codec;
 
 import net.pixeldreamstudios.combat_styles.api.SequenceInfo;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -15,10 +16,10 @@ public record StyleSequence(String name, List<StyleEntry> entries) implements Se
 
     public static final StyleSequence EMPTY = new StyleSequence("", List.of());
 
-    public static final Codec<StyleSequence> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<StyleSequence> CODEC = Customs.wrap(StyleSequence.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf("name", "").forGetter(StyleSequence::name),
             StyleEntry.CODEC.listOf().optionalFieldOf("entries", List.of()).forGetter(StyleSequence::entries)
-    ).apply(instance, StyleSequence::new));
+    ).apply(instance, StyleSequence::new)));
 
     private static final int MAX_STREAM_ENTRIES = 64;
 

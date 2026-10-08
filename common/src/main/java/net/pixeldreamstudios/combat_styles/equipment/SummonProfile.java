@@ -6,7 +6,9 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
+import net.pixeldreamstudios.combat_styles.affix.LibraryRef;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.entity.AbilityCaster;
 import net.pixeldreamstudios.combat_styles.entity.AbilityPick;
@@ -84,7 +86,7 @@ public record SummonProfile(Optional<String> entity,
             Codec.BOOL.optionalFieldOf("own_damage", Boolean.FALSE).forGetter(Rules::ownDamage)
     ).apply(instance, Rules::new));
 
-    public static final Codec<SummonProfile> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<SummonProfile> CODEC = Customs.wrap(SummonProfile.class, LibraryRef.wrap(RecordCodecBuilder.create(instance -> instance.group(
             CORE_CODEC.forGetter(profile -> new Core(profile.entity(), List.of(),
                     profile.maxActive(), profile.anchored(), profile.damageMultiplier(),
                     profile.lifespan(), profile.damageScaling(), profile.finale(),
@@ -97,7 +99,7 @@ public record SummonProfile(Optional<String> entity,
             core.maxActive(), core.anchored(), core.damageMultiplier(), core.lifespan(),
             core.damageScaling(), core.finale(), core.tuning(), core.variants(), rules.exempt(),
             rules.replacedSummonedEntities(), rules.replacesSummons(), rules.companion(),
-            rules.damageSpec(), rules.ownDamage(), cadence)));
+            rules.damageSpec(), rules.ownDamage(), cadence))), LibraryRef.SUMMON_KEY));
 
     public SummonProfile(Optional<String> entity, List<String> abilities,
                          Optional<Integer> maxActive, Optional<Integer> anchored,

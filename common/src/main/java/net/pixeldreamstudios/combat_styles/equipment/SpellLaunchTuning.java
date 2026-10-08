@@ -3,6 +3,8 @@ package net.pixeldreamstudios.combat_styles.equipment;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 public record SpellLaunchTuning(int extraLaunches, int launchDelay, float velocityAdd,
                                 float scaleAdd, float meteorRadiusAdd) {
 
@@ -11,7 +13,7 @@ public record SpellLaunchTuning(int extraLaunches, int launchDelay, float veloci
     public static final SpellLaunchTuning NONE =
             new SpellLaunchTuning(0, SPELL_DELAY, 0.0F, 0.0F, 0.0F);
 
-    public static final Codec<SpellLaunchTuning> CODEC = RecordCodecBuilder.create(
+    public static final Codec<SpellLaunchTuning> CODEC = Customs.wrap(SpellLaunchTuning.class, RecordCodecBuilder.create(
             instance -> instance.group(
                     Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("extra_launches", 0)
                             .forGetter(SpellLaunchTuning::extraLaunches),
@@ -24,7 +26,7 @@ public record SpellLaunchTuning(int extraLaunches, int launchDelay, float veloci
                             .forGetter(SpellLaunchTuning::scaleAdd),
                     Codec.FLOAT.optionalFieldOf("meteor_radius_add", 0.0F)
                             .forGetter(SpellLaunchTuning::meteorRadiusAdd)
-            ).apply(instance, SpellLaunchTuning::new));
+            ).apply(instance, SpellLaunchTuning::new)));
 
     public boolean isEmpty() {
         return equals(NONE);

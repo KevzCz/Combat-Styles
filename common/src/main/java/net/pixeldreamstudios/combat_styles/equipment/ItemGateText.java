@@ -9,6 +9,7 @@ import net.pixeldreamstudios.combat_styles.style.StyleText;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public final class ItemGateText {
 
@@ -34,6 +35,13 @@ public final class ItemGateText {
     private static final String PATH_SEPARATOR = "/";
     private static final String WORD_SEPARATOR = "_";
     private static final String SPACE = " ";
+    private static final String KEY_AND = "tooltip.combat_styles.item_and";
+    private static final String KEY_ENCHANTED = "tooltip.combat_styles.item_enchanted";
+    private static final String KEY_ENCHANT_AT_LEAST = "tooltip.combat_styles.enchant_at_least";
+    private static final String KEY_ENCHANT_AT_MOST = "tooltip.combat_styles.enchant_at_most";
+    private static final String KEY_ENCHANT_BETWEEN = "tooltip.combat_styles.enchant_between";
+    private static final String ENCHANTMENT_PREFIX = "enchantment.";
+    private static final String LEVEL_PREFIX = "enchantment.level.";
 
     private ItemGateText() {
     }
@@ -62,6 +70,8 @@ public final class ItemGateText {
         for (ItemGate.Slotted slot : items.slotted()) {
             addMatch(slot.match(), Component.translatable(KEY_SLOT_PREFIX + slot.key()), parts);
         }
+        items.self().ifPresent(self ->
+                addMatch(self, Component.translatable(KEY_SLOT_PREFIX + ItemGate.SELF), parts));
         for (AccessoryMatch accessory : items.accessories()) {
             if (!accessory.isEmpty()) {
                 addMatch(accessory.match(), accessory.anySlot()
@@ -86,6 +96,41 @@ public final class ItemGateText {
             parts.add(Component.translatable(KEY_WITHOUT, joined(match.excludedItems(),
                     match.excludedTags(), match.excludedCategories()), where));
         }
+        if (!match.enchantments().isEmpty()) {
+            MutableComponent listed = Component.empty();
+            boolean first = true;
+            for (Map.Entry<String, EnchantLevels.Range> entry : match.enchantments().entrySet()) {
+                if (!first) {
+                    listed.append(Component.translatable(match.enchantmentsAny() ? KEY_OR : KEY_AND));
+                }
+                listed.append(enchantmentLine(entry.getKey(), entry.getValue()));
+                first = false;
+            }
+            parts.add(Component.translatable(KEY_ENCHANTED, where, listed));
+        }
+    }
+
+    private static Component enchantmentLine(String id, EnchantLevels.Range range) {
+        ResourceLocation key = ResourceLocation.tryParse(id);
+        Component name = key == null
+                ? Component.literal(id)
+                : Component.translatableWithFallback(ENCHANTMENT_PREFIX + key.getNamespace()
+                        + KEY_SEPARATOR + key.getPath(), StyleText.prettify(key.getPath()));
+        if (range.min().isPresent() && range.max().isPresent()) {
+            return Component.translatable(KEY_ENCHANT_BETWEEN, name, level(range.min().get()),
+                    level(range.max().get()));
+        }
+        if (range.min().isPresent()) {
+            return Component.translatable(KEY_ENCHANT_AT_LEAST, name, level(range.min().get()));
+        }
+        if (range.max().isPresent()) {
+            return Component.translatable(KEY_ENCHANT_AT_MOST, name, level(range.max().get()));
+        }
+        return name;
+    }
+
+    private static Component level(int value) {
+        return Component.translatableWithFallback(LEVEL_PREFIX + value, String.valueOf(value));
     }
 
     private static Component joined(List<String> items, List<String> tags, List<String> categories) {

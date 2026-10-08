@@ -232,12 +232,33 @@ public final class AffixMechanics {
         if (!condition.state().matches(player, target)) {
             return false;
         }
+        if (!condition.targetEffects().isEmpty() && !afflicted(target, condition.targetEffects())) {
+            return false;
+        }
+        if (condition.targetBurning().isPresent()
+                && (target == null || target.isOnFire() != condition.targetBurning().get())) {
+            return false;
+        }
         if (!DamageTypeMatch.matches(condition.takenDamageType(),
                 CombatState.lastDamageType(player))) {
             return false;
         }
         return condition.onMiss().isEmpty()
                 || condition.onMiss().get() == CombatState.lastSwingMissed(player);
+    }
+
+    private static boolean afflicted(LivingEntity target, List<String> effects) {
+        if (target == null) {
+            return false;
+        }
+        for (String raw : effects) {
+            ResourceLocation id = ResourceLocation.tryParse(raw);
+            if (id != null && BuiltInRegistries.MOB_EFFECT.getHolder(id)
+                    .map(target::hasEffect).orElse(false)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean selfConditionMet(AffixEffects.Condition condition, Player player) {
@@ -628,7 +649,12 @@ public final class AffixMechanics {
 
     public static void applyOrder(ServerLevel level, Player player, LivingEntity target,
                                   AffixEffects.Order order, float dealtDamage) {
-        if (order.isEmpty() || !EffectChance.rolls(player, order.chance())) {
+        order.quicken().ifPresent(quicken -> {
+            if (EffectChance.rolls(player, quicken.chance())) {
+                AbilityHosts.quicken(player, quicken.ratio());
+            }
+        });
+        if (!order.ordersAbility() || !EffectChance.rolls(player, order.chance())) {
             return;
         }
         if (!AbilityRegistry.has(order.ability())) {

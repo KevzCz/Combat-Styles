@@ -3,6 +3,7 @@ package net.pixeldreamstudios.combat_styles.equipment;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.entity.AbilityPick;
 import net.pixeldreamstudios.combat_styles.entity.SummonAim;
 
@@ -16,14 +17,14 @@ public record SummonActives(List<AbilityUse> abilities, Optional<AbilityPick> pi
     public static final String KEY_ABILITIES = "abilities";
     public static final String KEY_PICK = "pick";
 
-    public static final Codec<SummonActives> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<SummonActives> CODEC = Customs.wrap(SummonActives.class, RecordCodecBuilder.create(instance -> instance.group(
             AbilityUse.CODEC.listOf().optionalFieldOf(KEY_ABILITIES, List.of())
                     .forGetter(SummonActives::abilities),
             AbilityPick.CODEC.optionalFieldOf(KEY_PICK).forGetter(SummonActives::pick),
             Codec.INT.optionalFieldOf(SummonCadence.KEY_RECAST_TICKS)
                     .forGetter(SummonActives::recastTicks),
             SummonAim.CODEC.optionalFieldOf(SummonCadence.KEY_AIM).forGetter(SummonActives::aim)
-    ).apply(instance, SummonActives::new));
+    ).apply(instance, SummonActives::new)));
 
     public static final SummonActives SAMPLE = new SummonActives(List.of(AbilityUse.SAMPLE),
             Optional.of(AbilityPick.RANDOM), Optional.empty(), Optional.empty());

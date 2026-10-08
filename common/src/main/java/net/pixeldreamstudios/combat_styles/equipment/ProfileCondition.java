@@ -4,6 +4,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.entity.player.Player;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -13,14 +15,14 @@ public record ProfileCondition(Optional<String> effect,
                                Optional<String> equipped,
                                boolean inverted) {
 
-    public static final Codec<ProfileCondition> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<ProfileCondition> CODEC = Customs.wrap(ProfileCondition.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf("effect").forGetter(ProfileCondition::effect),
             Codec.STRING.optionalFieldOf("holding").forGetter(ProfileCondition::holding),
             Codec.STRING.optionalFieldOf("wearing").forGetter(ProfileCondition::wearing),
             Codec.STRING.optionalFieldOf("equipped").forGetter(ProfileCondition::equipped),
             Codec.BOOL.optionalFieldOf("inverted", Boolean.FALSE)
                     .forGetter(ProfileCondition::inverted)
-    ).apply(instance, ProfileCondition::new));
+    ).apply(instance, ProfileCondition::new)));
 
     public static final Codec<List<ProfileCondition>> LIST_CODEC = CODEC.listOf();
 

@@ -4,7 +4,7 @@ import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.equipment.SequenceSlots;
 import net.pixeldreamstudios.combat_styles.equipment.SubstitutionScope;
@@ -50,7 +50,7 @@ public final class AttackShaping {
 
     private static AttackBehaviour withAffixes(Player player, AttackBehaviour behaviour,
                                                StyleEntry entry, StylePage page) {
-        List<StyleAffix> affixes = AffixDamageDealer
+        List<StyleAffix> affixes = CombatEffectDealer
                 .affixesForCurrentAttack(player, player.getMainHandItem())
                 .restrictedTo(page).affixes();
         if (affixes.isEmpty()) {

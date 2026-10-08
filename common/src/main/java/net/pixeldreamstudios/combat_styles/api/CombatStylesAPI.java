@@ -18,7 +18,7 @@ import net.minecraft.world.item.ItemStack;
 import net.pixeldreamstudios.combat_styles.equipment.SummonProfiles;
 import net.pixeldreamstudios.combat_styles.DataIntegrity;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.damage.DamageHurt;
 import net.pixeldreamstudios.combat_styles.affix.HitStreaks;
@@ -245,7 +245,7 @@ public final class CombatStylesAPI {
     }
 
     public static AffixInfo affixOnCurrentAttack(Player player, ItemStack stack) {
-        return AffixDamageDealer.affixForCurrentAttack(player, stack);
+        return CombatEffectDealer.affixForCurrentAttack(player, stack);
     }
 
     public static ItemStack affixedPage(String styleId, String affixId) {
@@ -253,7 +253,7 @@ public final class CombatStylesAPI {
     }
 
     public static String entryKey(String styleId, String affixId) {
-        return StyleEntry.key(styleId, affixId);
+        return StyleEntry.key(StyleRegistry.representativeOf(styleId), affixId);
     }
 
     public static StylePage styleByAnimation(String animation, String category) {
@@ -265,7 +265,7 @@ public final class CombatStylesAPI {
     }
 
     public static List<? extends AffixInfo> affixesOnCurrentAttack(Player player, ItemStack stack) {
-        return AffixDamageDealer.affixesForCurrentAttack(player, stack).affixes();
+        return CombatEffectDealer.affixesForCurrentAttack(player, stack).affixes();
     }
 
     public static boolean hurtBypassingIFrames(LivingEntity target, DamageSource source, float amount) {

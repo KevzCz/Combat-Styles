@@ -1,12 +1,13 @@
 package net.pixeldreamstudios.combat_styles.affix;
 
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.entity.ConfigurableSummon;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.mixin.ArrowPickupAccessor;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
-import net.pixeldreamstudios.combat_styles.entity.SummonData;
 import net.pixeldreamstudios.combat_styles.entity.SlashWaveEntity;
 import net.pixeldreamstudios.combat_styles.equipment.SpellTuning;
 import net.minecraft.world.entity.Entity;
@@ -22,11 +23,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Items;
 import net.minecraft.core.registries.BuiltInRegistries;
 
-public final class AffixProjectiles {
+import java.util.ArrayList;
+import java.util.List;
+
+public final class ProjectileLaunches {
 
     private static final String PROJECTILE_DEBUG = "projectile";
 
-    private AffixProjectiles() {
+    private ProjectileLaunches() {
     }
 
     private static void shootSpellProjectiles(Player player, LivingEntity target,
@@ -131,7 +135,7 @@ public final class AffixProjectiles {
             if (spawn.velocity().overridesGravity()) {
                 spawned.setNoGravity(true);
             }
-            applyProjectileDamage(player, spawned, projectile, hitDamage);
+            float carriedDamage = applyProjectileDamage(player, spawned, projectile, hitDamage);
             if (spawned instanceof AbstractArrow arrow) {
                 arrow.pickup = AbstractArrow.Pickup.DISALLOWED;
                 if (arrow.getPickupItemStackOrigin().isEmpty()) {
@@ -139,35 +143,43 @@ public final class AffixProjectiles {
                             .combat_styles$setPickupItemStack(new ItemStack(Items.ARROW));
                 }
             }
-            ProjectileUpkeep.track(player, spawned, projectile);
+            ProjectileUpkeep.track(player, spawned, projectile, triggeringDamage, carriedDamage, false);
             level.addFreshEntity(spawned);
+            Customs.spawned(CustomScopes.PROJECTILE, projectile, player, player, spawned);
         }
     }
 
     public static void spawnFrom(ServerLevel level, Player player, Entity origin,
                                  LivingEntity target, AffixEffects.Projectile projectile,
                                  float triggeringDamage) {
+        spawnFrom(level, player, origin, target, projectile, triggeringDamage, origin != player);
+    }
+
+    public static List<Entity> spawnFrom(ServerLevel level, Player player, Entity origin,
+                                         LivingEntity target, AffixEffects.Projectile projectile,
+                                         float triggeringDamage, boolean viaSummon) {
+        List<Entity> launched = new ArrayList<>();
         if (origin == null || !EffectChance.rolls(player, projectile.chance())) {
-            return;
+            return launched;
         }
         int count = Math.max(1, projectile.count());
         if (!projectile.spellProjectile().isEmpty()) {
             ResourceLocation spellId = ResourceLocation.tryParse(projectile.spellProjectile().spell());
             if (spellId == null || !SpellEngineCompat.isLoaded()) {
-                return;
+                return launched;
             }
             float damage = spellDamageOf(player, projectile, triggeringDamage);
             DamageSpec spec = projectile.damageSpec().orElse(null);
             for (int shot = 0; shot < count; shot++) {
                 Object tag = SpellEngineCompat.shootSpell(player, spellId, target, damage,
                         projectile.spellProjectile().tuning(),
-                        launched -> SpellShotPlacement.expectFrom(launched, player, target, origin));
+                        fired -> SpellShotPlacement.expectFrom(fired, player, target, origin));
                 if (tag == null) {
-                    return;
+                    return launched;
                 }
                 ProjectileUpkeep.watchSpellShot(tag, player, spec, projectile.ignoreIframes());
             }
-            return;
+            return launched;
         }
         ResourceLocation entityId = ResourceLocation.tryParse(projectile.entity());
         EntityType<?> type = entityId == null
@@ -175,7 +187,7 @@ public final class AffixProjectiles {
                 : BuiltInRegistries.ENTITY_TYPE.getOptional(entityId).orElse(null);
         if (type == null) {
             CombatStyles.LOGGER.warn("Ability projectile entity {} does not exist", projectile.entity());
-            return;
+            return launched;
         }
         Vec3 from = origin instanceof ConfigurableSummon summon
                 ? summon.abilityOrigin()
@@ -188,7 +200,7 @@ public final class AffixProjectiles {
         for (int i = 0; i < count; i++) {
             Entity spawned = type.create(level);
             if (spawned == null) {
-                return;
+                return launched;
             }
             Vec3 direction = jitter(aimed, projectile.spread(), player);
             spawned.setPos(from.x, from.y, from.z);
@@ -205,7 +217,7 @@ public final class AffixProjectiles {
             if (projectile.spawn().velocity().overridesGravity()) {
                 spawned.setNoGravity(true);
             }
-            applyProjectileDamage(player, spawned, projectile, hitDamage);
+            float carriedDamage = applyProjectileDamage(player, spawned, projectile, hitDamage);
             if (spawned instanceof AbstractArrow arrow) {
                 arrow.pickup = AbstractArrow.Pickup.DISALLOWED;
                 if (arrow.getPickupItemStackOrigin().isEmpty()) {
@@ -213,9 +225,13 @@ public final class AffixProjectiles {
                             .combat_styles$setPickupItemStack(new ItemStack(Items.ARROW));
                 }
             }
-            ProjectileUpkeep.track(player, spawned, projectile);
+            ProjectileUpkeep.track(player, spawned, projectile, triggeringDamage, carriedDamage,
+                    viaSummon);
             level.addFreshEntity(spawned);
+            Customs.spawned(CustomScopes.PROJECTILE, projectile, player, origin, spawned);
+            launched.add(spawned);
         }
+        return launched;
     }
 
     private static float projectileDamage(Player player, AffixEffects.Projectile projectile,
@@ -226,30 +242,21 @@ public final class AffixProjectiles {
         return Math.max(0.0F, projectile.damage());
     }
 
-    private static void applyProjectileDamage(Player player, Entity spawned,
-                                              AffixEffects.Projectile projectile,
-                                              float hitDamage) {
+    private static float applyProjectileDamage(Player player, Entity spawned,
+                                               AffixEffects.Projectile projectile,
+                                               float hitDamage) {
         if (hitDamage <= 0.0F) {
-            return;
+            return ProjectileUpkeep.NO_CARRIED;
         }
         if (spawned instanceof AbstractArrow arrow) {
             arrow.setBaseDamage(hitDamage);
-            return;
-        }
-        if (spawned instanceof SummonData data) {
-            data.combat_styles$setSummonOwner(player);
-            data.combat_styles$setSummonDamage(hitDamage);
-            data.combat_styles$setSummonSpec(projectile.damageSpec().orElse(null));
-            if (CombatDebug.enabled(player)) {
-                CombatDebug.fired(player, PROJECTILE_DEBUG,
-                        projectile.entity() + " carries " + hitDamage + " via summon data");
-            }
-            return;
+            return ProjectileUpkeep.NO_CARRIED;
         }
         if (CombatDebug.enabled(player)) {
-            CombatDebug.skipped(player, PROJECTILE_DEBUG,
-                    projectile.entity() + " cannot carry a damage value");
+            CombatDebug.fired(player, PROJECTILE_DEBUG,
+                    projectile.entity() + " carries " + hitDamage);
         }
+        return hitDamage;
     }
 
     private static Vec3 jitter(Vec3 direction, float spread, Player player) {

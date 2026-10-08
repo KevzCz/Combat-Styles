@@ -7,6 +7,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.damage.DamageBonus;
 import net.pixeldreamstudios.combat_styles.style.AttackOverride;
 
@@ -49,7 +50,7 @@ public record EquipmentEffect(Optional<String> substituteStyle,
 
     public static final String KEY_SUMMON_ORDER = "summon_order";
 
-    public static final Codec<EquipmentEffect> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<EquipmentEffect> CODEC = Customs.wrap(EquipmentEffect.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf("substitute_style").forGetter(EquipmentEffect::substituteStyle),
             AttackOverride.CODEC.optionalFieldOf("augment").forGetter(EquipmentEffect::augment),
             Codec.STRING.listOf().optionalFieldOf("grant_affixes", List.of())
@@ -78,7 +79,7 @@ public record EquipmentEffect(Optional<String> substituteStyle,
     ).apply(instance, (substitute, augment, grants, swing, hit, reset, tune, echo, attributes, substitution,
                        replacement, summon, dive, spells, bonuses, events) -> new EquipmentEffect(substitute,
             augment, grants, swing, hit, reset, tune, echo, attributes, substitution, replacement,
-            summon.profile(), dive, spells, bonuses, events, summon.grant())));
+            summon.profile(), dive, spells, bonuses, events, summon.grant()))));
 
     public EquipmentEffect {
         grantAffixes = grantAffixes == null ? List.of() : List.copyOf(grantAffixes);
@@ -124,7 +125,7 @@ public record EquipmentEffect(Optional<String> substituteStyle,
         merged.putAll(other.attributes());
         List<DamageBonus> bonuses = new ArrayList<>(damageBonus);
         bonuses.addAll(other.damageBonus());
-        return new EquipmentEffect(substituteStyle.or(other::substituteStyle),
+        return Customs.merged(this, other, new EquipmentEffect(substituteStyle.or(other::substituteStyle),
                 augment.or(other::augment), grants,
                 onSwing.or(other::onSwing), onHit.or(other::onHit),
                 resetCombo.or(other::resetCombo), tuning,
@@ -132,7 +133,7 @@ public record EquipmentEffect(Optional<String> substituteStyle,
                 summonReplacement.or(other::summonReplacement),
                 summonProfile.or(other::summonProfile),
                 summonDive.or(other::summonDive), spells.mergedWith(other.spells()), bonuses,
-                events.mergedWith(other.events()), grantAbilities.or(other::grantAbilities));
+                events.mergedWith(other.events()), grantAbilities.or(other::grantAbilities)));
     }
 
     public boolean hasAlwaysOnParts() {
@@ -152,6 +153,7 @@ public record EquipmentEffect(Optional<String> substituteStyle,
                 && tuneAffixes.isEmpty() && echo.isEmpty() && attributes.isEmpty()
                 && substitution.isEmpty() && summonReplacement.isEmpty()
                 && summonProfile.isEmpty() && summonDive.isEmpty() && spells.isEmpty()
-                && damageBonus.isEmpty() && events.isEmpty() && grantAbilities.isEmpty();
+                && damageBonus.isEmpty() && events.isEmpty() && grantAbilities.isEmpty()
+                && !Customs.has(this);
     }
 }

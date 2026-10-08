@@ -94,22 +94,24 @@ public final class StateEdges {
             EquipmentDefinition definition = piece.definition();
             String owner = piece.owner();
             worn.add(owner);
-            for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
-                TriggeredEffect entry = named.getValue();
-                if (tracked(entry)) {
-                    step(player, definition, owner, named.getKey(), entry.trigger(),
-                            entry.cooldown(), swings,
-                            !EquipmentDefinition.substitutes(entry.effect()), previous, current);
+            OwnerScope.run(piece.stack(), () -> {
+                for (Map.Entry<String, TriggeredEffect> named : definition.effects().entrySet()) {
+                    TriggeredEffect entry = named.getValue();
+                    if (tracked(entry)) {
+                        step(player, definition, owner, named.getKey(), entry.trigger(),
+                                entry.cooldown(), swings,
+                                !EquipmentDefinition.substitutes(entry.effect()), previous, current);
+                    }
                 }
-            }
-            for (Map.Entry<String, EffectGroup> named : definition.groups().entrySet()) {
-                EffectGroup group = named.getValue();
-                if (tracked(definition, group)) {
-                    step(player, definition, owner, groupKey(named.getKey()), group.trigger(),
-                            group.cooldown(), swings, !definition.groupSubstitutes(group),
-                            previous, current);
+                for (Map.Entry<String, EffectGroup> named : definition.groups().entrySet()) {
+                    EffectGroup group = named.getValue();
+                    if (tracked(definition, group)) {
+                        step(player, definition, owner, groupKey(named.getKey()), group.trigger(),
+                                group.cooldown(), swings, !definition.groupSubstitutes(group),
+                                previous, current);
+                    }
                 }
-            }
+            });
         }
         GroupDraw.retainWorn(player, worn);
         Map<String, Long> since = SINCE.computeIfAbsent(player.getUUID(),

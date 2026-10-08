@@ -6,6 +6,7 @@ import com.mojang.serialization.JsonOps;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -15,8 +16,11 @@ import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.platform.WeaponRegistryAccess;
 
+import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
+import net.pixeldreamstudios.combat_styles.affix.LibraryRef;
 import net.pixeldreamstudios.combat_styles.style.InnateAffixes;
 import net.pixeldreamstudios.combat_styles.equipment.ActiveIn;
+import net.pixeldreamstudios.combat_styles.equipment.SwingHands;
 import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
 import net.pixeldreamstudios.combat_styles.equipment.EffectCooldown;
 import net.pixeldreamstudios.combat_styles.equipment.EffectGroup;
@@ -25,6 +29,7 @@ import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.network.EditConfigPayload;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentEffect;
 import net.pixeldreamstudios.combat_styles.equipment.PoseTuning;
+import net.pixeldreamstudios.combat_styles.equipment.SummonProfile;
 import net.pixeldreamstudios.combat_styles.equipment.UseSpec;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentTrigger;
 import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
@@ -36,6 +41,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -51,6 +57,7 @@ public class EquipmentDetailScreen extends PanelScreen {
     private static final int FOOTER = 30;
     private static final int ROW_HEIGHT = 20;
     private static final int GAP = 4;
+    private static final int FOOTER_TEXT_PAD = 4;
     private static final int TITLE_Y = 10;
     private static final int ID_Y = 24;
     private static final int ID_HEIGHT = 14;
@@ -101,13 +108,28 @@ public class EquipmentDetailScreen extends PanelScreen {
     private static final String KEY_ACTIVE_IN = "screen.combat_styles.equipment_active_in";
     private static final String KEY_ACTIVE_IN_PREFIX = "screen.combat_styles.equipment_active_in.";
     private static final String KEY_ACTIVE_IN_HINT = "hint.combat_styles.active_in";
-    private static final int META_COLUMNS = 3;
+    private static final String KEY_SWINGS = "screen.combat_styles.equipment_swings";
+    private static final String KEY_SWINGS_PREFIX = "screen.combat_styles.equipment_swings.";
+    private static final String KEY_SWINGS_HINT = "hint.combat_styles.swings";
+    private static final String KEY_SCOPE_HIDDEN = "screen.combat_styles.equipment_scope_hidden";
+    private static final String KEY_RARITY_HINT = "hint.combat_styles.equipment_rarity";
+    private static final int RIGHT_BUTTON = 1;
+    private static final int META_COLUMNS = 4;
     private static final String KEY_CATEGORY_PICKER = "screen.combat_styles.weapon_category_picker";
     private static final String KEY_USE = "screen.combat_styles.equipment_use";
     private static final String KEY_PASSIVES = "screen.combat_styles.equipment_passives";
     private static final String KEY_TARGETS = "screen.combat_styles.equipment_targets";
     private static final String KEY_APPLIES_ID = "screen.combat_styles.equipment_applies_id";
     private static final String KEY_APPLIES_BOUND = "screen.combat_styles.equipment_applies_bound";
+    private static final String KEY_PROJECTILES = "screen.combat_styles.equipment_projectiles";
+    private static final String KEY_LIBRARY_NAME = "screen.combat_styles.equipment_library_name";
+    private static final String KEY_SUMMON_PROFILES = "screen.combat_styles.equipment_summon_profiles";
+    private static final String KEY_SUMMON_PROFILE_HINT = "screen.combat_styles.equipment_summon_profile.hint";
+    private static final String KEY_ENTITIES = "screen.combat_styles.equipment_entities";
+    private static final String KEY_REMOVE_OVERRIDE = "screen.combat_styles.equipment_remove_override";
+    private static final String KEY_PROJECTILE_HINT = "screen.combat_styles.equipment_projectile.hint";
+    private static final String NAME_SEPARATOR = "_";
+    private static final String WHITESPACE = "\\s+";
 
     private final Consumer<EquipmentDefinition> onSave;
     private final String definitionId;
@@ -115,6 +137,10 @@ public class EquipmentDetailScreen extends PanelScreen {
     private final List<InnateAffixes.Slot> innate = new ArrayList<>();
     private final Map<String, EffectGroup> groups = new LinkedHashMap<>();
     private final Map<String, AttributeBonus> passiveAttributes = new LinkedHashMap<>();
+    private final Map<String, AffixEffects.Projectile> projectiles = new LinkedHashMap<>();
+    private final Map<String, SummonProfile> summonProfiles = new LinkedHashMap<>();
+    private final List<DropdownMenu> menus = new ArrayList<>();
+    private Runnable onClear;
     private static final Codec<Map<String, AttributeBonus>> ATTRIBUTE_MAP_CODEC =
             Codec.unboundedMap(Codec.STRING, AttributeBonus.EXPANDED);
 
@@ -129,6 +155,9 @@ public class EquipmentDetailScreen extends PanelScreen {
     private UseSpec use = UseSpec.NONE;
     private Optional<String> weaponCategory;
     private ActiveIn activeIn;
+    private SwingHands swings;
+    private boolean hideScopeTooltip;
+    private boolean hideRarity;
     private final List<String> matchItems = new ArrayList<>();
     private final List<String> matchTags = new ArrayList<>();
     private final List<String> matchCategories = new ArrayList<>();
@@ -154,6 +183,8 @@ public class EquipmentDetailScreen extends PanelScreen {
         this.innate.addAll(definition.innateAffixes());
         this.groups.putAll(definition.groups());
         this.passiveAttributes.putAll(definition.attributes());
+        this.projectiles.putAll(definition.projectiles());
+        this.summonProfiles.putAll(definition.summonProfiles());
         this.rarity = definition.rarity();
         this.pose = definition.pose();
         this.offHandPose = definition.offHandPose();
@@ -161,6 +192,9 @@ public class EquipmentDetailScreen extends PanelScreen {
         this.use = definition.use();
         this.weaponCategory = definition.weaponCategory();
         this.activeIn = definition.activeIn();
+        this.swings = definition.swings();
+        this.hideScopeTooltip = definition.hideScopeTooltip();
+        this.hideRarity = definition.hideRarity();
         this.matchItems.addAll(definition.items());
         this.matchTags.addAll(definition.itemTags());
         this.matchCategories.addAll(definition.weaponCategories());
@@ -268,6 +302,8 @@ public class EquipmentDetailScreen extends PanelScreen {
 
     @Override
     protected void layout() {
+        EffectChoices.offerLibraries(projectiles::keySet, summonProfiles::keySet);
+        menus.clear();
         dock.place(left, top, PANEL_WIDTH, width, height);
         refreshPreview();
         idBox = new FieldBox(font, contentLeft() + ID_LABEL_WIDTH, top + ID_Y,
@@ -300,23 +336,15 @@ public class EquipmentDetailScreen extends PanelScreen {
                             TARGET_BUTTON_WIDTH, TARGET_BUTTON_HEIGHT).build());
         }
 
-        int buttonY = top + PANEL_HEIGHT - ScreenTheme.BUTTON_HEIGHT - ScreenTheme.PADDING;
-        boolean resettable = EquipmentRegistry.isOverridden(definitionId);
-        int slots = resettable ? 10 : 9;
-        int span = PANEL_WIDTH - ScreenTheme.PADDING * 2;
-        int slotWidth = (span - GAP * (slots - 1)) / slots;
-        int slot = 0;
+        boolean resettable = !perStack && EquipmentRegistry.isOverridden(definitionId);
+        boolean removable = perStack && onClear != null;
+        List<Button> footer = new ArrayList<>();
+        Set<Button> anchors = new LinkedHashSet<>();
 
-        addRenderableWidget(PanelButton.of(Component.translatable(KEY_ADD),
-                        button -> addEffect())
-                .bounds(buttonX(slot++, slotWidth), buttonY,
-                        slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        addRenderableWidget(PanelButton.of(Component.translatable(KEY_ADD_GROUP),
-                        button -> addGroup())
-                .bounds(buttonX(slot++, slotWidth), buttonY,
-                        slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
+        footer.add(footerButton(Component.translatable(KEY_ADD), button -> addEffect()));
+        footer.add(footerButton(Component.translatable(KEY_ADD_GROUP), button -> addGroup()));
         if (resettable) {
-            addRenderableWidget(PanelButton.of(Component.translatable(KEY_RESET), button -> {
+            footer.add(footerButton(Component.translatable(KEY_RESET), button -> {
                 if (!ConfigEdits.permitted()) {
                     ConfigEdits.tell(ConfigEdits.operatorOnly());
                     return;
@@ -324,41 +352,71 @@ public class EquipmentDetailScreen extends PanelScreen {
                 ConfigEdits.remove(EditConfigPayload.Kind.EQUIPMENT_CLEAR, definitionId);
                 EquipmentRegistry.restoreLocal(definitionId);
                 minecraft.setScreen(parent);
-            }).bounds(buttonX(slot++, slotWidth), buttonY,
-                    slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
+            }));
         }
-        addRenderableWidget(PanelButton.of(Component.translatable(KEY_PASSIVES),
-                        button -> openPassives())
-                .bounds(buttonX(slot++, slotWidth), buttonY,
-                        slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        addRenderableWidget(PanelButton.of(Component.translatable(KEY_POSE),
-                        button -> openPoses())
-                .bounds(buttonX(slot++, slotWidth), buttonY,
-                        slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        addRenderableWidget(PanelButton.of(Component.translatable(KEY_CATEGORY),
-                        button -> openWeaponCategory())
-                .bounds(buttonX(slot++, slotWidth), buttonY,
-                        slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        addRenderableWidget(PanelButton.of(useLabel(),
-                        button -> openUse())
-                .bounds(buttonX(slot++, slotWidth), buttonY,
-                        slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        addRenderableWidget(PanelButton.of(Component.translatable(KEY_EXPORT),
-                        button -> export())
-                .bounds(buttonX(slot++, slotWidth), buttonY,
-                        slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        addRenderableWidget(PanelButton.of(Component.translatable(KEY_CLOSE),
-                        button -> minecraft.setScreen(parent))
-                .bounds(buttonX(slot++, slotWidth), buttonY,
-                        slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        addRenderableWidget(PanelButton.of(Component.translatable(KEY_APPLY),
-                        button -> save())
-                .bounds(buttonX(slot, slotWidth), buttonY,
-                        slotWidth, ScreenTheme.BUTTON_HEIGHT).build());
+        if (removable) {
+            footer.add(footerButton(Component.translatable(KEY_REMOVE_OVERRIDE), button -> onClear.run()));
+        }
+        footer.add(footerButton(Component.translatable(KEY_PASSIVES), button -> openPassives()));
+        Button entities = footerButton(Component.translatable(KEY_ENTITIES),
+                button -> openLibrary(projectileLibrary()));
+        footer.add(entities);
+        anchors.add(entities);
+        menus.add(new DropdownMenu(entities, List.of(
+                DropdownMenu.Option.always(Component.translatable(KEY_PROJECTILES),
+                        () -> openLibrary(projectileLibrary())),
+                DropdownMenu.Option.always(Component.translatable(KEY_SUMMON_PROFILES),
+                        () -> openLibrary(summonLibrary())))));
+        Button looks = footerButton(Component.translatable(KEY_POSE), button -> openPoses());
+        footer.add(looks);
+        anchors.add(looks);
+        menus.add(new DropdownMenu(looks, List.of(
+                DropdownMenu.Option.always(Component.translatable(KEY_POSE), this::openPoses),
+                DropdownMenu.Option.always(Component.translatable(KEY_CATEGORY),
+                        this::openWeaponCategory))));
+        footer.add(footerButton(useLabel(), button -> openUse()));
+        footer.add(footerButton(Component.translatable(KEY_EXPORT), button -> export()));
+        footer.add(footerButton(Component.translatable(KEY_CLOSE), button -> minecraft.setScreen(parent)));
+        footer.add(footerButton(Component.translatable(KEY_APPLY), button -> save()));
+        layoutFooter(footer, anchors);
     }
 
-    private int buttonX(int slot, int slotWidth) {
-        return left + ScreenTheme.PADDING + slot * (slotWidth + GAP);
+    private Button footerButton(Component label, Button.OnPress action) {
+        return addRenderableWidget(PanelButton.of(label, action)
+                .bounds(0, top + PANEL_HEIGHT - ScreenTheme.BUTTON_HEIGHT - ScreenTheme.PADDING,
+                        0, ScreenTheme.BUTTON_HEIGHT).build());
+    }
+
+    private void layoutFooter(List<Button> footer, Set<Button> anchors) {
+        int span = PANEL_WIDTH - ScreenTheme.PADDING * 2 - GAP * (footer.size() - 1);
+        int[] widths = new int[footer.size()];
+        int natural = 0;
+        for (int index = 0; index < footer.size(); index++) {
+            Button button = footer.get(index);
+            widths[index] = font.width(button.getMessage()) + FOOTER_TEXT_PAD * 2
+                    + (anchors.contains(button) ? DropdownMenu.caretWidth(font) : 0);
+            natural += widths[index];
+        }
+        int spare = span - natural;
+        int x = left + ScreenTheme.PADDING;
+        for (int index = 0; index < footer.size(); index++) {
+            int share = spare >= 0
+                    ? spare / footer.size() + (index < spare % footer.size() ? 1 : 0)
+                    : (int) ((long) spare * widths[index] / natural);
+            int width = widths[index] + share;
+            if (index == footer.size() - 1) {
+                width = left + ScreenTheme.PADDING + PANEL_WIDTH - ScreenTheme.PADDING * 2 - x;
+            }
+            Button button = footer.get(index);
+            button.setX(x);
+            button.setWidth(width);
+            x += width + GAP;
+        }
+    }
+
+    public EquipmentDetailScreen clearingWith(Runnable clear) {
+        this.onClear = clear;
+        return this;
     }
 
     private boolean matchesItem(String id) {
@@ -504,6 +562,58 @@ public class EquipmentDetailScreen extends PanelScreen {
                 }).withSchema(EffectSchema.ROOT_ATTRIBUTE_MAP));
     }
 
+    private record Library<T>(String titleKey, String hintKey, Map<String, T> entries, T sample,
+                              Codec<T> codec, String schema) {
+    }
+
+    private Library<AffixEffects.Projectile> projectileLibrary() {
+        return new Library<>(KEY_PROJECTILES, KEY_PROJECTILE_HINT, projectiles,
+                EffectSchema.SAMPLE_PROJECTILE, AffixEffects.Projectile.CODEC,
+                EffectSchema.ROOT_PROJECTILE);
+    }
+
+    private Library<SummonProfile> summonLibrary() {
+        return new Library<>(KEY_SUMMON_PROFILES, KEY_SUMMON_PROFILE_HINT, summonProfiles,
+                SummonProfile.EMPTY, SummonProfile.CODEC, EffectSchema.ROOT_SUMMON_PROFILE);
+    }
+
+    private <T> void openLibrary(Library<T> library) {
+        minecraft.setScreen(new EquipmentListScreen(this,
+                Component.translatable(library.titleKey()),
+                library.entries().keySet().stream()
+                        .map(name -> new EquipmentListScreen.Entry(name,
+                                Component.literal(LibraryRef.refTo(name))))
+                        .toList(),
+                () -> minecraft.setScreen(new ChoicePickerScreen(this,
+                        Component.translatable(KEY_LIBRARY_NAME),
+                        List.copyOf(library.entries().keySet()), null, picked -> {
+                            library.entries().putIfAbsent(picked, library.sample());
+                            openLibraryEntry(library, picked);
+                        }).creatingNew(EquipmentDetailScreen::libraryName).handingOffOnPick()),
+                library.entries()::remove,
+                name -> openLibraryEntry(library, name),
+                name -> List.of(Component.literal(LibraryRef.refTo(name)),
+                        Component.translatable(library.hintKey())
+                                .withStyle(ChatFormatting.GRAY))));
+    }
+
+    private <T> void openLibraryEntry(Library<T> library, String name) {
+        T current = library.entries().get(name);
+        if (current == null) {
+            return;
+        }
+        minecraft.setScreen(new EffectTreeScreen(this,
+                Component.literal(LibraryRef.refTo(name)),
+                library.codec(), current,
+                saved -> library.entries().put(name, saved.orElse(current)))
+                .withSchema(library.schema()));
+    }
+
+    private static Optional<String> libraryName(String typed) {
+        String name = LibraryRef.nameOf(typed == null ? "" : typed.trim())
+                .toLowerCase(Locale.ROOT).replaceAll(WHITESPACE, NAME_SEPARATOR);
+        return name.isBlank() ? Optional.empty() : Optional.of(name);
+    }
     private Component useLabel() {
         return Component.translatable(KEY_USE);
     }
@@ -534,7 +644,9 @@ public class EquipmentDetailScreen extends PanelScreen {
                 pose, offHandPose, poseTuning, List.copyOf(matchItems),
                 List.copyOf(matchTags), List.copyOf(matchCategories),
                 List.copyOf(excludeItems), List.copyOf(excludeTags),
-                List.copyOf(excludeCategories), use, weaponCategory, activeIn);
+                List.copyOf(excludeCategories), use, weaponCategory, activeIn, swings, hideScopeTooltip,
+                hideRarity).withProjectiles(Map.copyOf(projectiles))
+                .withSummonProfiles(Map.copyOf(summonProfiles));
     }
 
     private void export() {
@@ -669,7 +781,8 @@ public class EquipmentDetailScreen extends PanelScreen {
         if (current == null) {
             return;
         }
-        minecraft.setScreen(new EffectEditorScreen(this, name, current, (key, edited) -> {
+        minecraft.setScreen(new EffectEditorScreen(this, name, current,
+                () -> currentDefinition(currentId()), (key, edited) -> {
             if (!key.equals(name)) {
                 effects.remove(name);
             }
@@ -736,24 +849,37 @@ public class EquipmentDetailScreen extends PanelScreen {
         return contentRight() - REMOVE_WIDTH;
     }
 
-    private int metaThird() {
+    private int metaColumn() {
         return contentWidth() / META_COLUMNS;
     }
 
     private int rarityWidth() {
-        return metaThird() - GAP;
+        return metaColumn() - GAP;
     }
 
     private int activeInX() {
-        return contentLeft() + metaThird();
+        return contentLeft() + metaColumn();
     }
 
     private int activeInWidth() {
-        return metaThird() - GAP;
+        return metaColumn() - GAP;
+    }
+
+    private int swingsX() {
+        return activeInX() + metaColumn();
     }
 
     private int innateX() {
-        return contentLeft() + metaThird() * (META_COLUMNS - 1);
+        return contentLeft() + metaColumn() * (META_COLUMNS - 1);
+    }
+
+    private Component scopeLabel(Component value) {
+        return hideScopeTooltip ? Component.translatable(KEY_SCOPE_HIDDEN, value) : value;
+    }
+
+    private SwingHands nextSwings() {
+        SwingHands[] values = SwingHands.values();
+        return values[(swings.ordinal() + 1) % values.length];
     }
 
     private ActiveIn nextActiveIn() {
@@ -779,6 +905,11 @@ public class EquipmentDetailScreen extends PanelScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        for (DropdownMenu menu : menus) {
+            if (menu.mouseClicked(font, mouseX, mouseY)) {
+                return true;
+            }
+        }
         if (dock.click(mouseX, mouseY, minecraft)) {
             return true;
         }
@@ -793,12 +924,27 @@ public class EquipmentDetailScreen extends PanelScreen {
         }
         if (ScreenDraw.isWithin(mouseX, mouseY, left + ScreenTheme.PADDING, top + META_Y,
                 rarityWidth(), ROW_HEIGHT)) {
-            rarity = nextRarity();
+            if (button == RIGHT_BUTTON) {
+                hideRarity = !hideRarity;
+            } else {
+                rarity = nextRarity();
+            }
+            return true;
+        }
+        if (button == RIGHT_BUTTON && (ScreenDraw.isWithin(mouseX, mouseY, activeInX(), top + META_Y,
+                activeInWidth(), ROW_HEIGHT) || ScreenDraw.isWithin(mouseX, mouseY, swingsX(),
+                top + META_Y, activeInWidth(), ROW_HEIGHT))) {
+            hideScopeTooltip = !hideScopeTooltip;
             return true;
         }
         if (ScreenDraw.isWithin(mouseX, mouseY, activeInX(), top + META_Y,
                 activeInWidth(), ROW_HEIGHT)) {
             activeIn = nextActiveIn();
+            return true;
+        }
+        if (ScreenDraw.isWithin(mouseX, mouseY, swingsX(), top + META_Y,
+                activeInWidth(), ROW_HEIGHT)) {
+            swings = nextSwings();
             return true;
         }
         if (isWeapon() && ScreenDraw.isWithin(mouseX, mouseY, innateX(), top + META_Y,
@@ -890,14 +1036,20 @@ public class EquipmentDetailScreen extends PanelScreen {
         graphics.drawString(font, Component.translatable(KEY_RARITY),
                 contentLeft() + TEXT_INSET, top + META_Y + 5,
                 ScreenTheme.TEXT, false);
-        Component rarityLabel = rarity
-                .map(value -> Component.literal(StyleText.prettify(value.getSerializedName()))
+        Component rarityValue = rarity
+                .map(value -> (Component) Component.literal(StyleText.prettify(value.getSerializedName()))
                         .withStyle(value.color()))
                 .orElse(Component.translatable(KEY_NONE).copy()
                         .withStyle(ChatFormatting.DARK_GRAY));
+        Component rarityLabel = hideRarity
+                ? Component.translatable(KEY_SCOPE_HIDDEN, rarityValue)
+                : rarityValue;
         graphics.drawString(font, rarityLabel,
                 contentLeft() + rarityWidth() - TEXT_INSET - font.width(rarityLabel),
                 top + META_Y + 5, ScreenTheme.MUTED, false);
+        if (rarityHover) {
+            tooltip = List.of(Component.translatable(KEY_RARITY_HINT));
+        }
 
         boolean activeHover = ScreenDraw.isWithin(mouseX, mouseY,
                 activeInX(), top + META_Y, activeInWidth(), ROW_HEIGHT);
@@ -905,13 +1057,28 @@ public class EquipmentDetailScreen extends PanelScreen {
                 activeInWidth(), ROW_HEIGHT - 2, 1, activeHover, false);
         graphics.drawString(font, Component.translatable(KEY_ACTIVE_IN),
                 activeInX() + TEXT_INSET, top + META_Y + 5, ScreenTheme.TEXT, false);
-        Component activeLabel = Component.translatable(KEY_ACTIVE_IN_PREFIX
-                + activeIn.getSerializedName());
+        Component activeLabel = scopeLabel(Component.translatable(KEY_ACTIVE_IN_PREFIX
+                + activeIn.getSerializedName()));
         graphics.drawString(font, activeLabel,
                 activeInX() + activeInWidth() - TEXT_INSET - font.width(activeLabel),
                 top + META_Y + 5, ScreenTheme.MUTED, false);
         if (activeHover) {
             tooltip = List.of(Component.translatable(KEY_ACTIVE_IN_HINT));
+        }
+
+        boolean swingsHover = ScreenDraw.isWithin(mouseX, mouseY,
+                swingsX(), top + META_Y, activeInWidth(), ROW_HEIGHT);
+        ScreenDraw.rowBackground(graphics, swingsX(), top + META_Y,
+                activeInWidth(), ROW_HEIGHT - 2, 1, swingsHover, false);
+        graphics.drawString(font, Component.translatable(KEY_SWINGS),
+                swingsX() + TEXT_INSET, top + META_Y + 5, ScreenTheme.TEXT, false);
+        Component swingsLabel = scopeLabel(Component.translatable(KEY_SWINGS_PREFIX
+                + swings.getSerializedName()));
+        graphics.drawString(font, swingsLabel,
+                swingsX() + activeInWidth() - TEXT_INSET - font.width(swingsLabel),
+                top + META_Y + 5, ScreenTheme.MUTED, false);
+        if (swingsHover) {
+            tooltip = List.of(Component.translatable(KEY_SWINGS_HINT));
         }
 
         if (isWeapon()) {
@@ -1010,6 +1177,9 @@ public class EquipmentDetailScreen extends PanelScreen {
         dock.render(graphics, font);
 
         drawWidgets(graphics, mouseX, mouseY, partialTick);
+        for (DropdownMenu menu : menus) {
+            menu.render(graphics, font, mouseX, mouseY);
+        }
 
         if (tooltip != null && !tooltip.isEmpty()) {
             ScreenDraw.tooltip(graphics, font, tooltip, mouseX, mouseY);

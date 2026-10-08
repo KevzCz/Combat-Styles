@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.SwingScales;
 import net.pixeldreamstudios.combat_styles.client.AttackInput;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
@@ -264,7 +264,7 @@ public class SwingHasteMixin {
             SwingHaste.beginSwing(player);
             PassDriver.onSwingStart(player);
             int raw = client.getComboCount();
-            AffixDamageDealer.applyLocalAttackTiming(player, raw);
+            CombatEffectDealer.applyLocalAttackTiming(player, raw);
             SwingDash.onUpswing(player, raw);
             combat_styles$lastStart = -1;
             combat_styles$lastNeeded = 0;

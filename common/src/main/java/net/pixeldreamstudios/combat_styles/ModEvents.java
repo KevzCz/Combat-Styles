@@ -17,7 +17,7 @@ import net.pixeldreamstudios.combat_styles.damage.DamageBonuses;
 import net.pixeldreamstudios.combat_styles.network.ConfigEditHandler;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.AffixLoader;
 import net.pixeldreamstudios.combat_styles.affix.AffixMechanics;
 import net.pixeldreamstudios.combat_styles.affix.ProjectileUpkeep;
@@ -114,7 +114,7 @@ public final class ModEvents {
         });
 
         PlayerEvent.PLAYER_QUIT.register(player -> {
-            AffixDamageDealer.forgetHistory(player.getUUID());
+            CombatEffectDealer.forgetHistory(player.getUUID());
             CombatState.forget(player.getUUID());
             CombatScheduler.forget(player.getUUID());
             ClientSwing.forget(player.getUUID());
@@ -157,7 +157,7 @@ public final class ModEvents {
             ConfigEditHandler.flush(server);
             long gameTime = server.overworld().getGameTime();
             AffixMechanics.tickExpiries(gameTime);
-            AffixDamageDealer.tickPending(gameTime);
+            CombatEffectDealer.tickPending(gameTime);
             CombatScheduler.tick(gameTime, id -> server.getPlayerList().getPlayer(id));
             ProjectileUpkeep.tick();
             AbilityGrants.tick(server);

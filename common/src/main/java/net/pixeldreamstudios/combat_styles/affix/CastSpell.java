@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.StringRepresentable;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.equipment.SpellTuning;
 
@@ -30,7 +31,7 @@ public record CastSpell(String spell, Target target, float chance, Optional<Dama
         }
     }
 
-    public static final Codec<CastSpell> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<CastSpell> CODEC = Customs.wrap(CastSpell.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("spell").forGetter(CastSpell::spell),
             Target.CODEC.optionalFieldOf("cast_target", Target.AUTO).forGetter(CastSpell::target),
             Codec.FLOAT.optionalFieldOf("chance", 1.0F).forGetter(CastSpell::chance),
@@ -40,7 +41,7 @@ public record CastSpell(String spell, Target target, float chance, Optional<Dama
             Codec.STRING.optionalFieldOf("name", "").forGetter(CastSpell::name),
             Codec.INT.optionalFieldOf("channel_duration", SPELL_CHANNEL)
                     .forGetter(CastSpell::channelDuration)
-    ).apply(instance, CastSpell::new));
+    ).apply(instance, CastSpell::new)));
 
     public CastSpell {
         spell = spell == null ? "" : spell;

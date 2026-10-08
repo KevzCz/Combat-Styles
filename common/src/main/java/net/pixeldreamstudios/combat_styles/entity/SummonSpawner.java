@@ -22,6 +22,8 @@ import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.EffectChance;
 import net.pixeldreamstudios.combat_styles.affix.ProjectileSpawn;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.equipment.SummonProfile;
@@ -210,6 +212,8 @@ public final class SummonSpawner {
                 DESPAWNING.add(new Despawn(spawned, level.getGameTime() + lifespan));
             }
             SummonLifecycle.spawned(player, spawned);
+            Customs.spawned(CustomScopes.SUMMON, declared, player, player, spawned);
+            Customs.spawned(CustomScopes.SUMMON_PROFILE, profile, player, player, spawned);
         }
     }
 
@@ -259,6 +263,8 @@ public final class SummonSpawner {
         level.addFreshEntity(spawned);
         announce(level, player, spawned);
         SummonLifecycle.spawned(player, spawned);
+        Customs.spawned(CustomScopes.SUMMON_COMPANION, companion, player, player, spawned);
+        Customs.spawned(CustomScopes.SUMMON_PROFILE, profile, player, player, spawned);
         return spawned;
     }
 

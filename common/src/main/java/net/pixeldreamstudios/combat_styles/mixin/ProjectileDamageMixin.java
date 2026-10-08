@@ -9,13 +9,16 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import org.spongepowered.asm.mixin.Mixin;
+import net.pixeldreamstudios.combat_styles.equipment.UseScope;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.ProjectileUpkeep;
-import net.pixeldreamstudios.combat_styles.entity.SummonData;
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.equipment.ProjectileImpactScope;
 
 @Mixin(LivingEntity.class)
@@ -25,11 +28,14 @@ public abstract class ProjectileDamageMixin {
     private void combat_styles$retypeProjectile(DamageSource source, float amount,
                                                 CallbackInfoReturnable<Boolean> callback) {
         LivingEntity self = (LivingEntity) (Object) this;
-        if (self.level().isClientSide() || DamageDealer.isDealing() || amount <= 0.0F) {
+        if (self.level().isClientSide() || DamageDealer.isDealing()) {
             return;
         }
         Projectile landing = ProjectileImpactScope.landingFor(source);
         Entity direct = landing != null ? landing : source.getDirectEntity();
+        if (amount <= 0.0F && !ProjectileUpkeep.dealsOwnDamage(direct)) {
+            return;
+        }
         ProjectileUpkeep.SpellShotSpec spellShot = ProjectileUpkeep.spellShotFor(direct);
         boolean unowned = false;
         if (spellShot == null) {
@@ -66,23 +72,40 @@ public abstract class ProjectileDamageMixin {
             return;
         }
         DamageSpec spec = ProjectileUpkeep.specFor(direct);
-        if (spec == null) {
+        if (spec == null && ProjectileUpkeep.carriedFor(direct) <= 0.0F) {
             if (ProjectileUpkeep.ignoresIframes(direct)) {
                 DamageHurt.clearIFrames(self);
             }
             return;
         }
-        if (direct instanceof SummonData carried
-                && carried.combat_styles$summonOwner() != null) {
-            return;
-        }
         Player owner = ProjectileUpkeep.ownerFor(direct);
-        ProjectileUpkeep.untrack(direct);
-        float resolved = spec.isEmpty()
-                ? amount
-                : spec.amountFor(owner, amount, self);
-        DamageDealer.dealSpec(owner, self, spec, resolved, source);
-        direct.discard();
+        float carried = ProjectileUpkeep.carriedFor(direct);
+        float triggering = ProjectileUpkeep.triggeringFor(direct);
+        boolean viaSummon = ProjectileUpkeep.launchedBySummon(direct);
+        Object box = ProjectileUpkeep.boxFor(direct);
+        boolean arrowLike = carried <= 0.0F;
+        float resolved;
+        if (spec != null && !spec.isEmpty()) {
+            resolved = UseScope.within(direct, () -> spec.amountFor(owner, triggering, self));
+        } else if (carried > 0.0F) {
+            resolved = carried;
+        } else {
+            resolved = amount;
+        }
+        resolved = Customs.modifyDamage(CustomScopes.PROJECTILE, box, owner, direct, self, resolved);
+        DamageDealer.beginDealing();
+        try {
+            DamageDealer.dealSpec(owner, self, spec, resolved, source);
+        } finally {
+            DamageDealer.endDealing();
+        }
+        if (viaSummon && carried > 0.0F && owner != null) {
+            CombatEffectDealer.onSummonHit(owner, self, resolved);
+        }
+        if (arrowLike) {
+            ProjectileUpkeep.untrack(direct);
+            direct.discard();
+        }
         callback.setReturnValue(true);
     }
 }

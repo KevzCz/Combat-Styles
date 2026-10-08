@@ -3,16 +3,18 @@ package net.pixeldreamstudios.combat_styles.style;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.Optional;
 
 public record AttackTrail(Optional<String> color, boolean glows, boolean overridesAffixes) {
 
-    public static final Codec<AttackTrail> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<AttackTrail> CODEC = Customs.wrap(AttackTrail.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf("color").forGetter(AttackTrail::color),
             Codec.BOOL.optionalFieldOf("glows", Boolean.FALSE).forGetter(AttackTrail::glows),
             Codec.BOOL.optionalFieldOf("overrides_affixes", Boolean.FALSE)
                     .forGetter(AttackTrail::overridesAffixes)
-    ).apply(instance, AttackTrail::new));
+    ).apply(instance, AttackTrail::new)));
 
     public static final AttackTrail NONE =
             new AttackTrail(Optional.empty(), false, false);

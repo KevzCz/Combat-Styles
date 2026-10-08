@@ -68,6 +68,7 @@ public final class CooldownHud {
         }
         HudDensity density = HudDensity.byKey(config.cooldownHudDensity());
         return HudLayout.of(rows, density, config.cooldownHudVertical(),
+                config.cooldownHudFlipped(),
                 widestTimer(Minecraft.getInstance().font, rows, density));
     }
 
@@ -88,6 +89,7 @@ public final class CooldownHud {
         Font font = Minecraft.getInstance().font;
         HudDensity density = HudDensity.byKey(config.cooldownHudDensity());
         HudLayout layout = HudLayout.of(rows, density, config.cooldownHudVertical(),
+                config.cooldownHudFlipped(),
                 widestTimer(font, rows, density));
 
         HudAnchor anchor = HudAnchor.byKey(config.cooldownHudAnchor());
@@ -135,17 +137,19 @@ public final class CooldownHud {
 
     private static void drawRow(GuiGraphics graphics, Font font, HudRow row,
                                 int x, int y, HudLayout layout) {
-        drawHighlight(graphics, row, x, y);
-        graphics.renderItem(row.stack(), x + ICON_INSET, y + ICON_INSET);
-        drawSweep(graphics, font, row, x, y);
+        int itemX = layout.itemX(x);
+        drawHighlight(graphics, row, itemX, y);
+        graphics.renderItem(row.stack(), itemX + ICON_INSET, y + ICON_INSET);
+        drawSweep(graphics, font, row, itemX, y);
 
         if (layout.density() == HudDensity.MINIMAL) {
-            drawTicks(graphics, row, x, y);
+            drawTicks(graphics, row, layout.tickX(x), y);
             return;
         }
         drawLanes(graphics, row, x, y, layout);
-        if (layout.density() == HudDensity.EXPANDED) {
-            drawTimer(graphics, font, row, layout.timerX(x), y);
+        if (layout.density() == HudDensity.EXPANDED && row.anyCooling()) {
+            String seconds = secondsOf(row.longestRemaining());
+            drawTimer(graphics, font, seconds, layout.timerX(x, font.width(seconds)), y);
         }
     }
 
@@ -179,13 +183,12 @@ public final class CooldownHud {
         graphics.pose().popPose();
     }
 
-    private static void drawTicks(GuiGraphics graphics, HudRow row, int x, int y) {
+    private static void drawTicks(GuiGraphics graphics, HudRow row, int tickX, int y) {
         List<HudRow.Lane> lanes = row.lanes();
         if (lanes.isEmpty()) {
             return;
         }
         int span = HudLayout.SLOT / lanes.size();
-        int tickX = x - HudLayout.TICK - HudLayout.LANE_INSET;
         for (int index = 0; index < lanes.size(); index++) {
             HudRow.Lane lane = lanes.get(index);
             int top = y + index * span;
@@ -212,13 +215,10 @@ public final class CooldownHud {
         }
     }
 
-    private static void drawTimer(GuiGraphics graphics, Font font, HudRow row, int x, int y) {
-        if (!row.anyCooling()) {
-            return;
-        }
+    private static void drawTimer(GuiGraphics graphics, Font font, String seconds, int x, int y) {
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, OVERLAY_LAYER);
-        graphics.drawString(font, secondsOf(row.longestRemaining()), x, y + TEXT_DROP,
+        graphics.drawString(font, seconds, x, y + TEXT_DROP,
                 ScreenTheme.TEXT, true);
         graphics.pose().popPose();
     }

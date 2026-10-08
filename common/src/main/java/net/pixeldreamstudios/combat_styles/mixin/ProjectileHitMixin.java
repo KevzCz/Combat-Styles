@@ -10,6 +10,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.pixeldreamstudios.combat_styles.affix.ProjectileUpkeep;
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentActivation;
 import net.pixeldreamstudios.combat_styles.equipment.ProjectileImpactScope;
@@ -40,6 +42,10 @@ public abstract class ProjectileHitMixin {
         Player owner = EquipmentActivation.ownerOf(shot);
         if (owner == null || owner == self) {
             return;
+        }
+        Object box = ProjectileUpkeep.boxFor(shot);
+        if (box != null) {
+            Customs.hit(CustomScopes.PROJECTILE, box, owner, shot, self);
         }
         EquipmentActivation.projectileHit(owner, new ProjectileHitEvent(shot, self, source,
                 amount, ProjectileOrigins.travelled(shot),

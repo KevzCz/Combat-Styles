@@ -22,7 +22,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
-import net.pixeldreamstudios.combat_styles.affix.AffixProjectiles;
+import net.pixeldreamstudios.combat_styles.affix.ProjectileLaunches;
 import net.pixeldreamstudios.combat_styles.affix.AffixTargets;
 import net.pixeldreamstudios.combat_styles.affix.SpellShotPlacement;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
@@ -32,6 +32,8 @@ import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.equipment.AbilityTuning;
 import net.pixeldreamstudios.combat_styles.equipment.SpellTuning;
 import net.pixeldreamstudios.combat_styles.affix.CastSpell;
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -42,9 +44,10 @@ import java.util.Set;
 
 public record ScriptedAbility(AbilityKind kind, PassiveTrigger on, float chance,
                               List<String> usedBy, AbilityFocus focus, AbilityTuning tuning,
-                              List<Step> steps) {
+                              List<Step> steps, Optional<String> description) {
 
     public static final String KEY_KIND = "kind";
+    public static final String KEY_DESCRIPTION = "description";
     public static final String KEY_ON = "on";
     public static final String KEY_CHANCE = "chance";
     public static final float ALWAYS = 1.0F;
@@ -205,7 +208,7 @@ public record ScriptedAbility(AbilityKind kind, PassiveTrigger on, float chance,
                                 .forGetter(Casting::rollSpellChance)
                 ).apply(instance, Casting::new));
 
-        public static final Codec<Action> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Action> CODEC = Customs.wrap(Action.class, RecordCodecBuilder.create(instance -> instance.group(
                 ActionType.CODEC.fieldOf(KEY_TYPE).forGetter(Action::type),
                 Codec.FLOAT.optionalFieldOf(KEY_DAMAGE_RATIO, FULL_DAMAGE).forGetter(Action::damageRatio),
                 DamageSpec.CODEC.optionalFieldOf(KEY_DAMAGE_SPEC).forGetter(Action::damageSpec),
@@ -225,7 +228,7 @@ public record ScriptedAbility(AbilityKind kind, PassiveTrigger on, float chance,
                 new Action(type, ratio, spec, focus, stacking.effect(), stacking.stacks(),
                         stacking.durationTicks(), stacking.maxStacks(), stacking.perStack(), heal,
                         sound, particle, projectile, casting.spell(), casting.spellTuning(),
-                        casting.spellTarget(), casting.rollSpellChance(), beam, shape)));
+                        casting.spellTarget(), casting.rollSpellChance(), beam, shape))));
 
         public static final Action SAMPLE = new Action(ActionType.BEAM, FULL_DAMAGE, Optional.empty(),
                 false, Optional.empty(), 1, AbilityStacks.DEFAULT_DURATION_TICKS,
@@ -248,13 +251,13 @@ public record ScriptedAbility(AbilityKind kind, PassiveTrigger on, float chance,
         public static final String KEY_CHANCE = "chance";
         public static final String KEY_UNTIL = "until";
 
-        public static final Codec<Step> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Step> CODEC = Customs.wrap(Step.class, RecordCodecBuilder.create(instance -> instance.group(
                 AT_CODEC.optionalFieldOf("at", AT_WINDUP).forGetter(Step::at),
                 Codec.INT.optionalFieldOf("every", 0).forGetter(Step::every),
                 AT_CODEC.optionalFieldOf(KEY_UNTIL).forGetter(Step::until),
                 Codec.FLOAT.optionalFieldOf(KEY_CHANCE, ALWAYS).forGetter(Step::chance),
                 Action.CODEC.fieldOf("action").forGetter(Step::action)
-        ).apply(instance, Step::new));
+        ).apply(instance, Step::new)));
 
         public static final Step SAMPLE = new Step(AT_WINDUP, 0, Optional.empty(), ALWAYS,
                 Action.SAMPLE);
@@ -288,7 +291,7 @@ public record ScriptedAbility(AbilityKind kind, PassiveTrigger on, float chance,
         }
     }
 
-    public static final Codec<ScriptedAbility> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<ScriptedAbility> CODEC = Customs.wrap(ScriptedAbility.class, RecordCodecBuilder.create(instance -> instance.group(
             AbilityKind.CODEC.optionalFieldOf(KEY_KIND, AbilityKind.ACTIVE)
                     .forGetter(ScriptedAbility::kind),
             PassiveTrigger.CODEC.optionalFieldOf(KEY_ON, PassiveTrigger.HIT)
@@ -300,12 +303,13 @@ public record ScriptedAbility(AbilityKind kind, PassiveTrigger on, float chance,
                     .forGetter(ScriptedAbility::focus),
             AbilityTuning.CODEC.optionalFieldOf("tuning", AbilityTuning.NONE)
                     .forGetter(ScriptedAbility::tuning),
-            Step.CODEC.listOf().optionalFieldOf("steps", List.of()).forGetter(ScriptedAbility::steps)
-    ).apply(instance, ScriptedAbility::new));
+            Step.CODEC.listOf().optionalFieldOf("steps", List.of()).forGetter(ScriptedAbility::steps),
+            Codec.STRING.optionalFieldOf(KEY_DESCRIPTION).forGetter(ScriptedAbility::description)
+    ).apply(instance, ScriptedAbility::new)));
 
     public static final ScriptedAbility SAMPLE = new ScriptedAbility(AbilityKind.ACTIVE,
             PassiveTrigger.HIT, ALWAYS, List.of(), AbilityFocus.TARGET, AbilityTuning.NONE,
-            List.of(Step.SAMPLE));
+            List.of(Step.SAMPLE), Optional.empty());
 
     public boolean passive() {
         return kind == AbilityKind.PASSIVE;
@@ -318,6 +322,7 @@ public record ScriptedAbility(AbilityKind kind, PassiveTrigger on, float chance,
         focus = focus == null ? AbilityFocus.TARGET : focus;
         tuning = tuning == null ? AbilityTuning.NONE : tuning;
         steps = steps == null ? List.of() : List.copyOf(steps);
+        description = description == null ? Optional.empty() : description.filter(text -> !text.isBlank());
     }
 
     public AbilityConfig.Entry defaults() {
@@ -334,11 +339,17 @@ public record ScriptedAbility(AbilityKind kind, PassiveTrigger on, float chance,
         if (owner == null) {
             return;
         }
+        if (elapsed == AT_START) {
+            Customs.apply(CustomScopes.SCRIPTED_ABILITY, this, owner, host.body(), host.target());
+        }
+        Customs.ticked(CustomScopes.SCRIPTED_ABILITY, this, owner, host.body());
         for (int index = 0; index < steps.size(); index++) {
             Step step = steps.get(index);
-            if (!step.firesAt(elapsed, tuned) || !step.rolls(level.getRandom())) {
+            if (!step.firesAt(elapsed, tuned) || !step.rolls(level.getRandom())
+                    || !Customs.allows(CustomScopes.ABILITY_STEP, step, owner, host.body(), host.target())) {
                 continue;
             }
+            Customs.apply(CustomScopes.ABILITY_STEP, step, owner, host.body(), host.target());
             Action action = step.action();
             JsonObject stepPatch = tuned.stepSpec(index);
             if (action.damageSpec().isEmpty() && stepPatch == null) {
@@ -355,6 +366,10 @@ public record ScriptedAbility(AbilityKind kind, PassiveTrigger on, float chance,
 
     private void perform(ServerLevel level, AbilityHost host, Player owner, Action action,
                          int elapsed, float damage, AbilityConfig.Entry tuned) {
+        if (!Customs.allows(CustomScopes.ABILITY_ACTION, action, owner, host.body(), host.target())) {
+            return;
+        }
+        Customs.apply(CustomScopes.ABILITY_ACTION, action, owner, host.body(), host.target());
         float amount = damage * action.damageRatio();
         Vec3 focusPoint = focusPoint(host, tuned);
         Vec3 centre = action.atFocus() ? focusPoint : host.origin();
@@ -374,7 +389,7 @@ public record ScriptedAbility(AbilityKind kind, PassiveTrigger on, float chance,
                 }
             }
             case PROJECTILE -> action.projectile().ifPresent(projectile ->
-                    AffixProjectiles.spawnFrom(level, owner, host.body(), host.target(),
+                    ProjectileLaunches.spawnFrom(level, owner, host.body(), host.target(),
                             projectile, amount));
             case DASH_STRIKE -> dashStrike(host, owner, amount, tuned);
             case PULL -> {

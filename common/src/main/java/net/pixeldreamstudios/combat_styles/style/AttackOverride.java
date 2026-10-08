@@ -13,6 +13,7 @@ import net.minecraft.network.codec.StreamCodec;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -113,7 +114,7 @@ public record AttackOverride(Optional<Double> damageMultiplier,
 
     private static final Codec<List<String>> CONDITIONS_CODEC = Codec.STRING.listOf();
 
-    public static final Codec<AttackOverride> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<AttackOverride> CODEC = Customs.wrap(AttackOverride.class, RecordCodecBuilder.create(instance -> instance.group(
             SHAPE_CODEC.forGetter(override -> new Shape(override.damageMultiplier(),
                     override.angle(), override.upswing(), override.rangeMultiplier(),
                     override.movementSpeedMultiplier(), override.hitbox(), override.animation())),
@@ -134,7 +135,7 @@ public record AttackOverride(Optional<Double> damageMultiplier,
             meta.attributes(), meta.ignoreAffinity(),
             timing.cooldownScale(), timing.hastensNext(), timing.drag(), behaviour,
             meta.damageType(), meta.affixes(), meta.affixTuning(),
-            timing.scaleAnimation(), conditions, meta.stylePage())));
+            timing.scaleAnimation(), conditions, meta.stylePage()))));
 
     public AttackOverride {
         attributes = attributes == null ? Map.of() : Map.copyOf(attributes);

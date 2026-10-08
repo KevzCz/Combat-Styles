@@ -6,6 +6,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.Optional;
 
 public record HealthGate(Optional<Float> selfAbove, Optional<Float> selfBelow,
@@ -14,12 +16,12 @@ public record HealthGate(Optional<Float> selfAbove, Optional<Float> selfBelow,
     public static final HealthGate ANY = new HealthGate(Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty());
 
-    public static final Codec<HealthGate> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<HealthGate> CODEC = Customs.wrap(HealthGate.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.FLOAT.optionalFieldOf("self_above").forGetter(HealthGate::selfAbove),
             Codec.FLOAT.optionalFieldOf("self_below").forGetter(HealthGate::selfBelow),
             Codec.FLOAT.optionalFieldOf("target_above").forGetter(HealthGate::targetAbove),
             Codec.FLOAT.optionalFieldOf("target_below").forGetter(HealthGate::targetBelow)
-    ).apply(instance, HealthGate::new));
+    ).apply(instance, HealthGate::new)));
 
     public boolean isEmpty() {
         return selfAbove.isEmpty() && selfBelow.isEmpty()

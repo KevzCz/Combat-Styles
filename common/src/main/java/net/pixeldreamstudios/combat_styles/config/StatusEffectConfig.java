@@ -71,6 +71,11 @@ public final class StatusEffectConfig {
         return LOADED.computeIfAbsent(id, key -> new Entry());
     }
 
+    public static Entry defaultOf(String id) {
+        Entry known = DEFAULTS.get(id);
+        return known == null ? new Entry() : known.copy();
+    }
+
     public static Map<String, Entry> all() {
         return Map.copyOf(LOADED);
     }

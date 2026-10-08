@@ -11,6 +11,7 @@ import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public enum TooltipGem {
     SAPPHIRE(0xE000),
@@ -93,6 +94,30 @@ public enum TooltipGem {
 
     private static MutableComponent spacer() {
         return Component.literal(Character.toString(SPACER)).withStyle(style -> style.withFont(FONT));
+    }
+
+    public static final String NO_ICON = "none";
+
+    public String serializedName() {
+        return name().toLowerCase(Locale.ROOT);
+    }
+
+    public static List<String> iconNames() {
+        List<String> names = new ArrayList<>();
+        for (TooltipGem gem : values()) {
+            names.add(gem.serializedName());
+        }
+        names.add(NO_ICON);
+        return names;
+    }
+
+    public static MutableComponent iconLine(String icon, Component body) {
+        for (TooltipGem gem : values()) {
+            if (gem.serializedName().equals(icon)) {
+                return gem.bullet(body);
+            }
+        }
+        return hang(body);
     }
 
     public static TooltipGem of(StyleRarity rarity) {

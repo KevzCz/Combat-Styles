@@ -58,7 +58,7 @@ public enum UseKind implements StringRepresentable {
     }
 
     public boolean emits(UsePhase phase) {
-        if (phase == UsePhase.ANY) {
+        if (phase == UsePhase.ANY || phase == UsePhase.EVERY) {
             return true;
         }
         return switch (this) {

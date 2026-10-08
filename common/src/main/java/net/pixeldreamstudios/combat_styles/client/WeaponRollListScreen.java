@@ -13,8 +13,6 @@ public class WeaponRollListScreen extends DefinitionListScreen<WeaponRoll> {
     private static final String KEY_TITLE = "screen.combat_styles.weapon_roll_list";
     private static final String KEY_SUMMARY = "screen.combat_styles.weapon_roll_summary";
     private static final String KEY_EDITOR = "screen.combat_styles.weapon_roll_editor";
-    private static final int PERCENT = 100;
-
     public WeaponRollListScreen(Screen parent, boolean creative) {
         super(Component.translatable(KEY_TITLE), parent, creative, WeaponRolls.DEFINITIONS,
                 EffectSchema.ROOT_WEAPON_ROLL, EditConfigPayload.Kind.WEAPON_ROLL,
@@ -25,7 +23,7 @@ public class WeaponRollListScreen extends DefinitionListScreen<WeaponRoll> {
     @Override
     protected String describe(WeaponRoll value) {
         return StyleText.prettify(value.mode()) + " · " + Component.translatable(KEY_SUMMARY,
-                StyleText.formatDecimal(value.chance() * PERCENT), value.styles().size()).getString();
+                StyleText.formatDecimal(value.weight()), value.styles().size()).getString();
     }
 
     @Override

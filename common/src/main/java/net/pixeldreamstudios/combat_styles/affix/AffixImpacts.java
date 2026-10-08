@@ -54,19 +54,47 @@ public final class AffixImpacts {
             return damage;
         }
         return new AffixEffects.Damage(damage.mode(), damage.damageType(), Optional.of(school),
-                damage.ratio(), damage.flat(), damage.ignoresArmour(), damage.scaling());
+                damage.ratio(), damage.flat(), damage.ignoresArmour(), damage.scaling(),
+                damage.multiplier());
+    }
+
+    static float ratioOf(Player player, AffixEffects.Damage damage) {
+        float ratio = Math.max(0.0F, damage.ratio());
+        if (damage.scaling().isEmpty()) {
+            return ratio;
+        }
+        AffixEffects.Scaling scaling = damage.scaling().get();
+        return scaling.apply(ratio,
+                SpellPowerAccess.valueOf(player, scaling.sources(), scaling.strongest()));
+    }
+
+    static float convertedShare(Player player, StyleAffix converter) {
+        if (converter == null) {
+            return 0.0F;
+        }
+        float share = 0.0F;
+        for (AffixEffects.Damage damage : converter.onHit().allDamage()) {
+            if (damage.converts()) {
+                share += ratioOf(player, damage);
+            }
+        }
+        return Math.min(1.0F, share);
+    }
+
+    static void dealPhysical(Player player, LivingEntity target, float amount) {
+        if (amount >= MINIMUM_DAMAGE) {
+            DamageHurt.bypassingIFrames(target, player.damageSources().playerAttack(player), amount);
+        }
     }
 
     static float dealDamage(Player player, LivingEntity target,
                                     AffixEffects.Damage damage, float dealtDamage) {
-        float ratio = Math.max(0.0F, damage.ratio());
+        float ratio = ratioOf(player, damage);
         if (damage.scaling().isPresent()) {
-            AffixEffects.Scaling scaling = damage.scaling().get();
-            ratio = scaling.apply(ratio,
-                    SpellPowerAccess.valueOf(player, scaling.sources(), scaling.strongest()));
-            damage = attunedTo(player, damage, scaling);
+            damage = attunedTo(player, damage, damage.scaling().get());
         }
-        float amount = dealtDamage * ratio + Math.max(0.0F, damage.flat());
+        float amount = (dealtDamage * ratio + Math.max(0.0F, damage.flat()))
+                * Math.max(0.0F, damage.multiplier());
         if (amount < MINIMUM_DAMAGE) {
             return 0.0F;
         }

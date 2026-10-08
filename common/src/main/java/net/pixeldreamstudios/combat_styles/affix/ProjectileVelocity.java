@@ -5,6 +5,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 public record ProjectileVelocity(float gravity, float drag, float acceleration,
                                  float maxSpeed, float divergence, float homing) {
 
@@ -18,7 +20,7 @@ public record ProjectileVelocity(float gravity, float drag, float acceleration,
     public static final ProjectileVelocity DEFAULT = new ProjectileVelocity(
             INHERIT_GRAVITY, 0.0F, 0.0F, NO_LIMIT, 0.0F, 0.0F);
 
-    public static final Codec<ProjectileVelocity> CODEC = RecordCodecBuilder.create(
+    public static final Codec<ProjectileVelocity> CODEC = Customs.wrap(ProjectileVelocity.class, RecordCodecBuilder.create(
             instance -> instance.group(
                     Codec.FLOAT.optionalFieldOf("gravity", INHERIT_GRAVITY)
                             .forGetter(ProjectileVelocity::gravity),
@@ -32,7 +34,7 @@ public record ProjectileVelocity(float gravity, float drag, float acceleration,
                             .forGetter(ProjectileVelocity::divergence),
                     Codec.FLOAT.optionalFieldOf("homing", 0.0F)
                             .forGetter(ProjectileVelocity::homing)
-            ).apply(instance, ProjectileVelocity::new));
+            ).apply(instance, ProjectileVelocity::new)));
 
     public ProjectileVelocity {
         gravity = Math.clamp(gravity, INHERIT_GRAVITY, ACCEL_LIMIT);

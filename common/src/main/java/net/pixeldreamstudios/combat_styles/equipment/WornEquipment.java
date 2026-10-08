@@ -28,6 +28,15 @@ public record WornEquipment(ItemStack stack, EquipmentDefinition definition, int
         return found;
     }
 
+    public static WornEquipment find(LivingEntity wearer, String definitionId, int copy) {
+        for (WornEquipment worn : of(wearer)) {
+            if (worn.copy() == copy && worn.definition().id().equals(definitionId)) {
+                return worn;
+            }
+        }
+        return null;
+    }
+
     public static int copyOf(LivingEntity wearer, ItemStack stack) {
         for (WornEquipment worn : of(wearer)) {
             if (worn.stack() == stack) {

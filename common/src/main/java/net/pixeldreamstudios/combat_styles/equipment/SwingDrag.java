@@ -4,7 +4,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.style.AttackDrag;
 import net.pixeldreamstudios.combat_styles.style.AttackOverride;
 import net.pixeldreamstudios.combat_styles.style.AttackBehaviour;
@@ -123,7 +123,7 @@ public final class SwingDrag {
         if (player == null) {
             return AttackDrag.NONE;
         }
-        ItemStack weapon = AffixDamageDealer.swingingWeapon(player, comboCount);
+        ItemStack weapon = CombatEffectDealer.swingingWeapon(player, comboCount);
         if (weapon.isEmpty()) {
             return AttackDrag.NONE;
         }
@@ -140,11 +140,11 @@ public final class SwingDrag {
     }
 
     private static double offsetReach(Player player, int comboCount) {
-        ItemStack weapon = AffixDamageDealer.swingingWeapon(player, comboCount);
+        ItemStack weapon = CombatEffectDealer.swingingWeapon(player, comboCount);
         if (weapon.isEmpty()) {
             return 0.0D;
         }
-        AttackOverride override = AffixDamageDealer.shapedOverrideFor(player, comboCount);
+        AttackOverride override = CombatEffectDealer.shapedOverrideFor(player, comboCount);
         if (override == null) {
             return 0.0D;
         }

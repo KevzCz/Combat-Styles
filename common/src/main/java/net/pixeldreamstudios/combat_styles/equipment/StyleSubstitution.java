@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.style.AttackOverride;
 
 public record StyleSubstitution(List<String> styles, List<Integer> slots, String mode,
@@ -81,7 +82,7 @@ public record StyleSubstitution(List<String> styles, List<Integer> slots, String
                             : Either.right(list));
 
     public static final Codec<StyleSubstitution> CODEC =
-            RecordCodecBuilder.create(instance -> instance.group(
+            Customs.wrap(StyleSubstitution.class, RecordCodecBuilder.create(instance -> instance.group(
                     STRINGS.fieldOf("styles").forGetter(StyleSubstitution::styles),
                     SLOTS.optionalFieldOf("slot", List.of()).forGetter(StyleSubstitution::slots),
                     Codec.STRING.optionalFieldOf("mode", MODE_REPLACE_ALL)
@@ -103,7 +104,7 @@ public record StyleSubstitution(List<String> styles, List<Integer> slots, String
                             .forGetter(StyleSubstitution::restartCombo),
                     Codec.STRING.optionalFieldOf("apply", APPLY_ON_SLOT)
                             .forGetter(StyleSubstitution::apply)
-            ).apply(instance, StyleSubstitution::new));
+            ).apply(instance, StyleSubstitution::new)));
 
     public static final StyleSubstitution SAMPLE = new StyleSubstitution(
             List.of(""), List.of(0), MODE_REPLACE_ALL, List.of(""), List.of(""),

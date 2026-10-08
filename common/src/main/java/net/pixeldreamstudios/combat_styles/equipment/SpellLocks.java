@@ -4,6 +4,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.StringRepresentable;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -30,7 +32,7 @@ public record SpellLocks(List<String> grant, List<String> disable, List<String> 
             List.of("wizards:fireball"), List.of("fire"), Mode.BLOCK,
             List.of(new SpellTune("wizards:frostbolt", SpellTuning.NONE)));
 
-    public static final Codec<SpellLocks> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<SpellLocks> CODEC = Customs.wrap(SpellLocks.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.listOf().optionalFieldOf("grant", List.of()).forGetter(SpellLocks::grant),
             Codec.STRING.listOf().optionalFieldOf("disable", List.of()).forGetter(SpellLocks::disable),
             Codec.STRING.listOf().optionalFieldOf("disable_schools", List.of())
@@ -38,7 +40,7 @@ public record SpellLocks(List<String> grant, List<String> disable, List<String> 
             Mode.CODEC.optionalFieldOf("disable_mode", Mode.BLOCK).forGetter(SpellLocks::disableMode),
             SpellTune.CODEC.listOf().optionalFieldOf("tune", List.of())
                     .forGetter(SpellLocks::tune)
-    ).apply(instance, SpellLocks::new));
+    ).apply(instance, SpellLocks::new)));
 
     public SpellLocks {
         grant = grant == null ? List.of() : List.copyOf(grant);

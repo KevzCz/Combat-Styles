@@ -7,19 +7,21 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.List;
 
 public record ShootGate(boolean enabled, List<String> entities, boolean fromSummon) {
 
     public static final ShootGate ANY = new ShootGate(false, List.of(), true);
 
-    public static final Codec<ShootGate> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<ShootGate> CODEC = Customs.wrap(ShootGate.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.BOOL.optionalFieldOf("enabled", Boolean.TRUE).forGetter(ShootGate::enabled),
             Codec.STRING.listOf().optionalFieldOf("entity", List.of())
                     .forGetter(ShootGate::entities),
             Codec.BOOL.optionalFieldOf("from_summon", Boolean.TRUE)
                     .forGetter(ShootGate::fromSummon)
-    ).apply(instance, ShootGate::new));
+    ).apply(instance, ShootGate::new)));
 
     public ShootGate {
         entities = entities == null ? List.of() : List.copyOf(entities);

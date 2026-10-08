@@ -1,7 +1,5 @@
 package net.pixeldreamstudios.combat_styles.entity;
 
-import net.bettercombat.api.WeaponAttributes;
-
 import net.pixeldreamstudios.combat_styles.api.AttackShape;
 
 public enum WaveShape {
@@ -47,17 +45,6 @@ public enum WaveShape {
     public static WaveShape ordinalOf(int index) {
         WaveShape[] values = values();
         return index < 0 || index >= values.length ? HORIZONTAL : values[index];
-    }
-
-    public static WaveShape forHitbox(WeaponAttributes.HitBoxShape hitbox) {
-        if (hitbox == null) {
-            return HORIZONTAL;
-        }
-        return switch (hitbox) {
-            case VERTICAL_PLANE -> VERTICAL;
-            case FORWARD_BOX -> FORWARD;
-            default -> HORIZONTAL;
-        };
     }
 
     public static WaveShape forShape(AttackShape shape) {

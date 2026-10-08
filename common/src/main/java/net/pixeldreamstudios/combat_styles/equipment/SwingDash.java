@@ -1,6 +1,6 @@
 package net.pixeldreamstudios.combat_styles.equipment;
 import net.bettercombat.api.AttackHand;
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
 import net.pixeldreamstudios.combat_styles.mixin.AttackStrengthAccessor;
@@ -336,7 +336,7 @@ public final class SwingDash {
                 && player.getUUID().equals(lastArmedOwner)) {
             return;
         }
-        ItemStack weapon = AffixDamageDealer.swingingWeapon(player, comboCount);
+        ItemStack weapon = CombatEffectDealer.swingingWeapon(player, comboCount);
         if (weapon.isEmpty()) {
             CombatDebug.skipped(player, "drag", "no weapon");
             return;
@@ -363,7 +363,7 @@ public final class SwingDash {
                 }
             }
         }
-        boolean moves = AffixDamageDealer.swingMoves(player, weapon, comboCount);
+        boolean moves = CombatEffectDealer.swingMoves(player, weapon, comboCount);
         if (!drag.enabled() && !moves) {
             StyleSequence sequence = SequenceService.sequenceOf(weapon, player.getUUID());
             int slots = sequence.entries().size();
@@ -442,6 +442,6 @@ public final class SwingDash {
         if (sequence.entries().isEmpty()) {
             return null;
         }
-        return AffixDamageDealer.attackOverrideFor(player, comboCount);
+        return CombatEffectDealer.attackOverrideFor(player, comboCount);
     }
 }

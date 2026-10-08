@@ -472,11 +472,6 @@ public final class AbilityConfig {
         DATA.remove(key(ability));
     }
 
-    public static boolean isData(String ability) {
-        String key = key(ability);
-        return DATA.containsKey(key) && !LOADED.containsKey(key);
-    }
-
     public static Map<String, Entry> all() {
         return Map.copyOf(LOADED);
     }

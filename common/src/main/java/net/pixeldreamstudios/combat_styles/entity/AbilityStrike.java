@@ -10,7 +10,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.EffectChance;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
 import net.pixeldreamstudios.combat_styles.config.SummonTuning;
@@ -29,7 +29,7 @@ public final class AbilityStrike {
             return false;
         }
         DamageHurt.bypassingIFrames(victim, sourceFor(attacker, owner, tuned), amount);
-        AffixDamageDealer.onSummonHit(owner, victim, amount);
+        CombatEffectDealer.onSummonHit(owner, victim, amount);
         afterHit(owner, victim, amount, tuned);
         return true;
     }

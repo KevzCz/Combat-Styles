@@ -16,7 +16,7 @@ import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.world.entity.Entity;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.equipment.SwingDash;
 import net.pixeldreamstudios.combat_styles.equipment.PendingExtraHit;
@@ -153,7 +153,7 @@ public final class ExtraAttackScheduler {
         SwingDash.armExtra(player, pending.comboCount(), pending.hitIndex(),
                 AttackDrag.effective(shape, List.of()),
                 !shape.behaviourOrDefault().motionOrNone().isEmpty(), targets);
-        AffixDamageDealer.runExtraMotion(player, shape);
+        CombatEffectDealer.runExtraMotion(player, shape);
         if (targets.isEmpty()) {
             PendingClaims.clear();
             if (CombatStylesConfig.get().debugLogging()) {

@@ -1,6 +1,7 @@
 package net.pixeldreamstudios.combat_styles.client;
 
 import net.pixeldreamstudios.combat_styles.equipment.ItemMatch;
+import net.pixeldreamstudios.combat_styles.equipment.DealtGate;
 import net.pixeldreamstudios.combat_styles.equipment.SummonCadence;
 import net.pixeldreamstudios.combat_styles.entity.BeamLook;
 import net.pixeldreamstudios.combat_styles.entity.ParticleShape;
@@ -8,6 +9,7 @@ import net.pixeldreamstudios.combat_styles.entity.RaiseProfile;
 import net.pixeldreamstudios.combat_styles.entity.RaiseRules;
 import net.pixeldreamstudios.combat_styles.entity.BeamOrigin;
 import net.pixeldreamstudios.combat_styles.entity.SummonAim;
+import net.pixeldreamstudios.combat_styles.entity.SummonTargeting;
 import net.pixeldreamstudios.combat_styles.entity.SummonCastTarget;
 import net.pixeldreamstudios.combat_styles.entity.PassiveTrigger;
 import net.pixeldreamstudios.combat_styles.equipment.SummonPassive;
@@ -28,6 +30,10 @@ import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.pixeldreamstudios.combat_styles.loot.BookRoll;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRoll;
 import net.pixeldreamstudios.combat_styles.affix.CastSpell;
+import net.pixeldreamstudios.combat_styles.affix.LibraryRef;
+import net.pixeldreamstudios.combat_styles.equipment.EntityLibraries;
+import net.pixeldreamstudios.combat_styles.equipment.UseScope;
+import net.pixeldreamstudios.combat_styles.damage.ScaledNumber;
 import net.pixeldreamstudios.combat_styles.affix.SpawnAnchor;
 import net.pixeldreamstudios.combat_styles.affix.SpreadMode;
 import net.pixeldreamstudios.combat_styles.api.SchemaRegistry;
@@ -39,12 +45,20 @@ import net.pixeldreamstudios.combat_styles.equipment.AttackConditions;
 import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
 import net.pixeldreamstudios.combat_styles.equipment.CastGate;
 import net.pixeldreamstudios.combat_styles.equipment.CastPhase;
+import net.pixeldreamstudios.combat_styles.config.OptionSources;
+import net.pixeldreamstudios.combat_styles.equipment.EffectStacking;
+import net.pixeldreamstudios.combat_styles.equipment.EnchantLevels;
+import net.pixeldreamstudios.combat_styles.equipment.EnchantmentChoices;
+import net.pixeldreamstudios.combat_styles.equipment.StateGate;
 import net.pixeldreamstudios.combat_styles.equipment.SummonGate;
 import net.pixeldreamstudios.combat_styles.equipment.AccessoryCompat;
 import net.pixeldreamstudios.combat_styles.equipment.AccessoryMatch;
 import net.pixeldreamstudios.combat_styles.equipment.ItemGate;
 import net.pixeldreamstudios.combat_styles.equipment.UsePhase;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+import net.pixeldreamstudios.combat_styles.custom.CustomRegistry;
+import net.pixeldreamstudios.combat_styles.custom.CustomUse;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLocks;
 import net.pixeldreamstudios.combat_styles.equipment.SlotBand;
 import net.pixeldreamstudios.combat_styles.equipment.StyleSubstitution;
@@ -57,13 +71,17 @@ import net.pixeldreamstudios.combat_styles.style.StylePage;
 import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Supplier;
 
 public final class EffectChoices {
 
     private static final String KEY_SCALING = "scaling";
+    private static final String KEY_TARGETS = "targets";
+    private static final String KEY_ORDER = "order";
     private static final String KEY_PARTICLES = "particles";
     private static final String KEY_SOUND = "sound";
     private static final String KEY_PLACEMENT = "placement";
@@ -142,6 +160,19 @@ public final class EffectChoices {
         return choicesFor(EffectSchema.ROOT_EFFECT, key);
     }
 
+    private static Supplier<? extends Collection<String>> projectileNames = List::of;
+    private static Supplier<? extends Collection<String>> summonProfileNames = List::of;
+
+    public static void offerLibraries(Supplier<? extends Collection<String>> projectiles,
+                                      Supplier<? extends Collection<String>> summonProfiles) {
+        projectileNames = projectiles == null ? List::of : projectiles;
+        summonProfileNames = summonProfiles == null ? List::of : summonProfiles;
+    }
+
+    private static List<String> refsTo(Supplier<? extends Collection<String>> names) {
+        return names.get().stream().map(LibraryRef::refTo).toList();
+    }
+
     private static String parentOf(String path) {
         int cut = path == null ? -1 : path.lastIndexOf(PATH_SEPARATOR);
         return cut < 0 ? "" : path.substring(0, cut);
@@ -180,6 +211,9 @@ public final class EffectChoices {
             return itemIds();
         }
         return switch (key) {
+            case LibraryRef.PROJECTILE_KEY -> within(scope, EntityLibraries.PROJECTILES)
+                    ? refsTo(projectileNames) : List.of();
+            case LibraryRef.SUMMON_KEY -> refsTo(summonProfileNames);
             case "hitbox" -> EffectSchema.HITBOX_SHAPES;
             case EffectSchema.KEY_CONDITIONS -> EffectSchema.KEY_OVERRIDE.equals(ownerOf(scope))
                     ? AttackConditions.names()
@@ -207,6 +241,9 @@ public final class EffectChoices {
                 if (scope.contains(EffectSchema.ROOT_WEAPON_ROLL)) {
                     yield WeaponRoll.MODES;
                 }
+                if (within(scope, ScaledNumber.KEY_BY)) {
+                    yield EffectSchema.SCALING_MODES;
+                }
                 if (within(scope, KEY_SPAWN)) {
                     yield names(SpreadMode.values());
                 }
@@ -215,6 +252,9 @@ public final class EffectChoices {
                 }
                 if (within(scope, KEY_SCALING)) {
                     yield EffectSchema.SCALING_MODES;
+                }
+                if (scope.contains(EffectSchema.ROOT_STACKING)) {
+                    yield names(EffectStacking.Mode.values());
                 }
                 yield scope.contains(EffectSchema.ROOT_SUBSTITUTION) || within(scope, KEY_SUBSTITUTE)
                         ? SUBSTITUTION_MODES
@@ -226,8 +266,9 @@ public final class EffectChoices {
                     : List.of();
             case "style_id", "substitute_style", "custom_style_id" -> styleIds();
             case "affix_id", "affix", "affixes", "grant_affixes" -> affixIds();
+            case "target" -> entityIdsAndTags();
             case "entity", "summon", "become_entity", "attacker",
-                    "replaced_summoned_entities", "target", SummonGate.ENTITIES -> entityIds();
+                    "replaced_summoned_entities", SummonGate.ENTITIES -> entityIds();
             case "attribute" -> attributeIds();
             case "source", "scales_with" -> scalingSourceIds();
             case "damage_type", "taken_damage_type" -> damageTypeIds();
@@ -242,6 +283,9 @@ public final class EffectChoices {
             case SummonCadence.KEY_AIM -> names(SummonAim.values());
             case ScriptedAbility.Action.KEY_SPELL_TARGET -> names(SummonCastTarget.values());
             case RaiseRules.KEY_PROFILE -> names(RaiseProfile.values());
+            case CustomUse.KEY_HOOK -> within(scope, Customs.KEY)
+                    ? CustomRegistry.idsFor(EffectSchema.customScopeAt(scope))
+                    : List.of();
             case AbilityGrant.KEY_APPLIES_TO -> scope.contains(EffectSchema.ROOT_ABILITY_GRANT)
                     ? names(GrantTarget.values())
                     : List.of();
@@ -266,7 +310,7 @@ public final class EffectChoices {
                     ? particleIds()
                     : List.of();
             case EffectSchema.KEY_USED_BY -> entityIds();
-            case "school", "disable_schools", "impact_school" -> spellSchoolIds();
+            case "school", "disable_schools", "impact_school", StateGate.HAS_SPELL_SCHOOL -> spellSchoolIds();
             case EffectSchema.KEY_SPELL, "grant", "disable" -> spellIds();
             case "disable_mode" -> names(SpellLocks.Mode.values());
             case "cast_target" -> names(CastSpell.Target.values());
@@ -282,7 +326,7 @@ public final class EffectChoices {
             case "entities", MobFilter.KEY_EXEMPT_ENTITIES -> entityIds();
             case MobFilter.KEY_ENTITY_TAGS, MobFilter.KEY_EXEMPT_TAGS ->
                     DropSuggestions.of(DropSuggestions.ENTITY_TAGS);
-            case "effect" -> effectIds();
+            case "effect", DealtGate.KEY_TARGET_EFFECTS -> effectIds();
             case "holding", "wearing", "equipped" -> itemIds();
             case "items", ItemMatch.EXCLUDED_ITEMS -> itemIds();
             case ItemMatch.EXCLUDED_TAGS -> itemTagIds();
@@ -304,6 +348,7 @@ public final class EffectChoices {
                 yield within(scope, SummonActives.KEY) ? activeAbilityIds() : abilityIds();
             }
             case "abilities" -> within(scope, SummonActives.KEY) ? activeAbilityIds() : abilityIds();
+            case KEY_TARGETS -> within(scope, KEY_ORDER) ? targetingNames() : List.of();
             case "finale" -> activeAbilityIds();
             case SummonActives.KEY_PICK -> within(scope, SummonActives.KEY)
                     ? names(AbilityPick.values())
@@ -319,6 +364,14 @@ public final class EffectChoices {
         };
     }
 
+    private static List<String> targetingNames() {
+        List<String> names = new ArrayList<>();
+        for (SummonTargeting targeting : SummonTargeting.values()) {
+            names.add(targeting.key());
+        }
+        return names;
+    }
+
     private static List<String> names(StringRepresentable[] values) {
         List<String> names = new ArrayList<>();
         for (StringRepresentable value : values) {
@@ -329,7 +382,7 @@ public final class EffectChoices {
 
     private static List<String> styleIds() {
         Set<String> ids = new TreeSet<>();
-        for (StylePage page : StyleRegistry.all()) {
+        for (StylePage page : StyleRegistry.distinct()) {
             ids.add(page.styleId());
         }
         for (CustomStyle style : CustomStyles.all()) {
@@ -340,6 +393,15 @@ public final class EffectChoices {
 
     private static List<String> affixIds() {
         return AffixRegistry.all().stream().map(StyleAffix::serializedId).sorted().toList();
+    }
+
+    private static List<String> entityIdsAndTags() {
+        List<String> ids = new ArrayList<>(entityIds());
+        BuiltInRegistries.ENTITY_TYPE.getTagNames()
+                .map(tag -> MobFilter.TAG_MARKER + tag.location())
+                .sorted()
+                .forEach(ids::add);
+        return List.copyOf(ids);
     }
 
     private static List<String> entityIds() {
@@ -413,6 +475,10 @@ public final class EffectChoices {
     private static List<String> scalingSourceIds() {
         Set<String> ids = new TreeSet<>(attributeIds());
         ids.addAll(SpellPowerAccess.schoolIds());
+        for (String enchantment : OptionSources.values(EnchantmentChoices.SELECTOR)) {
+            ids.add(EnchantLevels.SOURCE_PREFIX + EnchantLevels.SEPARATOR + enchantment);
+        }
+        ids.addAll(List.of(UseScope.CHARGE, UseScope.HELD_SECONDS, UseScope.HELD_TICKS));
         return List.copyOf(ids);
     }
 

@@ -3,6 +3,8 @@ package net.pixeldreamstudios.combat_styles.style;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 public record HitboxOffset(float forward, float up, float right,
                            float yaw, float pitch, float roll) {
 
@@ -16,14 +18,14 @@ public record HitboxOffset(float forward, float up, float right,
         this(forward, up, right, 0.0F, 0.0F, 0.0F);
     }
 
-    public static final Codec<HitboxOffset> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<HitboxOffset> CODEC = Customs.wrap(HitboxOffset.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.FLOAT.optionalFieldOf("forward", 0.0F).forGetter(HitboxOffset::forward),
             Codec.FLOAT.optionalFieldOf("up", 0.0F).forGetter(HitboxOffset::up),
             Codec.FLOAT.optionalFieldOf("right", 0.0F).forGetter(HitboxOffset::right),
             Codec.FLOAT.optionalFieldOf("yaw", 0.0F).forGetter(HitboxOffset::yaw),
             Codec.FLOAT.optionalFieldOf("pitch", 0.0F).forGetter(HitboxOffset::pitch),
             Codec.FLOAT.optionalFieldOf("roll", 0.0F).forGetter(HitboxOffset::roll)
-    ).apply(instance, HitboxOffset::new));
+    ).apply(instance, HitboxOffset::new)));
 
     public boolean isEmpty() {
         return forward == 0.0F && up == 0.0F && right == 0.0F && !rotates();

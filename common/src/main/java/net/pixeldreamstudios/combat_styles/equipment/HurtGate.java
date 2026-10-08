@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 
 import net.pixeldreamstudios.combat_styles.affix.DamageTypeMatch;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,7 +20,7 @@ public record HurtGate(boolean enabled, List<String> damageTypes, Optional<Float
     public static final HurtGate ANY = new HurtGate(false, List.of(), Optional.empty(),
             Optional.empty(), Optional.empty(), List.of());
 
-    public static final Codec<HurtGate> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<HurtGate> CODEC = Customs.wrap(HurtGate.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.BOOL.optionalFieldOf("enabled", Boolean.TRUE).forGetter(HurtGate::enabled),
             Codec.STRING.listOf().optionalFieldOf("taken_damage_type", List.of())
                     .forGetter(HurtGate::damageTypes),
@@ -28,7 +29,7 @@ public record HurtGate(boolean enabled, List<String> damageTypes, Optional<Float
             Codec.FLOAT.optionalFieldOf("total_damage_above").forGetter(HurtGate::totalAbove),
             Codec.STRING.listOf().optionalFieldOf("attacker", List.of())
                     .forGetter(HurtGate::attackers)
-    ).apply(instance, HurtGate::new));
+    ).apply(instance, HurtGate::new)));
 
     public HurtGate {
         damageTypes = damageTypes == null ? List.of() : List.copyOf(damageTypes);

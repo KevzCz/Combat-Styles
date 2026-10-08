@@ -13,6 +13,8 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
+import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.style.InnateAffixes;
 import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 
@@ -39,16 +41,33 @@ public record EquipmentDefinition(String id,
                                   List<String> excludedCategories,
                                   UseSpec use,
                                   Optional<String> weaponCategory,
-                                  ActiveIn activeIn) {
+                                  ActiveIn activeIn,
+                                  SwingHands swings,
+                                  boolean hideScopeTooltip,
+                                  boolean hideRarity,
+                                  Map<String, AffixEffects.Projectile> projectiles,
+                                  Map<String, SummonProfile> summonProfiles) {
 
     private static final String WEAPON_CATEGORY = "weapon_category";
+    public static final String HIDE_SCOPE_TOOLTIP = "hide_scope_tooltip";
+    public static final String HIDE_RARITY = "hide_rarity";
 
-    private record Extras(Optional<String> weaponCategory, ActiveIn activeIn) {
+    private record Extras(Optional<String> weaponCategory, ActiveIn activeIn, SwingHands swings,
+                          boolean hideScopeTooltip, boolean hideRarity,
+                          Map<String, AffixEffects.Projectile> projectiles,
+                          Map<String, SummonProfile> summonProfiles) {
     }
 
     private static final MapCodec<Extras> EXTRAS = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Codec.STRING.optionalFieldOf(WEAPON_CATEGORY).forGetter(Extras::weaponCategory),
-            ActiveIn.CODEC.optionalFieldOf(ActiveIn.KEY, ActiveIn.ANY).forGetter(Extras::activeIn)
+            ActiveIn.CODEC.optionalFieldOf(ActiveIn.KEY, ActiveIn.ANY).forGetter(Extras::activeIn),
+            SwingHands.CODEC.optionalFieldOf(SwingHands.KEY, SwingHands.OWN_HAND).forGetter(Extras::swings),
+            Codec.BOOL.optionalFieldOf(HIDE_SCOPE_TOOLTIP, false).forGetter(Extras::hideScopeTooltip),
+            Codec.BOOL.optionalFieldOf(HIDE_RARITY, false).forGetter(Extras::hideRarity),
+            EntityLibraries.PROJECTILES_CODEC.optionalFieldOf(EntityLibraries.PROJECTILES, Map.of())
+                    .forGetter(Extras::projectiles),
+            EntityLibraries.SUMMON_PROFILES_CODEC.optionalFieldOf(EntityLibraries.SUMMON_PROFILES, Map.of())
+                    .forGetter(Extras::summonProfiles)
     ).apply(instance, Extras::new));
 
     private static final MapCodec<EquipmentDefinition> CORE = RecordCodecBuilder.mapCodec(instance -> instance.group(
@@ -86,12 +105,20 @@ public record EquipmentDefinition(String id,
                     .forGetter(EquipmentDefinition::use)
     ).apply(instance, EquipmentDefinition::new));
 
-    public static final Codec<EquipmentDefinition> CODEC = Codec.mapPair(CORE, EXTRAS)
+    public static final Codec<EquipmentDefinition> CODEC = Customs.wrap(EquipmentDefinition.class, EntityLibraries.wrap(Codec.mapPair(CORE, EXTRAS)
             .xmap(pair -> pair.getFirst().withWeaponCategory(pair.getSecond().weaponCategory())
-                            .withActiveIn(pair.getSecond().activeIn()),
+                            .withActiveIn(pair.getSecond().activeIn())
+                            .withSwings(pair.getSecond().swings())
+                            .withHideScopeTooltip(pair.getSecond().hideScopeTooltip())
+                            .withHideRarity(pair.getSecond().hideRarity())
+                            .withProjectiles(pair.getSecond().projectiles())
+                            .withSummonProfiles(pair.getSecond().summonProfiles()),
                     definition -> Pair.of(definition,
-                            new Extras(definition.weaponCategory(), definition.activeIn())))
-            .codec();
+                            new Extras(definition.weaponCategory(), definition.activeIn(),
+                                    definition.swings(), definition.hideScopeTooltip(),
+                                    definition.hideRarity(), definition.projectiles(),
+                                    definition.summonProfiles())))
+            .codec()));
 
     public static final StreamCodec<ByteBuf, EquipmentDefinition> STREAM_CODEC =
             ByteBufCodecs.STRING_UTF8.map(
@@ -122,6 +149,51 @@ public record EquipmentDefinition(String id,
                 ? List.of()
                 : List.copyOf(excludedCategories);
         activeIn = activeIn == null ? ActiveIn.ANY : activeIn;
+        swings = swings == null ? SwingHands.OWN_HAND : swings;
+        projectiles = projectiles == null ? Map.of() : new LinkedHashMap<>(projectiles);
+        summonProfiles = summonProfiles == null ? Map.of() : new LinkedHashMap<>(summonProfiles);
+    }
+
+    public EquipmentDefinition(String id, Map<String, TriggeredEffect> effects,
+                               Map<String, AttributeBonus> attributes, Optional<StyleRarity> rarity,
+                               List<InnateAffixes.Slot> innateAffixes, Map<String, EffectGroup> groups,
+                               Optional<String> pose, Optional<String> offHandPose,
+                               PoseTuning poseTuning, List<String> items, List<String> itemTags,
+                               List<String> weaponCategories, List<String> excludedItems,
+                               List<String> excludedTags, List<String> excludedCategories,
+                               UseSpec use, Optional<String> weaponCategory, ActiveIn activeIn,
+                               SwingHands swings, boolean hideScopeTooltip, boolean hideRarity) {
+        this(id, effects, attributes, rarity, innateAffixes, groups, pose, offHandPose, poseTuning,
+                items, itemTags, weaponCategories, excludedItems, excludedTags, excludedCategories,
+                use, weaponCategory, activeIn, swings, hideScopeTooltip, hideRarity, Map.of(),
+                Map.of());
+    }
+
+    public EquipmentDefinition(String id, Map<String, TriggeredEffect> effects,
+                               Map<String, AttributeBonus> attributes, Optional<StyleRarity> rarity,
+                               List<InnateAffixes.Slot> innateAffixes, Map<String, EffectGroup> groups,
+                               Optional<String> pose, Optional<String> offHandPose,
+                               PoseTuning poseTuning, List<String> items, List<String> itemTags,
+                               List<String> weaponCategories, List<String> excludedItems,
+                               List<String> excludedTags, List<String> excludedCategories,
+                               UseSpec use, Optional<String> weaponCategory, ActiveIn activeIn) {
+        this(id, effects, attributes, rarity, innateAffixes, groups, pose, offHandPose, poseTuning,
+                items, itemTags, weaponCategories, excludedItems, excludedTags, excludedCategories,
+                use, weaponCategory, activeIn, SwingHands.OWN_HAND, false, false);
+    }
+
+    public EquipmentDefinition(String id, Map<String, TriggeredEffect> effects,
+                               Map<String, AttributeBonus> attributes, Optional<StyleRarity> rarity,
+                               List<InnateAffixes.Slot> innateAffixes, Map<String, EffectGroup> groups,
+                               Optional<String> pose, Optional<String> offHandPose,
+                               PoseTuning poseTuning, List<String> items, List<String> itemTags,
+                               List<String> weaponCategories, List<String> excludedItems,
+                               List<String> excludedTags, List<String> excludedCategories,
+                               UseSpec use, Optional<String> weaponCategory, ActiveIn activeIn,
+                               SwingHands swings) {
+        this(id, effects, attributes, rarity, innateAffixes, groups, pose, offHandPose, poseTuning,
+                items, itemTags, weaponCategories, excludedItems, excludedTags, excludedCategories,
+                use, weaponCategory, activeIn, swings, false, false);
     }
 
     public EquipmentDefinition(String id, Map<String, TriggeredEffect> effects,
@@ -153,13 +225,50 @@ public record EquipmentDefinition(String id,
     public EquipmentDefinition withWeaponCategory(Optional<String> category) {
         return new EquipmentDefinition(id, effects, attributes, rarity, innateAffixes, groups, pose,
                 offHandPose, poseTuning, items, itemTags, weaponCategories, excludedItems,
-                excludedTags, excludedCategories, use, category, activeIn);
+                excludedTags, excludedCategories, use, category, activeIn, swings, hideScopeTooltip,
+                hideRarity, projectiles, summonProfiles);
     }
 
     public EquipmentDefinition withActiveIn(ActiveIn scope) {
         return new EquipmentDefinition(id, effects, attributes, rarity, innateAffixes, groups, pose,
                 offHandPose, poseTuning, items, itemTags, weaponCategories, excludedItems,
-                excludedTags, excludedCategories, use, weaponCategory, scope);
+                excludedTags, excludedCategories, use, weaponCategory, scope, swings, hideScopeTooltip,
+                hideRarity, projectiles, summonProfiles);
+    }
+
+    public EquipmentDefinition withSwings(SwingHands hands) {
+        return new EquipmentDefinition(id, effects, attributes, rarity, innateAffixes, groups, pose,
+                offHandPose, poseTuning, items, itemTags, weaponCategories, excludedItems,
+                excludedTags, excludedCategories, use, weaponCategory, activeIn, hands, hideScopeTooltip,
+                hideRarity, projectiles, summonProfiles);
+    }
+
+    public EquipmentDefinition withHideScopeTooltip(boolean hidden) {
+        return new EquipmentDefinition(id, effects, attributes, rarity, innateAffixes, groups, pose,
+                offHandPose, poseTuning, items, itemTags, weaponCategories, excludedItems,
+                excludedTags, excludedCategories, use, weaponCategory, activeIn, swings, hidden,
+                hideRarity, projectiles, summonProfiles);
+    }
+
+    public EquipmentDefinition withProjectiles(Map<String, AffixEffects.Projectile> library) {
+        return new EquipmentDefinition(id, effects, attributes, rarity, innateAffixes, groups, pose,
+                offHandPose, poseTuning, items, itemTags, weaponCategories, excludedItems,
+                excludedTags, excludedCategories, use, weaponCategory, activeIn, swings, hideScopeTooltip,
+                hideRarity, library, summonProfiles);
+    }
+
+    public EquipmentDefinition withSummonProfiles(Map<String, SummonProfile> library) {
+        return new EquipmentDefinition(id, effects, attributes, rarity, innateAffixes, groups, pose,
+                offHandPose, poseTuning, items, itemTags, weaponCategories, excludedItems,
+                excludedTags, excludedCategories, use, weaponCategory, activeIn, swings, hideScopeTooltip,
+                hideRarity, projectiles, library);
+    }
+
+    public EquipmentDefinition withHideRarity(boolean hidden) {
+        return new EquipmentDefinition(id, effects, attributes, rarity, innateAffixes, groups, pose,
+                offHandPose, poseTuning, items, itemTags, weaponCategories, excludedItems,
+                excludedTags, excludedCategories, use, weaponCategory, activeIn, swings, hideScopeTooltip,
+                hidden, projectiles, summonProfiles);
     }
 
     private static Map<String, TriggeredEffect> withEventPayloads(Map<String, TriggeredEffect> effects,

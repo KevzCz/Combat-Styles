@@ -5,12 +5,16 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.item.ItemStack;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public record ItemMatch(List<String> items, List<String> itemTags, List<String> weaponCategories,
                         List<String> excludedItems, List<String> excludedTags,
-                        List<String> excludedCategories, Optional<Boolean> empty) {
+                        List<String> excludedCategories, Optional<Boolean> empty,
+                        Map<String, EnchantLevels.Range> enchantments, boolean enchantmentsAny) {
 
     public static final String ITEMS = "items";
     public static final String ITEM_TAGS = "item_tags";
@@ -19,6 +23,8 @@ public record ItemMatch(List<String> items, List<String> itemTags, List<String> 
     public static final String EXCLUDED_TAGS = "excluded_tags";
     public static final String EXCLUDED_CATEGORIES = "excluded_categories";
     public static final String EMPTY = "empty";
+    public static final String ENCHANTMENTS = "enchantments";
+    public static final String ENCHANTMENTS_ANY = "enchantments_any";
 
     public record Lists(String items, String tags, String categories) {
     }
@@ -27,7 +33,7 @@ public record ItemMatch(List<String> items, List<String> itemTags, List<String> 
     public static final Lists EXCLUDE = new Lists(EXCLUDED_ITEMS, EXCLUDED_TAGS, EXCLUDED_CATEGORIES);
 
     public static final ItemMatch NONE = new ItemMatch(List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), Optional.empty());
+            List.of(), List.of(), List.of(), Optional.empty(), Map.of(), false);
 
     public static final MapCodec<ItemMatch> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Codec.STRING.listOf().optionalFieldOf(ITEMS, List.of()).forGetter(ItemMatch::items),
@@ -40,10 +46,13 @@ public record ItemMatch(List<String> items, List<String> itemTags, List<String> 
                     .forGetter(ItemMatch::excludedTags),
             Codec.STRING.listOf().optionalFieldOf(EXCLUDED_CATEGORIES, List.of())
                     .forGetter(ItemMatch::excludedCategories),
-            Codec.BOOL.optionalFieldOf(EMPTY).forGetter(ItemMatch::empty)
+            Codec.BOOL.optionalFieldOf(EMPTY).forGetter(ItemMatch::empty),
+            Codec.unboundedMap(Codec.STRING, EnchantLevels.Range.CODEC)
+                    .optionalFieldOf(ENCHANTMENTS, Map.of()).forGetter(ItemMatch::enchantments),
+            Codec.BOOL.optionalFieldOf(ENCHANTMENTS_ANY, false).forGetter(ItemMatch::enchantmentsAny)
     ).apply(instance, ItemMatch::new));
 
-    public static final Codec<ItemMatch> CODEC = MAP_CODEC.codec();
+    public static final Codec<ItemMatch> CODEC = Customs.wrap(ItemMatch.class, MAP_CODEC.codec());
 
     public ItemMatch {
         items = meaningful(items);
@@ -53,6 +62,7 @@ public record ItemMatch(List<String> items, List<String> itemTags, List<String> 
         excludedTags = meaningful(excludedTags);
         excludedCategories = meaningful(excludedCategories);
         empty = empty == null ? Optional.empty() : empty;
+        enchantments = enchantments == null ? Map.of() : Map.copyOf(enchantments);
     }
 
     private static List<String> meaningful(List<String> entries) {
@@ -70,7 +80,7 @@ public record ItemMatch(List<String> items, List<String> itemTags, List<String> 
     }
 
     public boolean isEmpty() {
-        return !picks() && !excludes() && empty.isEmpty();
+        return !picks() && !excludes() && empty.isEmpty() && enchantments.isEmpty();
     }
 
     public boolean test(ItemStack stack) {
@@ -84,6 +94,10 @@ public record ItemMatch(List<String> items, List<String> itemTags, List<String> 
         }
         if (picks() && stacks.stream().noneMatch(stack ->
                 WeaponMatch.targets(stack, items, itemTags, weaponCategories))) {
+            return false;
+        }
+        if (!enchantments.isEmpty() && stacks.stream().noneMatch(stack ->
+                EnchantLevels.matches(stack, enchantments, enchantmentsAny))) {
             return false;
         }
         return !excludes() || stacks.stream().noneMatch(stack ->

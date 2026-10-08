@@ -77,7 +77,9 @@ public class ChoicePickerScreen extends PickerScreen<String> {
             return Optional.of(Component.translatable(KEY_BAD_NAME));
         }
         onPick.accept(created.get());
-        minecraft.setScreen(parent);
+        if (!handsOff) {
+            minecraft.setScreen(parent);
+        }
         return Optional.empty();
     }
 

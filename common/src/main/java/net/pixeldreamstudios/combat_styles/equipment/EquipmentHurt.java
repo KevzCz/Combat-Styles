@@ -7,7 +7,7 @@ import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.api.CombatScheduler;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.AffixImpacts;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.EquipmentAffix;
@@ -94,7 +94,7 @@ public final class EquipmentHurt {
                 Runnable fire = () -> {
                     AffixImpacts.applySelfEffects(player, match.entry().selfEffects());
                     for (AffixEffects.OnHit payload : payloads) {
-                        AffixDamageDealer.applyHurtReaction(player, attacker, affix,
+                        CombatEffectDealer.applyHurtReaction(player, attacker, affix,
                                 payload, amount);
                     }
                 };

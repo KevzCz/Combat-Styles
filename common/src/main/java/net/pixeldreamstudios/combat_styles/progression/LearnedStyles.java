@@ -8,7 +8,6 @@ import net.minecraft.nbt.Tag;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
-import net.pixeldreamstudios.combat_styles.style.StylePage;
 import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 
 import java.util.HashSet;
@@ -58,7 +57,11 @@ public class LearnedStyles {
     }
 
     public int count(String styleId) {
-        return styleId == null ? 0 : copies.getOrDefault(styleId, 0);
+        if (styleId == null) {
+            return 0;
+        }
+        Integer own = copies.get(styleId);
+        return own != null ? own : copies.getOrDefault(StyleRegistry.representativeOf(styleId), 0);
     }
 
     public boolean learn(String styleId) {
@@ -251,10 +254,10 @@ public class LearnedStyles {
             return key;
         }
         String styleId = StyleEntry.styleIdOfKey(key);
-        StylePage page = StyleRegistry.get(styleId);
-        if (page == null || page.styleId().equals(styleId)) {
+        String representative = StyleRegistry.representativeOf(styleId);
+        if (representative == null || representative.equals(styleId)) {
             return key;
         }
-        return StyleEntry.key(page.styleId(), StyleEntry.affixIdsOfKey(key));
+        return StyleEntry.key(representative, StyleEntry.affixIdsOfKey(key));
     }
 }

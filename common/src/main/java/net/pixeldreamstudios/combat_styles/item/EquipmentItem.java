@@ -10,7 +10,6 @@ import net.pixeldreamstudios.combat_styles.equipment.AccessoryCompat;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentTooltip;
-import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 
 import java.util.List;
 
@@ -39,16 +38,15 @@ public class EquipmentItem extends Item {
                                 List<Component> tooltip, TooltipFlag flag) {
         EquipmentDefinition own = EquipmentTooltip.shownFor(stack);
         EquipmentDefinition definition = own == null ? definition() : own;
-        StyleRarity rarity = definition == null
-                ? StyleRarity.COMMON
-                : definition.rarity().orElse(StyleRarity.COMMON);
 
         tooltip.add(Component.translatable(getDescriptionId() + DESC_SUFFIX)
                 .withStyle(ChatFormatting.DARK_GRAY));
-        tooltip.add(Component.translatable(rarity.translationKey())
-                .withStyle(rarity.color()));
+        if (definition != null && !definition.hideRarity()) {
+            definition.rarity().ifPresent(rarity -> tooltip.add(
+                    Component.translatable(rarity.translationKey()).withStyle(rarity.color())));
+        }
 
-        ItemTooltip.expandable(tooltip, lines -> EquipmentTooltip.append(definition, lines));
+        ItemTooltip.equipmentExpandable(tooltip, lines -> EquipmentTooltip.append(definition, lines));
 
         if (!AccessoryCompat.isLoaded()) {
             tooltip.add(Component.translatable(KEY_NO_SLOT).withStyle(ChatFormatting.RED));

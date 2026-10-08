@@ -1,5 +1,6 @@
 package net.pixeldreamstudios.combat_styles.loot;
 
+import net.minecraft.Util;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -62,6 +63,27 @@ public final class WeaponRolls {
                 || !CombatStylesConfig.get().weaponRollsEnabled()) {
             return false;
         }
+        return drawOnto(stack, null, random);
+    }
+
+    public static boolean apply(ItemStack stack, ResourceLocation table, RandomSource random) {
+        return CombatStylesConfig.get().weaponRollsEnabled() && rollFresh(stack, table, random);
+    }
+
+    public static boolean applyCrafted(ItemStack stack, RandomSource random) {
+        return CombatStylesConfig.get().rollCraftedWeapons() && rollFresh(stack, null, random);
+    }
+
+    private static boolean rollFresh(ItemStack stack, ResourceLocation table, RandomSource random) {
+        if (stack == null || stack.isEmpty() || ROLLS.isEmpty()
+                || !SequenceService.customSequenceOf(stack).isEmpty()
+                || !SequenceService.rolledSequenceOf(stack).isEmpty()) {
+            return false;
+        }
+        return drawOnto(stack, table, random);
+    }
+
+    private static boolean drawOnto(ItemStack stack, ResourceLocation table, RandomSource random) {
         if (!SequenceService.isSupported(stack) && !adoptable(stack)) {
             return false;
         }
@@ -70,12 +92,12 @@ public final class WeaponRolls {
 
         List<WeaponRoll> candidates = new ArrayList<>();
         for (WeaponRoll roll : ROLLS) {
-            if (matches(roll, stack, itemId, category, null)) {
+            if (roll.weight() > 0.0F && matches(roll, stack, itemId, category, table)) {
                 candidates.add(roll);
             }
         }
         while (!candidates.isEmpty()) {
-            WeaponRoll roll = candidates.remove(random.nextInt(candidates.size()));
+            WeaponRoll roll = candidates.remove(weightedIndex(candidates, random));
             if (rollOnto(stack, roll, category, random)) {
                 return true;
             }
@@ -83,35 +105,19 @@ public final class WeaponRolls {
         return false;
     }
 
-    public static boolean apply(ItemStack stack, ResourceLocation table, RandomSource random) {
-        if (stack == null || stack.isEmpty() || ROLLS.isEmpty()
-                || !CombatStylesConfig.get().weaponRollsEnabled()
-                || !SequenceService.customSequenceOf(stack).isEmpty()
-                || !SequenceService.rolledSequenceOf(stack).isEmpty()) {
-            return false;
+    private static int weightedIndex(List<WeaponRoll> candidates, RandomSource random) {
+        double total = 0.0D;
+        for (WeaponRoll roll : candidates) {
+            total += roll.weight();
         }
-        if (!SequenceService.isSupported(stack) && !adoptable(stack)) {
-            return false;
-        }
-
-        String category = SequenceService.categoryOf(stack);
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
-
-        List<WeaponRoll> candidates = new ArrayList<>();
-        for (WeaponRoll roll : ROLLS) {
-            float chance = (float) (roll.chance()
-                    * CombatStylesConfig.get().weaponRollChanceMultiplier());
-            if (matches(roll, stack, itemId, category, table) && random.nextFloat() < chance) {
-                candidates.add(roll);
+        double pick = random.nextDouble() * total;
+        for (int index = 0; index < candidates.size(); index++) {
+            pick -= candidates.get(index).weight();
+            if (pick < 0.0D) {
+                return index;
             }
         }
-        while (!candidates.isEmpty()) {
-            WeaponRoll roll = candidates.remove(random.nextInt(candidates.size()));
-            if (rollOnto(stack, roll, category, random)) {
-                return true;
-            }
-        }
-        return false;
+        return candidates.size() - 1;
     }
 
     public static String diagnose(ItemStack stack) {
@@ -379,13 +385,16 @@ public final class WeaponRolls {
         if (page == null) {
             return picked;
         }
+        if (roll.styles().isEmpty() && picked.customStyleId().isEmpty()) {
+            page = StyleRegistry.variantOf(page, random);
+        }
 
         List<String> affixIds = new ArrayList<>(template.affixIds());
         addAffixes(affixIds, page, roll, random);
 
         boolean custom = picked.customStyleId().isPresent();
         StyleEntry entry = new StyleEntry(
-                custom ? picked.rawStyleId() : template.styleId(),
+                custom ? picked.rawStyleId() : page.styleId(),
                 custom ? picked.soundId() : template.soundId(),
                 StyleEntry.sorted(affixIds),
                 custom ? picked.attackOverride() : template.attackOverride(),
@@ -403,7 +412,9 @@ public final class WeaponRolls {
         int cap = Math.max(0, roll.maxAffixes());
         int before = affixIds.size();
 
-        for (String requested : roll.affixes()) {
+        List<String> requestedOrder = new ArrayList<>(roll.affixes());
+        Util.shuffle(requestedOrder, random);
+        for (String requested : requestedOrder) {
             if (affixIds.size() >= cap) {
                 break;
             }
@@ -453,8 +464,8 @@ public final class WeaponRolls {
             return pool;
         }
         List<StylePage> pages = StylePool.natural(category == null
-                ? StyleRegistry.all()
-                : StyleRegistry.forCategory(category));
+                ? StyleRegistry.distinct()
+                : StyleRegistry.distinctFor(category));
         for (StylePage page : pages) {
             StyleEntry entry = SequenceService.entryFor(page.styleId());
             if (entry != null) {

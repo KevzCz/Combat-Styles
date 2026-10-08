@@ -7,7 +7,9 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 
+import net.pixeldreamstudios.combat_styles.affix.AffixText;
 import net.pixeldreamstudios.combat_styles.affix.DamageTypeMatch;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.style.AttackAttribute;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
 
@@ -24,19 +26,16 @@ public record DamageBonus(List<String> damageTypes, double amount,
     private static final String KEY_PERCENT = "tooltip.combat_styles.damage_bonus.percent";
     private static final String KEY_MULTIPLIER = "tooltip.combat_styles.damage_bonus.multiplier";
     private static final String KEY_ANY = "tooltip.combat_styles.damage_bonus.any";
-    private static final String TYPE_JOIN = ", ";
-    private static final String TAG_MARKER = "#";
-    private static final char NAMESPACE_SEPARATOR = ':';
     private static final double PERCENT = 100.0D;
 
-    public static final Codec<DamageBonus> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<DamageBonus> CODEC = Customs.wrap(DamageBonus.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.listOf().optionalFieldOf("damage_type", List.of())
                     .forGetter(DamageBonus::damageTypes),
             Codec.DOUBLE.fieldOf("amount").forGetter(DamageBonus::amount),
             AttackAttribute.OPERATION_CODEC.optionalFieldOf("operation",
                     AttributeModifier.Operation.ADD_VALUE).forGetter(DamageBonus::operation),
             Codec.BOOL.optionalFieldOf("stacks", true).forGetter(DamageBonus::stacks)
-    ).apply(instance, DamageBonus::new));
+    ).apply(instance, DamageBonus::new)));
 
     public static final Codec<List<DamageBonus>> LIST_CODEC = CODEC.listOf();
 
@@ -57,8 +56,7 @@ public record DamageBonus(List<String> damageTypes, double amount,
     public MutableComponent describe() {
         Component types = damageTypes.isEmpty()
                 ? Component.translatable(KEY_ANY)
-                : Component.literal(String.join(TYPE_JOIN,
-                        damageTypes.stream().map(DamageBonus::typeName).toList()));
+                : Component.literal(AffixText.damageTypeNames(damageTypes));
         return switch (operation) {
             case ADD_MULTIPLIED_BASE -> Component.translatable(KEY_PERCENT,
                     StyleText.formatDecimal(amount * PERCENT), types);
@@ -66,14 +64,6 @@ public record DamageBonus(List<String> damageTypes, double amount,
                     StyleText.formatDecimal(1.0D + amount), types);
             default -> Component.translatable(KEY_FLAT, StyleText.formatDecimal(amount), types);
         };
-    }
-
-    private static String typeName(String raw) {
-        boolean tag = raw.startsWith(TAG_MARKER);
-        String id = tag ? raw.substring(TAG_MARKER.length()) : raw;
-        int split = id.indexOf(NAMESPACE_SEPARATOR);
-        String name = StyleText.prettify(split < 0 ? id : id.substring(split + 1));
-        return tag ? TAG_MARKER + name : name;
     }
 
     private String stackKey() {

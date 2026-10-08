@@ -27,6 +27,7 @@ import net.pixeldreamstudios.combat_styles.equipment.EventPayloads;
 import net.pixeldreamstudios.combat_styles.equipment.StyleSubstitution;
 import net.pixeldreamstudios.combat_styles.equipment.SummonDive;
 import net.pixeldreamstudios.combat_styles.equipment.SummonProfile;
+import net.pixeldreamstudios.combat_styles.equipment.EffectStacking;
 import net.pixeldreamstudios.combat_styles.equipment.SelfEffectList;
 import net.pixeldreamstudios.combat_styles.equipment.TooltipOverride;
 import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
@@ -44,6 +45,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class EffectEditorScreen extends PanelScreen {
 
@@ -108,10 +110,11 @@ public class EffectEditorScreen extends PanelScreen {
     private static final String ROW_SUMMON_PROFILE = "screen.combat_styles.effect_row_summon_profile";
     private static final String ROW_SUMMON_DIVE = "screen.combat_styles.effect_row_summon_dive";
     private static final String ROW_GRANT_ABILITIES = "screen.combat_styles.effect_row_grant_abilities";
-    private static final String ROW_HIDE_TOOLTIP = "screen.combat_styles.effect_row_hide_tooltip";
-    private static final String ROW_TOOLTIP_TEXT = "screen.combat_styles.effect_row_tooltip_text";
+    private static final String ROW_TOOLTIP = "screen.combat_styles.effect_row_tooltip";
+    private static final String KEY_TOOLTIP_HIDDEN = "screen.combat_styles.tooltip_editor_state_hidden";
     private static final String ROW_DELAY = "screen.combat_styles.effect_row_delay";
     private static final String ROW_SELF_EFFECTS = "screen.combat_styles.effect_row_self_effects";
+    private static final String ROW_STACKING = "screen.combat_styles.effect_row_stacking";
 
     private static final StyleSubstitution BLANK_SUBSTITUTION = new StyleSubstitution(
             List.of(), List.of(), StyleSubstitution.MODE_REPLACE_ALL, List.of(), List.of(),
@@ -129,7 +132,7 @@ public class EffectEditorScreen extends PanelScreen {
                 ROW_GRANTS, ROW_TUNES, ROW_ATTRS, ROW_DAMAGE_BONUS, ROW_ON_SWING, ROW_ON_HIT,
                 ROW_EVENTS, ROW_ECHO,
                 ROW_RESET, ROW_SUMMON_PROFILE, ROW_SUMMON_DIVE, ROW_GRANT_ABILITIES,
-                ROW_HIDE_TOOLTIP, ROW_TOOLTIP_TEXT, ROW_DELAY, ROW_SELF_EFFECTS));
+                ROW_TOOLTIP, ROW_DELAY, ROW_STACKING, ROW_SELF_EFFECTS));
         if (SpellEngineCompat.isLoaded()) {
             rows.add(rows.indexOf(ROW_ECHO), ROW_SPELLS);
         }
@@ -137,6 +140,7 @@ public class EffectEditorScreen extends PanelScreen {
     }
 
     private final BiConsumer<String, TriggeredEffect> onApply;
+    private final Supplier<EquipmentDefinition> definition;
     private final String originalName;
 
     private TriggeredEffect effect;
@@ -147,9 +151,11 @@ public class EffectEditorScreen extends PanelScreen {
     private List<Component> tooltip;
 
     public EffectEditorScreen(Screen parent, String name, TriggeredEffect effect,
+                              Supplier<EquipmentDefinition> definition,
                               BiConsumer<String, TriggeredEffect> onApply) {
         super(Component.translatable(KEY_TITLE), parent);
         this.originalName = name;
+        this.definition = definition;
         this.effect = effect;
         this.onApply = onApply;
     }
@@ -282,10 +288,10 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_ECHO -> flag(payload.echo().isPresent());
             case ROW_SPELLS -> flag(!payload.spells().isEmpty());
             case ROW_RESET -> count(payload.resetCombo().orElse(0));
-            case ROW_HIDE_TOOLTIP -> flag(effect.hideTooltip());
-            case ROW_TOOLTIP_TEXT -> flag(!effect.tooltip().isEmpty());
+            case ROW_TOOLTIP -> tooltipLabel();
             case ROW_DELAY -> delayLabel();
             case ROW_SELF_EFFECTS -> count(effect.selfEffects().size());
+            case ROW_STACKING -> text(effect.stacking().map(EffectStacking::source).orElse(null));
             case ROW_SUMMON_PROFILE -> flag(payload.summonProfile().isPresent());
             case ROW_SUMMON_DIVE -> flag(payload.summonDive().isPresent());
             case ROW_GRANT_ABILITIES -> flag(payload.grantAbilities().isPresent());
@@ -414,10 +420,12 @@ public class EffectEditorScreen extends PanelScreen {
         switch (row) {
             case ROW_COOLDOWN -> openCooldown();
             case ROW_RESET -> beginRepeatEdit();
-            case ROW_HIDE_TOOLTIP -> effect = effect.withHideTooltip(!effect.hideTooltip());
-            case ROW_TOOLTIP_TEXT -> openTooltipText();
+            case ROW_TOOLTIP -> openTooltip();
             case ROW_DELAY -> beginDelayEdit();
             case ROW_SELF_EFFECTS -> openSelfEffects();
+            case ROW_STACKING -> openTree(ROW_STACKING, EffectStacking.CODEC,
+                    effect.stacking().orElse(EffectStacking.SAMPLE),
+                    applied -> effect = effect.withStacking(applied));
             case ROW_AUGMENT -> openAugment();
             case ROW_SUBSTITUTE -> openSubstitute();
             case ROW_TRIGGER -> openTree(ROW_TRIGGER, EquipmentTrigger.CODEC,
@@ -537,6 +545,7 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_ECHO -> EffectSchema.ROOT_ECHO;
             case ROW_SPELLS -> EffectSchema.ROOT_SPELLS;
             case ROW_ATTRS -> EffectSchema.ROOT_CONDITIONAL_ATTRIBUTES;
+            case ROW_STACKING -> EffectSchema.ROOT_STACKING;
             case ROW_DAMAGE_BONUS -> EffectSchema.ROOT_DAMAGE_BONUS;
             default -> EffectSchema.ROOT_EFFECT;
         };
@@ -577,12 +586,19 @@ public class EffectEditorScreen extends PanelScreen {
                 .withSchema(EffectSchema.ROOT_COOLDOWN));
     }
 
-    private void openTooltipText() {
-        minecraft.setScreen(new EffectTreeScreen(this,
-                Component.translatable(ROW_TOOLTIP_TEXT),
-                TooltipOverride.CODEC, effect.tooltip(), applied -> effect =
-                        effect.withTooltip(applied.orElse(TooltipOverride.NONE)))
-                .withSchema(EffectSchema.ROOT_TOOLTIP));
+    private void openTooltip() {
+        String name = nameBox.getValue().trim();
+        minecraft.setScreen(new TooltipEditorScreen(this, definition,
+                name.isBlank() ? originalName : name, effect, edited -> effect = edited));
+    }
+
+    private Component tooltipLabel() {
+        if (effect.hideTooltip()) {
+            return Component.translatable(KEY_TOOLTIP_HIDDEN);
+        }
+        TooltipOverride override = effect.tooltip();
+        return count(override.edits().size() + override.lines().size()
+                + (override.header().isEmpty() ? 0 : 1));
     }
 
     private void beginRepeatEdit() {
@@ -659,10 +675,11 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_DAMAGE_BONUS -> setPayload(EquipmentEffects.withDamageBonus(payload, List.of()));
             case ROW_COOLDOWN -> effect = effect.withCooldown(EffectCooldown.NONE);
             case ROW_TRIGGER -> effect = effect.withTrigger(EquipmentTrigger.ALWAYS);
-            case ROW_HIDE_TOOLTIP -> effect = effect.withHideTooltip(false);
-            case ROW_TOOLTIP_TEXT -> effect = effect.withTooltip(TooltipOverride.NONE);
+            case ROW_TOOLTIP -> effect = effect.withHideTooltip(false)
+                    .withTooltip(TooltipOverride.NONE);
             case ROW_DELAY -> effect = effect.withDelayTicks(TriggeredEffect.NO_DELAY);
             case ROW_SELF_EFFECTS -> effect = effect.withSelfEffects(List.of());
+            case ROW_STACKING -> effect = effect.withStacking(Optional.empty());
             default -> {
             }
         }
@@ -688,8 +705,8 @@ public class EffectEditorScreen extends PanelScreen {
             case ROW_DAMAGE_BONUS -> !payload.damageBonus().isEmpty();
             case ROW_COOLDOWN -> !effect.cooldown().isEmpty();
             case ROW_TRIGGER -> !effect.trigger().equals(EquipmentTrigger.ALWAYS);
-            case ROW_HIDE_TOOLTIP -> effect.hideTooltip();
-            case ROW_TOOLTIP_TEXT -> !effect.tooltip().isEmpty();
+            case ROW_TOOLTIP -> effect.hideTooltip() || !effect.tooltip().isEmpty();
+            case ROW_STACKING -> effect.stacking().isPresent();
             default -> false;
         };
     }

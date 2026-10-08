@@ -100,7 +100,7 @@ public final class StyleLoot {
     }
 
     public static StylePage weightedPick(RandomSource random) {
-        List<StylePage> pages = StylePool.natural(StyleRegistry.all());
+        List<StylePage> pages = StylePool.natural(StyleRegistry.distinct());
         if (pages.isEmpty()) {
             return null;
         }
@@ -112,9 +112,9 @@ public final class StyleLoot {
             }
         }
         if (weighted.isEmpty()) {
-            return pages.get(random.nextInt(pages.size()));
+            return StyleRegistry.variantOf(pages.get(random.nextInt(pages.size())), random);
         }
-        return weighted.get(random.nextInt(weighted.size()));
+        return StyleRegistry.variantOf(weighted.get(random.nextInt(weighted.size())), random);
     }
 
     private static int weightOf(StyleRarity rarity) {

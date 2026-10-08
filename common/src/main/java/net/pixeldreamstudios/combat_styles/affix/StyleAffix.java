@@ -13,6 +13,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
 
 import net.pixeldreamstudios.combat_styles.api.AffixInfo;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.damage.DamageBonus;
 import net.pixeldreamstudios.combat_styles.style.AttackBehaviour;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
@@ -43,7 +44,12 @@ public record StyleAffix(ResourceLocation id,
         damageBonus = damageBonus == null ? List.of() : List.copyOf(damageBonus);
     }
 
-    public static final Codec<StyleAffix> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public StyleAffix withPayloads(AffixEffects.OnHit hit, AffixEffects.OnHit swing) {
+        return Customs.copy(this, new StyleAffix(id, weight, rarity, trail, hit, swing, appliesTo,
+                costModifier, damageMultiplier, behaviour, damageBonus));
+    }
+
+    public static final Codec<StyleAffix> CODEC = Customs.wrap(StyleAffix.class, RecordCodecBuilder.create(instance -> instance.group(
             ResourceLocation.CODEC.fieldOf("id").forGetter(StyleAffix::id),
             Codec.INT.optionalFieldOf("weight", DEFAULT_WEIGHT).forGetter(StyleAffix::weight),
             StyleRarity.CODEC.optionalFieldOf("rarity", StyleRarity.UNCOMMON).forGetter(StyleAffix::rarity),
@@ -56,7 +62,7 @@ public record StyleAffix(ResourceLocation id,
             AttackBehaviour.CODEC.optionalFieldOf("behaviour").forGetter(StyleAffix::behaviour),
             DamageBonus.LIST_CODEC.optionalFieldOf(DamageBonus.KEY, List.of())
                     .forGetter(StyleAffix::damageBonus)
-    ).apply(instance, StyleAffix::new));
+    ).apply(instance, StyleAffix::new)));
 
     public static final StreamCodec<ByteBuf, StyleAffix> STREAM_CODEC =
             ByteBufCodecs.STRING_UTF8.map(
@@ -70,10 +76,10 @@ public record StyleAffix(ResourceLocation id,
 
     public record TrailColor(String color, boolean glows) {
 
-        public static final Codec<TrailColor> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<TrailColor> CODEC = Customs.wrap(TrailColor.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("color").forGetter(TrailColor::color),
                 Codec.BOOL.optionalFieldOf("glows", true).forGetter(TrailColor::glows)
-        ).apply(instance, TrailColor::new));
+        ).apply(instance, TrailColor::new)));
 
         public long rgba() {
             String hex = color.startsWith("#") ? color.substring(1) : color;
@@ -95,11 +101,11 @@ public record StyleAffix(ResourceLocation id,
 
         public static final AppliesTo ANY = new AppliesTo(List.of(), List.of(), List.of());
 
-        public static final Codec<AppliesTo> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<AppliesTo> CODEC = Customs.wrap(AppliesTo.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.listOf().optionalFieldOf("hitbox", List.of()).forGetter(AppliesTo::hitboxes),
                 Codec.STRING.listOf().optionalFieldOf("categories", List.of()).forGetter(AppliesTo::categories),
                 Codec.STRING.listOf().optionalFieldOf("animations", List.of()).forGetter(AppliesTo::animations)
-        ).apply(instance, AppliesTo::new));
+        ).apply(instance, AppliesTo::new)));
 
         public boolean matches(StylePage page) {
             if (page == null) {

@@ -4,6 +4,7 @@ import net.bettercombat.api.AttackHand;
 import net.bettercombat.api.ComboState;
 import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
@@ -142,6 +143,19 @@ public record EquipmentContext(Player player,
 
     public boolean hasTarget() {
         return target != null;
+    }
+
+    public float reactionDamage() {
+        if (dealtDamage > 0.0F) {
+            return dealtDamage;
+        }
+        if (hurt != null) {
+            return hurt.amount();
+        }
+        if (blocked != null) {
+            return blocked.amount();
+        }
+        return player == null ? 0.0F : (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
     }
 
     public boolean fromSwing() {

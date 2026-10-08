@@ -31,7 +31,6 @@ public class MultiChoiceScreen extends PickerScreen<String> {
     private static final String MARK_ON = "✔";
     private static final String MARK_OFF = "•";
 
-    private final Component subtitle;
     private final List<String> options = new ArrayList<>();
     private final Set<String> picked = new LinkedHashSet<>();
     private final Consumer<List<String>> onApply;
@@ -42,8 +41,7 @@ public class MultiChoiceScreen extends PickerScreen<String> {
 
     public MultiChoiceScreen(Screen parent, Component subtitle, List<String> choices,
                              List<String> current, Consumer<List<String>> onApply) {
-        super(Component.translatable(KEY_TITLE), parent);
-        this.subtitle = subtitle;
+        super(subtitle == null ? Component.translatable(KEY_TITLE) : subtitle, parent);
         this.onApply = onApply;
         this.options.addAll(choices);
         if (current != null) {
@@ -175,12 +173,5 @@ public class MultiChoiceScreen extends PickerScreen<String> {
                         width - MARK_WIDTH - 8 - tagWidth),
                 x + MARK_WIDTH, y + TEXT_INSET,
                 on ? ScreenTheme.TEXT : ScreenTheme.MUTED, false);
-    }
-
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-
-        drawTitle(graphics, subtitle, top + TITLE_Y);
     }
 }

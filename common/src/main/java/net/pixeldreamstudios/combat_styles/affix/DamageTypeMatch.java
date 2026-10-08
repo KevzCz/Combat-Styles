@@ -6,12 +6,16 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
+import net.pixeldreamstudios.combat_styles.CombatStyles;
 
 import java.util.List;
 
 public final class DamageTypeMatch {
 
     private static final String TAG_PREFIX = "#";
+
+    public static final TagKey<DamageType> COUNTS_AS_ANY = TagKey.create(Registries.DAMAGE_TYPE,
+            ResourceLocation.fromNamespaceAndPath(CombatStyles.MOD_ID, "counts_as_any"));
 
     private DamageTypeMatch() {
     }
@@ -26,6 +30,9 @@ public final class DamageTypeMatch {
         }
         if (type == null) {
             return false;
+        }
+        if (type.is(COUNTS_AS_ANY)) {
+            return true;
         }
         for (String entry : accepted) {
             if (matchesOne(entry, type)) {

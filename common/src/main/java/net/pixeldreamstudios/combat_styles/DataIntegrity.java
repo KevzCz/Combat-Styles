@@ -128,6 +128,13 @@ public final class DataIntegrity {
                             + " fires on a hit or an event with no uses/duration, so the"
                             + " attack is already built and the change never applies");
                 }
+                if (named.getValue().effect().rewritesAttack()
+                        && named.getValue().trigger().needsTarget()) {
+                    problems.add(where + " rewrites the attack (augment, granted or tuned"
+                            + " affixes), but its trigger needs a target; the attack is built"
+                            + " before there is one, so the change never applies. Use an on_hit"
+                            + " payload instead");
+                }
                 if (nestedChance(named.getValue().trigger())) {
                     problems.add(where + " sets chance inside any_of or all_of, which is"
                             + " ignored; put it on the top-level trigger");

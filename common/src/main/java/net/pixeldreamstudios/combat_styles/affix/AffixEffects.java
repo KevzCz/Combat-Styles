@@ -1,6 +1,8 @@
 package net.pixeldreamstudios.combat_styles.affix;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
+import net.pixeldreamstudios.combat_styles.damage.ScaledNumbers;
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 public final class AffixEffects {
     public static OnHit tune(OnHit onHit, Optional<Double> chance, Optional<Integer> cooldown) {
@@ -53,11 +56,18 @@ public final class AffixEffects {
             mechanics = mechanics.withCooldown(new Cooldown(cooldown.get()));
         }
 
-        return new OnHit(onHit.damage(), onHit.damages(), statusEffects, ignite, lifesteal,
+        OnHit tuned = Customs.copy(onHit, new OnHit(onHit.damage(), onHit.damages(), statusEffects, ignite, lifesteal,
                 onHit.knockback(), onHit.splash(), onHit.selfEffects(), onHit.sound(),
                 onHit.particles(), onHit.projectiles(), onHit.castSpells(), onHit.slashWave(),
-                mechanics, onHit.freezeTicks(), onHit.delayTicks(), onHit.echo());
+                mechanics, onHit.freezeTicks(), onHit.delayTicks(), onHit.echo()));
+        return ScaledNumbers.carry(onHit, tuned, path ->
+                (chance.isPresent() && TUNED_CHANCE.matcher(path).matches())
+                        || (cooldown.isPresent() && path.startsWith(TUNED_COOLDOWN)));
     }
+
+    private static final Pattern TUNED_CHANCE =
+            Pattern.compile("(ignite|lifesteal|effects/\\d+)/chance");
+    private static final String TUNED_COOLDOWN = "mechanics/cooldown";
 
     private AffixEffects() {
     }
@@ -103,12 +113,12 @@ public final class AffixEffects {
                                 ? Either.left(list.getFirst())
                                 : Either.right(list));
 
-        public static final Codec<Scaling> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Scaling> CODEC = Customs.wrap(Scaling.class, RecordCodecBuilder.create(instance -> instance.group(
                 SOURCE_CODEC.fieldOf("source").forGetter(Scaling::sources),
                 Codec.FLOAT.optionalFieldOf("per_point", 0.0F).forGetter(Scaling::perPoint),
                 Codec.FLOAT.optionalFieldOf("cap").forGetter(Scaling::cap),
                 Codec.BOOL.optionalFieldOf("strongest", true).forGetter(Scaling::strongest)
-        ).apply(instance, Scaling::new));
+        ).apply(instance, Scaling::new)));
 
         public float apply(float base, double sourceValue) {
             float bonus = (float) (perPoint * sourceValue);
@@ -118,16 +128,26 @@ public final class AffixEffects {
 
     public record Damage(DamageMode mode, String damageType, Optional<String> school,
                          float ratio, float flat, boolean ignoresArmour,
-                         Optional<Scaling> scaling) {
-        public static final Codec<Damage> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                         Optional<Scaling> scaling, float multiplier) {
+        public static final float NO_MULTIPLIER = 1.0F;
+        public static final String KEY_MULTIPLIER = "multiplier";
+        public static final String KEY_RATIO = "ratio";
+
+        public static final Codec<Damage> CODEC = Customs.wrap(Damage.class, RecordCodecBuilder.create(instance -> instance.group(
                 DamageMode.CODEC.optionalFieldOf("mode", DamageMode.ADDITIVE).forGetter(Damage::mode),
                 Codec.STRING.optionalFieldOf("type", "").forGetter(Damage::damageType),
                 Codec.STRING.optionalFieldOf("school").forGetter(Damage::school),
-                Codec.FLOAT.optionalFieldOf("ratio", 0.0F).forGetter(Damage::ratio),
+                Codec.FLOAT.optionalFieldOf(KEY_RATIO, 0.0F).forGetter(Damage::ratio),
                 Codec.FLOAT.optionalFieldOf("flat", 0.0F).forGetter(Damage::flat),
                 Codec.BOOL.optionalFieldOf("ignores_armour", false).forGetter(Damage::ignoresArmour),
-                Scaling.CODEC.optionalFieldOf("scaling").forGetter(Damage::scaling)
-        ).apply(instance, Damage::new));
+                Scaling.CODEC.optionalFieldOf("scaling").forGetter(Damage::scaling),
+                Codec.FLOAT.optionalFieldOf(KEY_MULTIPLIER, NO_MULTIPLIER).forGetter(Damage::multiplier)
+        ).apply(instance, Damage::new)));
+
+        public Damage(DamageMode mode, String damageType, Optional<String> school, float ratio,
+                      float flat, boolean ignoresArmour, Optional<Scaling> scaling) {
+            this(mode, damageType, school, ratio, flat, ignoresArmour, scaling, NO_MULTIPLIER);
+        }
 
         public boolean converts() {
             return mode == DamageMode.CONVERT;
@@ -140,43 +160,43 @@ public final class AffixEffects {
 
     public record StatusEffect(String effect, int duration, int amplifier, float chance,
                                boolean stacks, Optional<Integer> maxAmplifier) {
-        public static final Codec<StatusEffect> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<StatusEffect> CODEC = Customs.wrap(StatusEffect.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("effect").forGetter(StatusEffect::effect),
                 Codec.INT.optionalFieldOf("duration", 60).forGetter(StatusEffect::duration),
                 Codec.INT.optionalFieldOf("amplifier", 0).forGetter(StatusEffect::amplifier),
                 Codec.FLOAT.optionalFieldOf("chance", 1.0F).forGetter(StatusEffect::chance),
                 Codec.BOOL.optionalFieldOf("stacks", false).forGetter(StatusEffect::stacks),
                 Codec.INT.optionalFieldOf("max_amplifier").forGetter(StatusEffect::maxAmplifier)
-        ).apply(instance, StatusEffect::new));
+        ).apply(instance, StatusEffect::new)));
     }
 
     public record Ignite(int seconds, float chance) {
-        public static final Codec<Ignite> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Ignite> CODEC = Customs.wrap(Ignite.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.optionalFieldOf("seconds", 4).forGetter(Ignite::seconds),
                 Codec.FLOAT.optionalFieldOf("chance", 1.0F).forGetter(Ignite::chance)
-        ).apply(instance, Ignite::new));
+        ).apply(instance, Ignite::new)));
     }
 
     public record Lifesteal(float ratio, float chance, Optional<DamageSpec> damageSpec) {
-        public static final Codec<Lifesteal> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Lifesteal> CODEC = Customs.wrap(Lifesteal.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("ratio", 0.15F).forGetter(Lifesteal::ratio),
                 Codec.FLOAT.optionalFieldOf("chance", 1.0F).forGetter(Lifesteal::chance),
                 DamageSpec.CODEC.optionalFieldOf("damage_spec").forGetter(Lifesteal::damageSpec)
-        ).apply(instance, Lifesteal::new));
+        ).apply(instance, Lifesteal::new)));
     }
 
     public record Knockback(float strength, boolean pull) {
-        public static final Codec<Knockback> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Knockback> CODEC = Customs.wrap(Knockback.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("strength", 0.5F).forGetter(Knockback::strength),
                 Codec.BOOL.optionalFieldOf("pull", false).forGetter(Knockback::pull)
-        ).apply(instance, Knockback::new));
+        ).apply(instance, Knockback::new)));
     }
 
     public record Splash(float radius, float ratio, boolean hitsAttacker,
                          boolean inherit, Optional<String> damageType,
                          Optional<String> school,
                          Optional<DamageSpec> damageSpec) implements Typed {
-        public static final Codec<Splash> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Splash> CODEC = Customs.wrap(Splash.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("radius", 3.0F).forGetter(Splash::radius),
                 Codec.FLOAT.optionalFieldOf("ratio", 0.4F).forGetter(Splash::ratio),
                 Codec.BOOL.optionalFieldOf("hits_attacker", false).forGetter(Splash::hitsAttacker),
@@ -184,47 +204,47 @@ public final class AffixEffects {
                 Codec.STRING.optionalFieldOf("damage_type").forGetter(Splash::damageType),
                 Codec.STRING.optionalFieldOf("school").forGetter(Splash::school),
                 DamageSpec.CODEC.optionalFieldOf("damage_spec").forGetter(Splash::damageSpec)
-        ).apply(instance, Splash::new));
+        ).apply(instance, Splash::new)));
     }
 
     public record SelfEffect(String effect, int duration, int amplifier,
                              boolean stacks, Optional<Integer> maxAmplifier) {
-        public static final Codec<SelfEffect> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<SelfEffect> CODEC = Customs.wrap(SelfEffect.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("effect").forGetter(SelfEffect::effect),
                 Codec.INT.optionalFieldOf("duration", 60).forGetter(SelfEffect::duration),
                 Codec.INT.optionalFieldOf("amplifier", 0).forGetter(SelfEffect::amplifier),
                 Codec.BOOL.optionalFieldOf("stacks", false).forGetter(SelfEffect::stacks),
                 Codec.INT.optionalFieldOf("max_amplifier").forGetter(SelfEffect::maxAmplifier)
-        ).apply(instance, SelfEffect::new));
+        ).apply(instance, SelfEffect::new)));
     }
 
     public record Sound(String id, float volume, float pitch) {
-        public static final Codec<Sound> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Sound> CODEC = Customs.wrap(Sound.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("id").forGetter(Sound::id),
                 Codec.FLOAT.optionalFieldOf("volume", 1.0F).forGetter(Sound::volume),
                 Codec.FLOAT.optionalFieldOf("pitch", 1.0F).forGetter(Sound::pitch)
-        ).apply(instance, Sound::new));
+        ).apply(instance, Sound::new)));
     }
 
     public record Particles(String type, int count, float spread, float speed) {
-        public static final Codec<Particles> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Particles> CODEC = Customs.wrap(Particles.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("type").forGetter(Particles::type),
                 Codec.INT.optionalFieldOf("count", 12).forGetter(Particles::count),
                 Codec.FLOAT.optionalFieldOf("spread", 0.4F).forGetter(Particles::spread),
                 Codec.FLOAT.optionalFieldOf("speed", 0.05F).forGetter(Particles::speed)
-        ).apply(instance, Particles::new));
+        ).apply(instance, Particles::new)));
     }
 
     public record WaveSpeed(float start, float trough, float end, int stallTicks, int recoverTicks) {
         public static final WaveSpeed FLAT = new WaveSpeed(1.0F, 1.0F, 1.0F, 0, 0);
 
-        public static final Codec<WaveSpeed> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<WaveSpeed> CODEC = Customs.wrap(WaveSpeed.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("start", 0.2F).forGetter(WaveSpeed::start),
                 Codec.FLOAT.optionalFieldOf("trough", 0.01F).forGetter(WaveSpeed::trough),
                 Codec.FLOAT.optionalFieldOf("end", 1.0F).forGetter(WaveSpeed::end),
                 Codec.INT.optionalFieldOf("stall_ticks", 3).forGetter(WaveSpeed::stallTicks),
                 Codec.INT.optionalFieldOf("recover_ticks", 6).forGetter(WaveSpeed::recoverTicks)
-        ).apply(instance, WaveSpeed::new));
+        ).apply(instance, WaveSpeed::new)));
 
         public boolean isFlat() {
             return stallTicks <= 0 && recoverTicks <= 0;
@@ -294,7 +314,7 @@ public final class AffixEffects {
                 TrailColour.CODEC.optionalFieldOf("colour").forGetter(Visual::colour)
         ).apply(instance, Visual::new));
 
-        public static final Codec<SlashWave> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<SlashWave> CODEC = Customs.wrap(SlashWave.class, RecordCodecBuilder.create(instance -> instance.group(
                 SHAPE_CODEC.forGetter(wave -> new Shape(wave.range(), wave.radius(), wave.ratio(),
                         wave.speed(), wave.chance(), wave.followsSwing(), wave.inherit(),
                         wave.delayTicks(), wave.speedCurve())),
@@ -305,7 +325,7 @@ public final class AffixEffects {
                 shape.range(), shape.radius(), shape.ratio(), shape.speed(), shape.chance(),
                 shape.followsSwing(), shape.inherit(), visual.damageSpec(),
                 visual.pierces(), visual.texture(), visual.frames(),
-                visual.scale(), visual.colour(), shape.delayTicks(), shape.speedCurve())));
+                visual.scale(), visual.colour(), shape.delayTicks(), shape.speedCurve()))));
 
         public Optional<String> damageType() {
             return damageSpec.flatMap(DamageSpec::damageType);
@@ -319,10 +339,10 @@ public final class AffixEffects {
     public record TrailColour(String colour, boolean glows) {
         private static final String KEY_COLOR = "color";
 
-        public static final Codec<TrailColour> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<TrailColour> CODEC = Customs.wrap(TrailColour.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf(KEY_COLOR).forGetter(TrailColour::colour),
                 Codec.BOOL.optionalFieldOf("glows", true).forGetter(TrailColour::glows)
-        ).apply(instance, TrailColour::new));
+        ).apply(instance, TrailColour::new)));
 
         public int argb() {
             String hex = colour.startsWith("#") ? colour.substring(1) : colour;
@@ -344,7 +364,7 @@ public final class AffixEffects {
                              SpellShot spellProjectile, String name, boolean ignoreIframes) {
         public static final int NO_LIFETIME = 0;
 
-        public static final Codec<Projectile> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Projectile> CODEC = Customs.wrap(Projectile.class, LibraryRef.wrap(RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.optionalFieldOf("entity", "").forGetter(Projectile::entity),
                 Codec.INT.optionalFieldOf("count", 1).forGetter(Projectile::count),
                 Codec.FLOAT.optionalFieldOf("speed", 1.5F).forGetter(Projectile::speed),
@@ -364,7 +384,7 @@ public final class AffixEffects {
                 Codec.STRING.optionalFieldOf("name", "").forGetter(Projectile::name),
                 Codec.BOOL.optionalFieldOf("ignore_iframes", false)
                         .forGetter(Projectile::ignoreIframes)
-        ).apply(instance, Projectile::new));
+        ).apply(instance, Projectile::new)), LibraryRef.PROJECTILE_KEY));
 
         public Projectile {
             spellProjectile = spellProjectile == null ? SpellShot.NONE : spellProjectile;
@@ -384,7 +404,7 @@ public final class AffixEffects {
 
     public record Dash(float forward, float upward, boolean towardTarget, float chance,
                        float onConnectRatio, float onConnectKnockback, int iframes) {
-        public static final Codec<Dash> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Dash> CODEC = Customs.wrap(Dash.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("forward", 0.6F).forGetter(Dash::forward),
                 Codec.FLOAT.optionalFieldOf("upward", 0.0F).forGetter(Dash::upward),
                 Codec.BOOL.optionalFieldOf("toward_target", false).forGetter(Dash::towardTarget),
@@ -393,25 +413,25 @@ public final class AffixEffects {
                 Codec.FLOAT.optionalFieldOf("on_connect_knockback", 0.0F)
                         .forGetter(Dash::onConnectKnockback),
                 Codec.INT.optionalFieldOf("iframes", 0).forGetter(Dash::iframes)
-        ).apply(instance, Dash::new));
+        ).apply(instance, Dash::new)));
     }
 
     public record Execute(float healthThreshold, float bonusRatio, boolean instantKill,
                           boolean repeatOnKill, Optional<DamageSpec> damageSpec) {
-        public static final Codec<Execute> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Execute> CODEC = Customs.wrap(Execute.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("health_threshold", 0.2F).forGetter(Execute::healthThreshold),
                 Codec.FLOAT.optionalFieldOf("bonus_ratio", 1.0F).forGetter(Execute::bonusRatio),
                 Codec.BOOL.optionalFieldOf("instant_kill", false).forGetter(Execute::instantKill),
                 Codec.BOOL.optionalFieldOf("repeat_on_kill", false).forGetter(Execute::repeatOnKill),
                 DamageSpec.CODEC.optionalFieldOf("damage_spec").forGetter(Execute::damageSpec)
-        ).apply(instance, Execute::new));
+        ).apply(instance, Execute::new)));
     }
 
     public record Chain(int maxTargets, float range, float falloff, float ratio,
                         boolean inherit, Optional<String> damageType,
                         Optional<String> school,
                         Optional<DamageSpec> damageSpec) implements Typed {
-        public static final Codec<Chain> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Chain> CODEC = Customs.wrap(Chain.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.optionalFieldOf("max_targets", 3).forGetter(Chain::maxTargets),
                 Codec.FLOAT.optionalFieldOf("range", 5.0F).forGetter(Chain::range),
                 Codec.FLOAT.optionalFieldOf("falloff", 0.65F).forGetter(Chain::falloff),
@@ -420,15 +440,15 @@ public final class AffixEffects {
                 Codec.STRING.optionalFieldOf("damage_type").forGetter(Chain::damageType),
                 Codec.STRING.optionalFieldOf("school").forGetter(Chain::school),
                 DamageSpec.CODEC.optionalFieldOf("damage_spec").forGetter(Chain::damageSpec)
-        ).apply(instance, Chain::new));
+        ).apply(instance, Chain::new)));
     }
 
     public record Momentum(float perHitRatio, int maxStacks, int decayTicks) {
-        public static final Codec<Momentum> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Momentum> CODEC = Customs.wrap(Momentum.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("per_hit_ratio", 0.12F).forGetter(Momentum::perHitRatio),
                 Codec.INT.optionalFieldOf("max_stacks", 5).forGetter(Momentum::maxStacks),
                 Codec.INT.optionalFieldOf("decay_ticks", 60).forGetter(Momentum::decayTicks)
-        ).apply(instance, Momentum::new));
+        ).apply(instance, Momentum::new)));
     }
 
     public record Requires(int minAttacks, List<String> styles, List<String> categories,
@@ -442,7 +462,7 @@ public final class AffixEffects {
         public static final Requires NONE = new Requires(0, List.of(), List.of(), List.of(), 0,
                 Optional.empty(), Optional.empty(), FAILURE_PLAIN, 0.0F, 0.0F);
 
-        public static final Codec<Requires> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Requires> CODEC = Customs.wrap(Requires.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.optionalFieldOf("min_attacks", 0).forGetter(Requires::minAttacks),
                 Codec.STRING.listOf().optionalFieldOf("styles", List.of()).forGetter(Requires::styles),
                 Codec.STRING.listOf().optionalFieldOf("categories", List.of())
@@ -456,7 +476,7 @@ public final class AffixEffects {
                 Codec.FLOAT.optionalFieldOf("per_preceding", 0.0F).forGetter(Requires::perPreceding),
                 Codec.FLOAT.optionalFieldOf("per_preceding_cap", 0.0F)
                         .forGetter(Requires::perPrecedingCap)
-        ).apply(instance, Requires::new));
+        ).apply(instance, Requires::new)));
 
         public float scaleFor(int preceding) {
             if (perPreceding <= 0.0F || preceding <= 0) {
@@ -482,7 +502,7 @@ public final class AffixEffects {
         public static final SlotRule ANY = new SlotRule(List.of(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Requires.NONE);
 
-        public static final Codec<SlotRule> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<SlotRule> CODEC = Customs.wrap(SlotRule.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.either(Codec.INT, Codec.INT.listOf())
                         .xmap(either -> either.map(List::of, list -> list),
                                 list -> list.size() == 1
@@ -494,7 +514,7 @@ public final class AffixEffects {
                 Codec.STRING.optionalFieldOf("after_style").forGetter(SlotRule::afterStyle),
                 Codec.STRING.optionalFieldOf("after_category").forGetter(SlotRule::afterCategory),
                 Requires.CODEC.optionalFieldOf("requires", Requires.NONE).forGetter(SlotRule::requires)
-        ).apply(instance, SlotRule::new));
+        ).apply(instance, SlotRule::new)));
 
         public boolean isEmpty() {
             return slots.isEmpty() && first.isEmpty() && last.isEmpty()
@@ -507,17 +527,21 @@ public final class AffixEffects {
                             StateGate state, SlotRule slot, float multiplier,
                             boolean refundSlot,
                             Optional<Boolean> onMiss, List<String> damageType,
-                            List<String> takenDamageType) {
+                            List<String> takenDamageType, List<String> targetEffects,
+                            Optional<Boolean> targetBurning) {
+        public static final String KEY_TARGET_EFFECTS = "target_effects";
+        public static final String KEY_TARGET_BURNING = "target_burning";
+
         public boolean needsTarget() {
             return targetHealthBelow.isPresent() || targetHealthAbove.isPresent()
-                    || state.needsTarget();
+                    || state.needsTarget() || !targetEffects.isEmpty() || targetBurning.isPresent();
         }
 
         public static final Condition NONE = new Condition(Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), StateGate.ANY, SlotRule.ANY, 1.0F,
-                false, Optional.empty(), List.of(), List.of());
+                false, Optional.empty(), List.of(), List.of(), List.of(), Optional.empty());
 
-        public static final Codec<Condition> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Condition> CODEC = Customs.wrap(Condition.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("self_health_below").forGetter(Condition::selfHealthBelow),
                 Codec.FLOAT.optionalFieldOf("self_health_above").forGetter(Condition::selfHealthAbove),
                 Codec.FLOAT.optionalFieldOf("target_health_below").forGetter(Condition::targetHealthBelow),
@@ -530,11 +554,16 @@ public final class AffixEffects {
                 Codec.STRING.listOf().optionalFieldOf("damage_type", List.of())
                         .forGetter(Condition::damageType),
                 Codec.STRING.listOf().optionalFieldOf("taken_damage_type", List.of())
-                        .forGetter(Condition::takenDamageType)
-        ).apply(instance, Condition::new));
+                        .forGetter(Condition::takenDamageType),
+                Codec.STRING.listOf().optionalFieldOf(KEY_TARGET_EFFECTS, List.of())
+                        .forGetter(Condition::targetEffects),
+                Codec.BOOL.optionalFieldOf(KEY_TARGET_BURNING).forGetter(Condition::targetBurning)
+        ).apply(instance, Condition::new)));
 
         public Condition {
             state = state == null ? StateGate.ANY : state;
+            targetEffects = targetEffects == null ? List.of() : List.copyOf(targetEffects);
+            targetBurning = targetBurning == null ? Optional.empty() : targetBurning;
         }
 
         public boolean isEmpty() {
@@ -542,34 +571,35 @@ public final class AffixEffects {
                     && targetHealthBelow.isEmpty() && targetHealthAbove.isEmpty()
                     && state.isEmpty() && slot.isEmpty() && !refundSlot
                     && onMiss.isEmpty() && damageType.isEmpty()
-                    && takenDamageType.isEmpty();
+                    && takenDamageType.isEmpty() && targetEffects.isEmpty()
+                    && targetBurning.isEmpty();
         }
     }
 
     public record Heal(float flat, float ratio, float chance, boolean overheal) {
-        public static final Codec<Heal> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Heal> CODEC = Customs.wrap(Heal.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("flat", 0.0F).forGetter(Heal::flat),
                 Codec.FLOAT.optionalFieldOf("ratio", 0.0F).forGetter(Heal::ratio),
                 Codec.FLOAT.optionalFieldOf("chance", 1.0F).forGetter(Heal::chance),
                 Codec.BOOL.optionalFieldOf("overheal", false).forGetter(Heal::overheal)
-        ).apply(instance, Heal::new));
+        ).apply(instance, Heal::new)));
     }
 
     public record Disarm(int durabilityDamage, float slownessSeconds, float chance) {
-        public static final Codec<Disarm> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Disarm> CODEC = Customs.wrap(Disarm.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.optionalFieldOf("durability_damage", 0).forGetter(Disarm::durabilityDamage),
                 Codec.FLOAT.optionalFieldOf("slowness_seconds", 0.0F).forGetter(Disarm::slownessSeconds),
                 Codec.FLOAT.optionalFieldOf("chance", 0.25F).forGetter(Disarm::chance)
-        ).apply(instance, Disarm::new));
+        ).apply(instance, Disarm::new)));
     }
 
     public record Vault(float radius, float strength, boolean upward, float chance) {
-        public static final Codec<Vault> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Vault> CODEC = Customs.wrap(Vault.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("radius", 3.0F).forGetter(Vault::radius),
                 Codec.FLOAT.optionalFieldOf("strength", 0.5F).forGetter(Vault::strength),
                 Codec.BOOL.optionalFieldOf("upward", true).forGetter(Vault::upward),
                 Codec.FLOAT.optionalFieldOf("chance", 1.0F).forGetter(Vault::chance)
-        ).apply(instance, Vault::new));
+        ).apply(instance, Vault::new)));
     }
 
     public record AttributeBonus(String attribute, double amount, String operation,
@@ -590,31 +620,31 @@ public final class AffixEffects {
             return DataResult.success(id);
         });
 
-        public static final Codec<AttributeBonus> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<AttributeBonus> CODEC = Customs.wrap(AttributeBonus.class, RecordCodecBuilder.create(instance -> instance.group(
                 ATTRIBUTE_ID_CODEC.fieldOf("attribute").forGetter(AttributeBonus::attribute),
                 Codec.DOUBLE.fieldOf("amount").forGetter(AttributeBonus::amount),
                 Codec.STRING.optionalFieldOf("operation", "add_value").forGetter(AttributeBonus::operation),
                 Codec.INT.optionalFieldOf("duration", 60).forGetter(AttributeBonus::duration),
                 Codec.INT.optionalFieldOf("max_stacks", 1).forGetter(AttributeBonus::maxStacks),
                 Codec.BOOL.optionalFieldOf("on_target", false).forGetter(AttributeBonus::onTarget)
-        ).apply(instance, AttributeBonus::new));
+        ).apply(instance, AttributeBonus::new)));
     }
 
     public record AttackAttributeBonus(String attribute, double amount, String operation,
                                  boolean stacks) {
-        public static final Codec<AttackAttributeBonus> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<AttackAttributeBonus> CODEC = Customs.wrap(AttackAttributeBonus.class, RecordCodecBuilder.create(instance -> instance.group(
                 AttributeBonus.attributeIdCodec().fieldOf("attribute").forGetter(AttackAttributeBonus::attribute),
                 Codec.DOUBLE.fieldOf("amount").forGetter(AttackAttributeBonus::amount),
                 Codec.STRING.optionalFieldOf("operation", "add_value").forGetter(AttackAttributeBonus::operation),
                 Codec.BOOL.optionalFieldOf("stacks", true).forGetter(AttackAttributeBonus::stacks)
-        ).apply(instance, AttackAttributeBonus::new));
+        ).apply(instance, AttackAttributeBonus::new)));
     }
 
     public record Cooldown(int ticks, boolean shared) {
-        public static final Codec<Cooldown> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Cooldown> CODEC = Customs.wrap(Cooldown.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.fieldOf("ticks").forGetter(Cooldown::ticks),
                 Codec.BOOL.optionalFieldOf("shared", Boolean.FALSE).forGetter(Cooldown::shared)
-        ).apply(instance, Cooldown::new));
+        ).apply(instance, Cooldown::new)));
 
         public Cooldown(int ticks) {
             this(ticks, false);
@@ -622,12 +652,12 @@ public final class AffixEffects {
     }
 
     public record Resource(float health, int hunger, int experienceLevels, boolean cancelIfShort) {
-        public static final Codec<Resource> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Resource> CODEC = Customs.wrap(Resource.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("health", 0.0F).forGetter(Resource::health),
                 Codec.INT.optionalFieldOf("hunger", 0).forGetter(Resource::hunger),
                 Codec.INT.optionalFieldOf("experience_levels", 0).forGetter(Resource::experienceLevels),
                 Codec.BOOL.optionalFieldOf("cancel_if_short", true).forGetter(Resource::cancelIfShort)
-        ).apply(instance, Resource::new));
+        ).apply(instance, Resource::new)));
     }
 
     public record Summon(String entity, int count, int lifespanTicks, float radius,
@@ -639,7 +669,7 @@ public final class AffixEffects {
                          boolean spectral, boolean keepGear, boolean ownDamage) {
         public static final String VICTIM = "@victim";
 
-        public static final Codec<Summon> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Summon> CODEC = Customs.wrap(Summon.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("entity").forGetter(Summon::entity),
                 Codec.INT.optionalFieldOf("count", 1).forGetter(Summon::count),
                 Codec.INT.optionalFieldOf("lifespan", 200).forGetter(Summon::lifespanTicks),
@@ -658,7 +688,7 @@ public final class AffixEffects {
                 Codec.BOOL.optionalFieldOf("spectral", Boolean.FALSE).forGetter(Summon::spectral),
                 Codec.BOOL.optionalFieldOf("keep_gear", Boolean.FALSE).forGetter(Summon::keepGear),
                 Codec.BOOL.optionalFieldOf("own_damage", Boolean.FALSE).forGetter(Summon::ownDamage)
-        ).apply(instance, Summon::new));
+        ).apply(instance, Summon::new)));
 
         public Summon {
             equipment = equipment == null ? SummonEquipment.NONE : equipment;
@@ -670,41 +700,41 @@ public final class AffixEffects {
         }
 
         public Summon asEntity(String id) {
-            return new Summon(id, count, lifespanTicks, radius, inheritTarget, damageRatio,
+            return Customs.copy(this, new Summon(id, count, lifespanTicks, radius, inheritTarget, damageRatio,
                     damageSpec, ability, chance, spawn, maxActive, equipment, attributes,
-                    spectral, keepGear, ownDamage);
+                    spectral, keepGear, ownDamage));
         }
     }
 
     public record Command(String command, boolean asServer) {
-        public static final Codec<Command> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Command> CODEC = Customs.wrap(Command.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("command").forGetter(Command::command),
                 Codec.BOOL.optionalFieldOf("as_server", true).forGetter(Command::asServer)
-        ).apply(instance, Command::new));
+        ).apply(instance, Command::new)));
     }
 
     public record Blink(float distance, boolean behindTarget, int iframes) {
-        public static final Codec<Blink> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Blink> CODEC = Customs.wrap(Blink.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("distance", 3.0F).forGetter(Blink::distance),
                 Codec.BOOL.optionalFieldOf("behind_target", true).forGetter(Blink::behindTarget),
                 Codec.INT.optionalFieldOf("iframes", 0).forGetter(Blink::iframes)
-        ).apply(instance, Blink::new));
+        ).apply(instance, Blink::new)));
     }
 
     public record Shield(float amount, int duration, float dodgeChance, int dodgeDuration) {
-        public static final Codec<Shield> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Shield> CODEC = Customs.wrap(Shield.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("amount", 4.0F).forGetter(Shield::amount),
                 Codec.INT.optionalFieldOf("duration", 100).forGetter(Shield::duration),
                 Codec.FLOAT.optionalFieldOf("dodge_chance", 0.0F).forGetter(Shield::dodgeChance),
                 Codec.INT.optionalFieldOf("dodge_duration", 0).forGetter(Shield::dodgeDuration)
-        ).apply(instance, Shield::new));
+        ).apply(instance, Shield::new)));
     }
 
     public record Cleave(float radius, float ratio, int maxTargets,
                          boolean inherit, Optional<String> damageType,
                          Optional<String> school,
                          Optional<DamageSpec> damageSpec) implements Typed {
-        public static final Codec<Cleave> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Cleave> CODEC = Customs.wrap(Cleave.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("radius", 3.0F).forGetter(Cleave::radius),
                 Codec.FLOAT.optionalFieldOf("ratio", 0.5F).forGetter(Cleave::ratio),
                 Codec.INT.optionalFieldOf("max_targets", 3).forGetter(Cleave::maxTargets),
@@ -712,7 +742,7 @@ public final class AffixEffects {
                 Codec.STRING.optionalFieldOf("damage_type").forGetter(Cleave::damageType),
                 Codec.STRING.optionalFieldOf("school").forGetter(Cleave::school),
                 DamageSpec.CODEC.optionalFieldOf("damage_spec").forGetter(Cleave::damageSpec)
-        ).apply(instance, Cleave::new));
+        ).apply(instance, Cleave::new)));
     }
 
     public record Motion(Optional<Dash> dash,
@@ -721,11 +751,11 @@ public final class AffixEffects {
         public static final Motion NONE =
                 new Motion(Optional.empty(), Optional.empty(), 0);
 
-        public static final Codec<Motion> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Motion> CODEC = Customs.wrap(Motion.class, RecordCodecBuilder.create(instance -> instance.group(
                 Dash.CODEC.optionalFieldOf("dash").forGetter(Motion::dash),
                 Blink.CODEC.optionalFieldOf("blink").forGetter(Motion::blink),
                 Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Motion::delayTicks)
-        ).apply(instance, Motion::new));
+        ).apply(instance, Motion::new)));
 
         @Override
         public Motion withoutDelay() {
@@ -745,13 +775,13 @@ public final class AffixEffects {
         public static final Offense NONE = new Offense(Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), 0);
 
-        public static final Codec<Offense> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Offense> CODEC = Customs.wrap(Offense.class, RecordCodecBuilder.create(instance -> instance.group(
                 Execute.CODEC.optionalFieldOf("execute").forGetter(Offense::execute),
                 Chain.CODEC.optionalFieldOf("chain").forGetter(Offense::chain),
                 Cleave.CODEC.optionalFieldOf("cleave").forGetter(Offense::cleave),
                 Momentum.CODEC.optionalFieldOf("momentum").forGetter(Offense::momentum),
                 Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Offense::delayTicks)
-        ).apply(instance, Offense::new));
+        ).apply(instance, Offense::new)));
 
         @Override
         public Offense withoutDelay() {
@@ -768,11 +798,11 @@ public final class AffixEffects {
                           int delayTicks) implements Delayed<Sustain> {
         public static final Sustain NONE = new Sustain(Optional.empty(), Optional.empty(), 0);
 
-        public static final Codec<Sustain> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Sustain> CODEC = Customs.wrap(Sustain.class, RecordCodecBuilder.create(instance -> instance.group(
                 Heal.CODEC.optionalFieldOf("heal").forGetter(Sustain::heal),
                 Shield.CODEC.optionalFieldOf("shield").forGetter(Sustain::shield),
                 Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Sustain::delayTicks)
-        ).apply(instance, Sustain::new));
+        ).apply(instance, Sustain::new)));
 
         @Override
         public Sustain withoutDelay() {
@@ -786,12 +816,12 @@ public final class AffixEffects {
 
     public record Hasten(float ratio, int swings, float chance, float thisSwing) {
 
-        public static final Codec<Hasten> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Hasten> CODEC = Customs.wrap(Hasten.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("ratio", 0.5F).forGetter(Hasten::ratio),
                 Codec.INT.optionalFieldOf("swings", 1).forGetter(Hasten::swings),
                 Codec.FLOAT.optionalFieldOf("chance", 1.0F).forGetter(Hasten::chance),
                 Codec.FLOAT.optionalFieldOf("this_swing", 1.0F).forGetter(Hasten::thisSwing)
-        ).apply(instance, Hasten::new));
+        ).apply(instance, Hasten::new)));
     }
 
     public record Control(Optional<Disarm> disarm,
@@ -804,7 +834,7 @@ public final class AffixEffects {
                 new Control(Optional.empty(), List.of(), List.of(), Optional.empty(),
                         Optional.empty(), 0);
 
-        public static final Codec<Control> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Control> CODEC = Customs.wrap(Control.class, RecordCodecBuilder.create(instance -> instance.group(
                 Disarm.CODEC.optionalFieldOf("disarm").forGetter(Control::disarm),
                 AttributeBonus.CODEC.listOf().optionalFieldOf("attributes", List.of())
                         .forGetter(Control::attributes),
@@ -813,7 +843,7 @@ public final class AffixEffects {
                 Hasten.CODEC.optionalFieldOf("hasten").forGetter(Control::hasten),
                 Vault.CODEC.optionalFieldOf("vault").forGetter(Control::vault),
                 Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Control::delayTicks)
-        ).apply(instance, Control::new));
+        ).apply(instance, Control::new)));
 
         @Override
         public Control withoutDelay() {
@@ -827,17 +857,26 @@ public final class AffixEffects {
         }
     }
 
+    public record Quicken(float ratio, float chance) {
+
+        public static final Codec<Quicken> CODEC = Customs.wrap(Quicken.class, RecordCodecBuilder.create(instance -> instance.group(
+                Codec.FLOAT.optionalFieldOf("ratio", 0.1F).forGetter(Quicken::ratio),
+                Codec.FLOAT.optionalFieldOf("chance", 1.0F).forGetter(Quicken::chance)
+        ).apply(instance, Quicken::new)));
+    }
+
     public record Order(String ability,
                         float damageRatio,
                         float chance,
                         SummonTargeting targets,
                         Optional<AbilityTuning> tuning,
                         int delayTicks,
-                        Optional<SummonAim> aim) implements Delayed<Order> {
+                        Optional<SummonAim> aim,
+                        Optional<Quicken> quicken) implements Delayed<Order> {
         public static final Order NONE = new Order("", 0.0F, 1.0F,
-                SummonTargeting.ALL, Optional.empty(), 0, Optional.empty());
+                SummonTargeting.ALL, Optional.empty(), 0, Optional.empty(), Optional.empty());
 
-        public static final Codec<Order> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Order> CODEC = Customs.wrap(Order.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.optionalFieldOf("ability", "").forGetter(Order::ability),
                 Codec.FLOAT.optionalFieldOf("damage_ratio", 0.0F).forGetter(Order::damageRatio),
                 Codec.FLOAT.optionalFieldOf("chance", 1.0F).forGetter(Order::chance),
@@ -845,18 +884,23 @@ public final class AffixEffects {
                         .forGetter(Order::targets),
                 AbilityTuning.CODEC.optionalFieldOf("tuning").forGetter(Order::tuning),
                 Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Order::delayTicks),
-                SummonAim.CODEC.optionalFieldOf(SummonCadence.KEY_AIM).forGetter(Order::aim)
-        ).apply(instance, Order::new));
+                SummonAim.CODEC.optionalFieldOf(SummonCadence.KEY_AIM).forGetter(Order::aim),
+                Quicken.CODEC.optionalFieldOf("quicken").forGetter(Order::quicken)
+        ).apply(instance, Order::new)));
 
         @Override
         public Order withoutDelay() {
             return delayTicks == 0
                     ? this
-                    : new Order(ability, damageRatio, chance, targets, tuning, 0, aim);
+                    : new Order(ability, damageRatio, chance, targets, tuning, 0, aim, quicken);
         }
 
         public boolean isEmpty() {
-            return ability.isBlank();
+            return ability.isBlank() && quicken.isEmpty();
+        }
+
+        public boolean ordersAbility() {
+            return !ability.isBlank();
         }
     }
 
@@ -866,12 +910,12 @@ public final class AffixEffects {
                         Optional<RaiseRules> raiseDead) implements Delayed<Spawn> {
         public static final Spawn NONE = new Spawn(List.of(), List.of(), 0, Optional.empty());
 
-        public static final Codec<Spawn> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Spawn> CODEC = Customs.wrap(Spawn.class, RecordCodecBuilder.create(instance -> instance.group(
                 Summon.CODEC.listOf().optionalFieldOf("summons", List.of()).forGetter(Spawn::summons),
                 Command.CODEC.listOf().optionalFieldOf("commands", List.of()).forGetter(Spawn::commands),
                 Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Spawn::delayTicks),
                 RaiseRules.CODEC.optionalFieldOf(RaiseRules.KEY).forGetter(Spawn::raiseDead)
-        ).apply(instance, Spawn::new));
+        ).apply(instance, Spawn::new)));
 
         public Spawn {
             raiseDead = raiseDead == null ? Optional.empty() : raiseDead;
@@ -907,7 +951,7 @@ public final class AffixEffects {
             return maxTargetsPerSwing > UNLIMITED_TARGETS;
         }
 
-        public static final Codec<Mechanics> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Mechanics> CODEC = Customs.wrap(Mechanics.class, RecordCodecBuilder.create(instance -> instance.group(
                 Motion.CODEC.optionalFieldOf("motion", Motion.NONE).forGetter(Mechanics::motion),
                 Offense.CODEC.optionalFieldOf("offense", Offense.NONE).forGetter(Mechanics::offense),
                 Sustain.CODEC.optionalFieldOf("sustain", Sustain.NONE).forGetter(Mechanics::sustain),
@@ -919,7 +963,7 @@ public final class AffixEffects {
                 Condition.CODEC.optionalFieldOf("condition", Condition.NONE).forGetter(Mechanics::condition),
                 Codec.INT.optionalFieldOf("max_targets_per_swing", UNLIMITED_TARGETS)
                         .forGetter(Mechanics::maxTargetsPerSwing)
-        ).apply(instance, Mechanics::new));
+        ).apply(instance, Mechanics::new)));
 
         public Optional<Dash> dash() {
             return motion.dash();
@@ -999,12 +1043,12 @@ public final class AffixEffects {
 
         public static final Echo SAMPLE = new Echo(1, SAMPLE_ECHO_DELAY, 1.0F, Optional.empty());
 
-        public static final Codec<Echo> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Echo> CODEC = Customs.wrap(Echo.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.optionalFieldOf("times", 1).forGetter(Echo::times),
                 Codec.INT.optionalFieldOf("delay_ticks", 10).forGetter(Echo::delayTicks),
                 Codec.FLOAT.optionalFieldOf("ratio", 1.0F).forGetter(Echo::ratio),
                 DamageSpec.CODEC.optionalFieldOf("damage_spec").forGetter(Echo::damageSpec)
-        ).apply(instance, Echo::new));
+        ).apply(instance, Echo::new)));
     }
 
     public record OnHit(Optional<Damage> damage,
@@ -1024,6 +1068,8 @@ public final class AffixEffects {
                         float freezeTicks,
                         int delayTicks,
                         Optional<Echo> echo) {
+        private static final String ECHO_KEY = "echo";
+
         public static final OnHit EMPTY = new OnHit(Optional.empty(), List.of(), List.of(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 List.of(), Optional.empty(), List.of(), List.of(), List.of(), Optional.empty(),
@@ -1043,9 +1089,10 @@ public final class AffixEffects {
         }
 
         public OnHit withEcho(Optional<Echo> value) {
-            return new OnHit(damage, damages, statusEffects, ignite, lifesteal, knockback,
-                    splash, selfEffects, sound, particles, projectiles, castSpells, slashWave,
-                    mechanics, freezeTicks, delayTicks, value);
+            return ScaledNumbers.carry(this, Customs.copy(this, new OnHit(damage, damages, statusEffects,
+                    ignite, lifesteal, knockback, splash, selfEffects, sound, particles, projectiles,
+                    castSpells, slashWave, mechanics, freezeTicks, delayTicks, value)),
+                    path -> path.startsWith(ECHO_KEY));
         }
 
         public Optional<Dash> dash() {
@@ -1154,10 +1201,10 @@ public final class AffixEffects {
                 SlashWave.CODEC.optionalFieldOf("slash_wave").forGetter(Presentation::slashWave),
                 Mechanics.CODEC.optionalFieldOf("mechanics", Mechanics.NONE).forGetter(Presentation::mechanics),
                 Codec.INT.optionalFieldOf("delay_ticks", 0).forGetter(Presentation::delayTicks),
-                Echo.CODEC.optionalFieldOf("echo").forGetter(Presentation::echo)
+                Echo.CODEC.optionalFieldOf(ECHO_KEY).forGetter(Presentation::echo)
         ).apply(instance, Presentation::new));
 
-        public static final Codec<OnHit> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<OnHit> CODEC = Customs.wrap(OnHit.class, ScaledNumbers.wrap(RecordCodecBuilder.create(instance -> instance.group(
                 IMPACT_CODEC.forGetter(hit -> new Impact(hit.damage(), hit.damages(),
                         hit.statusEffects(), hit.ignite(), hit.lifesteal(), hit.knockback(),
                         hit.splash(), hit.freezeTicks())),
@@ -1171,7 +1218,7 @@ public final class AffixEffects {
                 presentation.selfEffects(), presentation.sound(), presentation.particles(),
                 presentation.projectiles(), presentation.castSpells(), presentation.slashWave(),
                 presentation.mechanics(),
-                impact.freezeTicks(), presentation.delayTicks(), presentation.echo())));
+                impact.freezeTicks(), presentation.delayTicks(), presentation.echo())))));
 
         public boolean isEmpty() {
             return damage.isEmpty() && damages.isEmpty() && statusEffects.isEmpty() && ignite.isEmpty()

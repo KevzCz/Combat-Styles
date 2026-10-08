@@ -7,6 +7,7 @@ import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.Map;
 import java.util.List;
@@ -42,7 +43,7 @@ public record ExtraAttack(int delayTicks, InheritGroups inherit, AttackOverride 
         }
     };
 
-    public static final Codec<ExtraAttack> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<ExtraAttack> CODEC = Customs.wrap(ExtraAttack.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.optionalFieldOf("delay_ticks", DEFAULT_DELAY).forGetter(ExtraAttack::delayTicks),
             InheritGroups.CODEC.optionalFieldOf("inherit", InheritGroups.ALL)
                     .forGetter(ExtraAttack::inherit),
@@ -55,7 +56,7 @@ public record ExtraAttack(int delayTicks, InheritGroups inherit, AttackOverride 
             AffixTuning.MAP_CODEC.optionalFieldOf("tuning", Map.of())
                     .forGetter(ExtraAttack::tuning)
     ).apply(instance, (delay, inherit, override, anchor, affixes, tuning) ->
-            new ExtraAttack(delay, inherit, override.orElse(null), anchor, affixes, tuning)));
+            new ExtraAttack(delay, inherit, override.orElse(null), anchor, affixes, tuning))));
 
     public AttackOverride overrideOrEmpty() {
         return override == null ? AttackOverride.EMPTY : override;

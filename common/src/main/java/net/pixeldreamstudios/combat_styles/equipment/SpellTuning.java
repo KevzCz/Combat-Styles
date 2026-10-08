@@ -4,6 +4,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.List;
 
 public record SpellTuning(float powerMultiplier, float criticalChanceBonus,
@@ -97,7 +99,7 @@ public record SpellTuning(float powerMultiplier, float criticalChanceBonus,
                     reach.knockbackMultiply(), reach.launch(), reach.chainReaction(),
                     reach.cooldownReduction(), reach.triggerChanceAdd())));
 
-    public static final Codec<SpellTuning> CODEC = MAP_CODEC.codec();
+    public static final Codec<SpellTuning> CODEC = Customs.wrap(SpellTuning.class, MAP_CODEC.codec());
 
     public SpellTuning {
         impactSchools = impactSchools == null ? List.of() : List.copyOf(impactSchools);

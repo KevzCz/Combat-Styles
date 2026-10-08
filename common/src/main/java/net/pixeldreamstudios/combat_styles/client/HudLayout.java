@@ -2,8 +2,8 @@ package net.pixeldreamstudios.combat_styles.client;
 
 import java.util.List;
 
-public record HudLayout(HudDensity density, boolean vertical, int cellWidth, int cellHeight,
-                        int laneWidth, int width, int height) {
+public record HudLayout(HudDensity density, boolean vertical, boolean flipped, int cellWidth,
+                        int cellHeight, int laneWidth, int width, int height) {
 
     public static final int SLOT = 18;
     public static final int GAP = 2;
@@ -16,7 +16,7 @@ public record HudLayout(HudDensity density, boolean vertical, int cellWidth, int
     public static final int TIMER_WIDTH = 12;
 
     public static HudLayout of(List<HudRow> rows, HudDensity density, boolean vertical,
-                               int timerWidth) {
+                               boolean flipped, int timerWidth) {
         int lanes = 0;
         for (HudRow row : rows) {
             lanes = Math.max(lanes, row.lanes().size());
@@ -33,7 +33,7 @@ public record HudLayout(HudDensity density, boolean vertical, int cellWidth, int
         int height = PAD * 2 + (vertical
                 ? count * SLOT + Math.max(0, count - 1) * GAP
                 : SLOT);
-        return new HudLayout(density, vertical, cellWidth, SLOT, laneWidth, width, height);
+        return new HudLayout(density, vertical, flipped, cellWidth, SLOT, laneWidth, width, height);
     }
 
     private static int laneWidthFor(HudDensity density, int lanes) {
@@ -46,12 +46,23 @@ public record HudLayout(HudDensity density, boolean vertical, int cellWidth, int
         return LANE_INSET + lanes * LANE + Math.max(0, lanes - 1) * LANE_GAP;
     }
 
-    public int laneX(int cellX, int index) {
-        return cellX + SLOT + LANE_INSET + index * (LANE + LANE_GAP);
+    public int itemX(int cellX) {
+        return flipped ? cellX + cellWidth - SLOT : cellX;
     }
 
-    public int timerX(int cellX) {
-        return cellX + SLOT + laneWidth + TIMER_GAP;
+    public int laneX(int cellX, int index) {
+        int offset = LANE_INSET + index * (LANE + LANE_GAP);
+        return flipped ? itemX(cellX) - offset - LANE : itemX(cellX) + SLOT + offset;
+    }
+
+    public int tickX(int cellX) {
+        return flipped ? itemX(cellX) + SLOT + LANE_INSET : itemX(cellX) - TICK - LANE_INSET;
+    }
+
+    public int timerX(int cellX, int textWidth) {
+        return flipped
+                ? itemX(cellX) - laneWidth - TIMER_GAP - textWidth
+                : itemX(cellX) + SLOT + laneWidth + TIMER_GAP;
     }
 
     public int advance() {

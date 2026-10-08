@@ -66,7 +66,7 @@ public final class CombatStylesConfig {
     private double slashWaveScale = 1.5D;
     private double thrustWaveScale = 2.0D;
     private boolean weaponRollsEnabled = true;
-    private double weaponRollChanceMultiplier = 1.0D;
+    private boolean rollCraftedWeapons = false;
     private boolean namedEntriesLocked = true;
     private boolean showAffinityInTooltip = true;
     private boolean alwaysExpandTooltips = false;
@@ -78,6 +78,7 @@ public final class CombatStylesConfig {
     private int cooldownHudOffsetX = 8;
     private int cooldownHudOffsetY = 8;
     private boolean cooldownHudVertical = true;
+    private boolean cooldownHudFlipped = false;
     private boolean cooldownHudHideWhenReady = false;
     private String cooldownHudDensity = ConfigOptions.HUD_DENSITY_DEFAULT;
     private boolean gameplayLootEnabled = false;
@@ -196,6 +197,7 @@ public final class CombatStylesConfig {
         cooldownHudOffsetX = other.cooldownHudOffsetX;
         cooldownHudOffsetY = other.cooldownHudOffsetY;
         cooldownHudVertical = other.cooldownHudVertical;
+        cooldownHudFlipped = other.cooldownHudFlipped;
         cooldownHudHideWhenReady = other.cooldownHudHideWhenReady;
         cooldownHudDensity = other.cooldownHudDensity;
         animationPreviewEnabled = other.animationPreviewEnabled;
@@ -252,8 +254,8 @@ public final class CombatStylesConfig {
         return weaponRollsEnabled;
     }
 
-    public double weaponRollChanceMultiplier() {
-        return weaponRollChanceMultiplier;
+    public boolean rollCraftedWeapons() {
+        return rollCraftedWeapons;
     }
 
     public boolean namedEntriesLocked() {
@@ -298,6 +300,10 @@ public final class CombatStylesConfig {
 
     public boolean cooldownHudVertical() {
         return cooldownHudVertical;
+    }
+
+    public boolean cooldownHudFlipped() {
+        return cooldownHudFlipped;
     }
 
     public boolean cooldownHudHideWhenReady() {
@@ -482,7 +488,10 @@ public final class CombatStylesConfig {
                 () -> categoryAffinityEnabled, value -> categoryAffinityEnabled = value));
         options.add(ConfigOptions.bool("weaponRollsEnabled", "Weapon Rolls Enabled",
                 () -> weaponRollsEnabled, value -> weaponRollsEnabled = value)
-                .describedAs("Let weapons generate with a random style rolled in."));
+                .describedAs("Every weapon found in loot gets one weighted weapon roll."));
+        options.add(ConfigOptions.bool("rollCraftedWeapons", "Roll Crafted Weapons",
+                () -> rollCraftedWeapons, value -> rollCraftedWeapons = value)
+                .describedAs("Crafted and smithed weapons also get a weapon roll."));
         options.add(ConfigOptions.bool("namedEntriesLocked", "Named Entries Locked",
                 () -> namedEntriesLocked, value -> namedEntriesLocked = value));
         options.add(ConfigOptions.bool("showAffinityInTooltip", "Show Affinity In Tooltip",
@@ -541,6 +550,8 @@ public final class CombatStylesConfig {
                 () -> cooldownHudEnabled, value -> cooldownHudEnabled = value));
         options.add(ConfigOptions.bool("cooldownHudVertical", "Cooldown HUD Vertical",
                 () -> cooldownHudVertical, value -> cooldownHudVertical = value));
+        options.add(ConfigOptions.bool("cooldownHudFlipped", "Cooldown HUD Bars On Left",
+                () -> cooldownHudFlipped, value -> cooldownHudFlipped = value));
         options.add(ConfigOptions.bool("cooldownHudHideWhenReady", "Cooldown HUD Hide When Ready",
                 () -> cooldownHudHideWhenReady, value -> cooldownHudHideWhenReady = value));
         options.add(ConfigOptions.text("cooldownHudDensity", "Cooldown HUD Density",
@@ -565,9 +576,6 @@ public final class CombatStylesConfig {
                 () -> slashWaveScale, value -> slashWaveScale = value));
         options.add(ConfigOptions.decimal("thrustWaveScale", "Thrust Wave Scale",
                 () -> thrustWaveScale, value -> thrustWaveScale = value));
-        options.add(ConfigOptions.decimal("weaponRollChanceMultiplier", "Weapon Roll Chance Multiplier",
-                () -> weaponRollChanceMultiplier, value -> weaponRollChanceMultiplier = value)
-                .describedAs("Scales every weapon roll chance. 1.0 is unchanged."));
         options.add(ConfigOptions.decimal("budgetPerStyle", "Budget Per Style",
                 () -> budgetPerStyle, value -> budgetPerStyle = value));
         options.add(ConfigOptions.decimal("budgetStyleSoftCap", "Budget Style Soft Cap",

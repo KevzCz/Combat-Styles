@@ -137,6 +137,7 @@ public class PreviewScreen extends PanelScreen {
         String hint = Component.translatable(KEY_DRAG_HINT).getString();
         graphics.drawString(font, hint, left + PADDING,
                 stageBottom + 6, COLOR_MUTED, false);
+        drawWidgets(graphics, mouseX, mouseY, partialTick);
     }
 
     private void renderTrailSwatch(GuiGraphics graphics, int stageTop) {

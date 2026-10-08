@@ -9,6 +9,7 @@ import java.util.Locale;
 public enum UsePhase implements StringRepresentable {
 
     ANY,
+    EVERY,
     START,
     CHANNEL,
     RELEASE;
@@ -39,6 +40,6 @@ public enum UsePhase implements StringRepresentable {
     }
 
     public boolean accepts(UsePhase actual) {
-        return this == ANY || this == actual;
+        return this == ANY || this == EVERY || this == actual;
     }
 }

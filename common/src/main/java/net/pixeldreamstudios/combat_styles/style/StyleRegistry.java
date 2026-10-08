@@ -4,6 +4,7 @@ import com.google.common.collect.MapMaker;
 import net.bettercombat.api.AttributesContainer;
 import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.RandomSource;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
@@ -14,6 +15,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -33,6 +35,11 @@ public final class StyleRegistry {
     private static volatile List<StylePage> ordered = List.of();
     private static volatile Map<String, String> signatures = Map.of();
     private static volatile Map<String, Map<String, StylePage>> bySignature = Map.of();
+    private static volatile Map<String, String> representatives = Map.of();
+    private static volatile Map<String, List<String>> families = Map.of();
+    private static volatile Map<String, List<StylePage>> distinctByCategory = Map.of();
+    private static volatile List<StylePage> distinct = List.of();
+    private static final Map<WeaponAttributes, String> OWNERS = new MapMaker().weakKeys().makeMap();
     private static final Map<WeaponAttributes, List<StylePage>> NODES = new MapMaker().weakKeys().makeMap();
     private static volatile List<String> categories = List.of();
     private static volatile List<WeaponAttributes.Sound> swingSounds = List.of();
@@ -73,6 +80,11 @@ public final class StyleRegistry {
             ordered = List.of();
             signatures = Map.of();
             bySignature = Map.of();
+            representatives = Map.of();
+            families = Map.of();
+            distinctByCategory = Map.of();
+            distinct = List.of();
+            OWNERS.clear();
             NODES.clear();
             swingSounds = List.of();
             return;
@@ -81,6 +93,7 @@ public final class StyleRegistry {
         Map<ResourceLocation, AttributesContainer> containers = WeaponRegistryAccess.containers();
         Set<String> presets = presetsOf(containers);
         Map<String, Draft> drafts = new LinkedHashMap<>();
+        Map<WeaponAttributes, String> owners = new IdentityHashMap<>();
         Map<String, WeaponAttributes.Sound> sounds = new TreeMap<>();
         Set<String> indexedAnimations = new HashSet<>();
 
@@ -98,6 +111,7 @@ public final class StyleRegistry {
                 continue;
             }
             String sourceId = entry.getKey().toString();
+            owners.put(attributes, sourceId);
             boolean preset = presets.contains(sourceId);
             WeaponAttributes.Attack[] own = ownAttacksOf(containers.get(entry.getKey()));
 
@@ -137,34 +151,41 @@ public final class StyleRegistry {
         Map<String, String> aliasMap = new HashMap<>();
         Map<String, String> signatureMap = new LinkedHashMap<>();
 
+        Map<String, String> representativeMap = new HashMap<>();
+        Map<String, List<String>> familyMap = new HashMap<>();
+        Map<String, List<StylePage>> distinctMap = new TreeMap<>();
         for (Draft draft : drafts.values()) {
-            StyleIdRule.Candidate chosen = StyleIdRule.canonical(draft.candidates);
-            if (chosen == null) {
-                continue;
-            }
-            String styleId = chosen.id();
-            int index = nextIndex.merge(draft.category, 1, Integer::sum) - 1;
-            if (pages.containsKey(styleId)) {
-                CombatStyles.LOGGER.error("Two combat styles resolved to the same id {}", styleId);
-                continue;
-            }
-            if (AttackOverrides.isDisabled(styleId)) {
-                disabled++;
-                continue;
-            }
-            ResourceLocation sourceWeapon = ResourceLocation.tryParse(chosen.source());
-            StylePage page = new StylePage(styleId, draft.category, index, draft.attack,
-                    sourceWeapon, draft.rarity);
-            raw.put(styleId, page);
-            page = AttackOverrides.apply(page);
-            pages.put(styleId, page);
-            byCategory.computeIfAbsent(draft.category, key -> new ArrayList<>()).add(page);
-            signatureMap.put(styleId, signatureOf(draft.attack));
-            for (StyleIdRule.Candidate candidate : draft.candidates) {
-                String alias = candidate.id();
-                if (!alias.equals(styleId)) {
-                    aliasMap.putIfAbsent(alias, styleId);
+            List<StyleIdRule.Candidate> members = StyleIdRule.ordered(draft.candidates);
+            String representative = null;
+            List<String> family = new ArrayList<>();
+            for (StyleIdRule.Candidate candidate : members) {
+                String styleId = candidate.id();
+                if (pages.containsKey(styleId)) {
+                    CombatStyles.LOGGER.error("Two combat styles resolved to the same id {}", styleId);
+                    continue;
                 }
+                if (AttackOverrides.isDisabled(styleId)) {
+                    disabled++;
+                    continue;
+                }
+                int index = nextIndex.merge(draft.category, 1, Integer::sum) - 1;
+                ResourceLocation sourceWeapon = ResourceLocation.tryParse(candidate.source());
+                StylePage page = new StylePage(styleId, draft.category, index, draft.attack,
+                        sourceWeapon, draft.rarity);
+                raw.put(styleId, page);
+                page = AttackOverrides.apply(page);
+                pages.put(styleId, page);
+                byCategory.computeIfAbsent(draft.category, key -> new ArrayList<>()).add(page);
+                signatureMap.put(styleId, signatureOf(draft.attack));
+                if (representative == null) {
+                    representative = styleId;
+                    distinctMap.computeIfAbsent(draft.category, key -> new ArrayList<>()).add(page);
+                }
+                family.add(styleId);
+                representativeMap.put(styleId, representative);
+            }
+            if (representative != null) {
+                familyMap.put(representative, List.copyOf(family));
             }
         }
 
@@ -185,6 +206,7 @@ public final class StyleRegistry {
                     custom.rarityOrDefault());
             pages.put(styleId, page);
             byCategory.computeIfAbsent(category, key -> new ArrayList<>()).add(page);
+            distinctMap.computeIfAbsent(category, key -> new ArrayList<>()).add(page);
         }
 
         Map<String, StylePage> animationIndex = animationIndexOf(pages);
@@ -211,9 +233,11 @@ public final class StyleRegistry {
                     custom.rarity().orElse(base.rarity()));
             pages.put(styleId, page);
             byCategory.computeIfAbsent(category, key -> new ArrayList<>()).add(page);
+            distinctMap.computeIfAbsent(category, key -> new ArrayList<>()).add(page);
         }
 
         byCategory.replaceAll((category, list) -> List.copyOf(list));
+        distinctMap.replaceAll((category, list) -> List.copyOf(list));
 
         PAGES.clear();
         PAGES.putAll(pages);
@@ -226,7 +250,19 @@ public final class StyleRegistry {
         ordered = List.copyOf(pages.values());
         firstByAnimation = Map.copyOf(animationIndexOf(pages));
         signatures = Collections.unmodifiableMap(signatureMap);
-        bySignature = signaturesOf(byCategory);
+        representatives = Map.copyOf(representativeMap);
+        families = Map.copyOf(familyMap);
+        distinctByCategory = Map.copyOf(distinctMap);
+        List<StylePage> distinctPages = new ArrayList<>();
+        for (StylePage page : pages.values()) {
+            if (representativeOf(page.styleId()).equals(page.styleId())) {
+                distinctPages.add(page);
+            }
+        }
+        distinct = List.copyOf(distinctPages);
+        bySignature = signaturesOf(distinctByCategory);
+        OWNERS.clear();
+        OWNERS.putAll(owners);
         NODES.clear();
         categories = List.copyOf(byCategory.keySet());
         swingSounds = List.copyOf(sounds.values());
@@ -237,7 +273,7 @@ public final class StyleRegistry {
                             + "with {} swing sounds in {}ms",
                     PAGES.size(), categories.size(), swingSounds.size(),
                     (System.nanoTime() - startedAt) / 1_000_000L);
-            CombatStyles.LOGGER.info("Indexed {} distinct animations ({} deduped, {} disabled, {} aliases)",
+            CombatStyles.LOGGER.info("Indexed {} distinct animations ({} identical copies grouped, {} disabled, {} aliases)",
                     indexedAnimations.size(), deduped, disabled, aliases.size());
         }
     }
@@ -336,13 +372,64 @@ public final class StyleRegistry {
                 .append('|').append(attack.angle())
                 .append('|').append(attack.upswing())
                 .append('|').append(attack.rangeMultiplier())
-                .append('|').append(attack.movementSpeedMultiplier());
+                .append('|').append(attack.movementSpeedMultiplier())
+                .append('|').append(soundSignature(attack.swingSound()))
+                .append('|').append(soundSignature(attack.impactSound()))
+                .append('|').append(attack.trailParticles());
         if (attack.conditions() != null) {
             for (WeaponAttributes.Condition condition : attack.conditions()) {
                 builder.append('|').append(condition);
             }
         }
         return builder.toString();
+    }
+
+    private static String soundSignature(WeaponAttributes.Sound sound) {
+        if (sound == null) {
+            return "";
+        }
+        return sound.id() + KEY_SEPARATOR + sound.volume() + KEY_SEPARATOR + sound.pitch()
+                + KEY_SEPARATOR + sound.randomness();
+    }
+
+    public static String representativeOf(String styleId) {
+        if (styleId == null) {
+            return null;
+        }
+        String canonical = canonicalOf(styleId);
+        return representatives.getOrDefault(canonical, canonical);
+    }
+
+    public static List<StylePage> familyOf(String styleId) {
+        List<String> members = families.get(representativeOf(styleId));
+        if (members == null) {
+            StylePage page = get(styleId);
+            return page == null ? List.of() : List.of(page);
+        }
+        List<StylePage> found = new ArrayList<>(members.size());
+        for (String member : members) {
+            StylePage page = PAGES.get(member);
+            if (page != null) {
+                found.add(page);
+            }
+        }
+        return found;
+    }
+
+    public static StylePage variantOf(StylePage page, RandomSource random) {
+        if (page == null) {
+            return null;
+        }
+        List<StylePage> family = familyOf(page.styleId());
+        return family.size() <= 1 ? page : family.get(random.nextInt(family.size()));
+    }
+
+    public static List<StylePage> distinct() {
+        return distinct;
+    }
+
+    public static List<StylePage> distinctFor(String category) {
+        return distinctByCategory.getOrDefault(category, List.of());
     }
 
     public static Map<String, String> nativeSignatures() {
@@ -432,16 +519,23 @@ public final class StyleRegistry {
             return cached;
         }
         Map<String, StylePage> signed = bySignature.getOrDefault(attributes.category(), Map.of());
+        String owner = OWNERS.get(attributes);
         List<StylePage> nodes = new ArrayList<>();
-        if (!signed.isEmpty()) {
-            for (WeaponAttributes.Attack attack : attributes.attacks()) {
-                if (attack == null || attack.animation() == null) {
-                    continue;
-                }
-                StylePage page = signed.get(signatureOf(attack));
-                if (page != null) {
-                    nodes.add(page);
-                }
+        WeaponAttributes.Attack[] attacks = attributes.attacks();
+        for (int slot = 0; slot < attacks.length; slot++) {
+            WeaponAttributes.Attack attack = attacks[slot];
+            if (attack == null || attack.animation() == null) {
+                continue;
+            }
+            String signature = signatureOf(attack);
+            StylePage own = owner == null ? null : PAGES.get(StyleIdRule.idOf(owner, slot));
+            if (own != null && signature.equals(signatures.get(own.styleId()))) {
+                nodes.add(own);
+                continue;
+            }
+            StylePage page = signed.get(signature);
+            if (page != null) {
+                nodes.add(page);
             }
         }
         List<StylePage> found = List.copyOf(nodes);
@@ -491,7 +585,7 @@ public final class StyleRegistry {
         if (first == null || second == null) {
             return false;
         }
-        return first.equals(second) || canonicalOf(first).equals(canonicalOf(second));
+        return first.equals(second) || representativeOf(first).equals(representativeOf(second));
     }
 
     public static StylePage byAnimation(String animation, String category) {

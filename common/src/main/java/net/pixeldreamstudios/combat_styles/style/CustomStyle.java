@@ -7,6 +7,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,7 +22,7 @@ public record CustomStyle(String id, String group, StyleEntry entry,
 
     public static final String DEFAULT_GROUP = "custom";
 
-    public static final Codec<CustomStyle> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<CustomStyle> CODEC = Customs.wrap(CustomStyle.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("id").forGetter(CustomStyle::id),
             Codec.STRING.optionalFieldOf("group", DEFAULT_GROUP).forGetter(CustomStyle::group),
             StyleEntry.CODEC.fieldOf("style").forGetter(CustomStyle::entry),
@@ -29,7 +30,7 @@ public record CustomStyle(String id, String group, StyleEntry entry,
             StyleRarity.CODEC.optionalFieldOf("rarity").forGetter(CustomStyle::rarity),
             Codec.DOUBLE.optionalFieldOf("cost").forGetter(CustomStyle::costOverride),
             Codec.BOOL.optionalFieldOf(StylePool.KEY_STYLE_PAGE).forGetter(CustomStyle::stylePage)
-    ).apply(instance, CustomStyle::new));
+    ).apply(instance, CustomStyle::new)));
 
     public static final StreamCodec<ByteBuf, CustomStyle> STREAM_CODEC = new StreamCodec<>() {
 

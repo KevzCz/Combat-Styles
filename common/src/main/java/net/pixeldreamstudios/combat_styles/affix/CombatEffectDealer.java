@@ -1,9 +1,9 @@
 package net.pixeldreamstudios.combat_styles.affix;
-import net.pixeldreamstudios.combat_styles.api.CombatScheduler;
 import net.pixeldreamstudios.combat_styles.damage.DamageBonus;
 import net.pixeldreamstudios.combat_styles.damage.DamageHurt;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.damage.DamageDealer;
+import net.pixeldreamstudios.combat_styles.damage.ScaledNumbers;
 import net.bettercombat.api.AttackHand;
 import net.bettercombat.api.ComboState;
 import net.bettercombat.api.EntityPlayer_BetterCombat;
@@ -35,6 +35,7 @@ import net.pixeldreamstudios.combat_styles.equipment.EquipmentEffect;
 import net.pixeldreamstudios.combat_styles.equipment.StyleSubstitution;
 import net.pixeldreamstudios.combat_styles.equipment.TriggeredEffect;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
+import net.pixeldreamstudios.combat_styles.equipment.EffectStacking;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRuntime;
 import net.pixeldreamstudios.combat_styles.equipment.EventKind;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
@@ -44,9 +45,10 @@ import net.pixeldreamstudios.combat_styles.equipment.MissTracker;
 import net.pixeldreamstudios.combat_styles.equipment.PendingExtraHit;
 import net.pixeldreamstudios.combat_styles.equipment.PendingGrants;
 import net.pixeldreamstudios.combat_styles.equipment.WornEquipment;
-import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 import net.pixeldreamstudios.combat_styles.equipment.ClientSwing;
 import net.pixeldreamstudios.combat_styles.api.SwingTiming;
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.equipment.SwingHaste;
 import net.pixeldreamstudios.combat_styles.equipment.SubstitutionScope;
 import net.pixeldreamstudios.combat_styles.platform.WeaponRegistryAccess;
@@ -92,8 +94,9 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 
-public final class AffixDamageDealer {
+public final class CombatEffectDealer {
     private static final ThreadLocal<Boolean> ECHOING = ThreadLocal.withInitial(() -> Boolean.FALSE);
+    private static final ThreadLocal<Boolean> CONVERTED = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     private static final ThreadLocal<Boolean> RESOLVING_EXTRA =
             ThreadLocal.withInitial(() -> Boolean.FALSE);
@@ -140,7 +143,7 @@ public final class AffixDamageDealer {
         return base.withHistory(streak, same);
     }
 
-    private AffixDamageDealer() {
+    private CombatEffectDealer() {
     }
 
     public static float executeBonusFor(Player player, LivingEntity target, float amount) {
@@ -220,13 +223,8 @@ public final class AffixDamageDealer {
                 added += amount * (momentum - 1.0F);
             }
             for (AffixEffects.Damage damage : amplifying) {
-                float ratio = Math.max(0.0F, damage.ratio());
-                if (damage.scaling().isPresent()) {
-                    AffixEffects.Scaling scaling = damage.scaling().get();
-                    ratio = scaling.apply(ratio, SpellPowerAccess.valueOf(
-                            player, scaling.sources(), scaling.strongest()));
-                }
-                added += scaled * ratio + Math.max(0.0F, damage.flat());
+                added += (scaled * AffixImpacts.ratioOf(player, damage)
+                        + Math.max(0.0F, damage.flat())) * Math.max(0.0F, damage.multiplier());
             }
             bonus += added;
             if (added > 0.0F) {
@@ -1399,7 +1397,8 @@ public final class AffixDamageDealer {
             }
             syncCooldowns(player, match);
         }
-        if (effects == null && events.isEmpty() && !selfHere) {
+        if (effects == null && events.isEmpty() && !selfHere
+                && !Customs.has(entry) && !Customs.has(match.effect())) {
             return true;
         }
         StyleAffix source = EquipmentAffix.of(match);
@@ -1410,7 +1409,11 @@ public final class AffixDamageDealer {
                             : payloadOf(match.effect(), effects)));
         }
         syncCooldowns(player, match);
+        ItemStack owner = match.stackOf(player);
+        float scaledBase = base * EffectStacking.multiplier(player, entry, owner);
         Runnable fire = () -> {
+            Customs.apply(CustomScopes.TRIGGERED_EFFECT, entry, player, player, target);
+            Customs.apply(CustomScopes.EQUIPMENT_EFFECT, match.effect(), player, player, target);
             if (selfHere) {
                 AffixImpacts.applySelfEffects(player, entry.selfEffects());
             }
@@ -1420,16 +1423,14 @@ public final class AffixDamageDealer {
             }
             firing.addAll(events);
             for (AffixEffects.OnHit payload : firing) {
-                apply(player, target, source, payload, base, resolved);
+                apply(player, target, source, payload, scaledBase, resolved);
                 if (!payload.isEmpty()) {
-                    scheduleEcho(player, target, source, payload, base, resolved,
+                    scheduleEcho(player, target, source, payload, scaledBase, resolved,
                             payload.echo().orElse(null));
                 }
             }
         };
-        if (!CombatScheduler.after(player, entry.delayTicks(), match.id(), fire)) {
-            fire.run();
-        }
+        EffectStacking.fire(player, entry, owner, match.id(), fire);
         return true;
     }
 
@@ -1639,12 +1640,55 @@ public final class AffixDamageDealer {
         return id != null && living != null && id == living.getId();
     }
 
+    public static boolean convertsHit(Player player, LivingEntity target, float amount) {
+        return converterFor(player, target, amount,
+                affixesForCurrentAttack(player, swingingWeapon(player))).isPresent();
+    }
+
+    public static boolean consumeConverted() {
+        boolean converted = CONVERTED.get();
+        CONVERTED.set(Boolean.FALSE);
+        return converted;
+    }
+
+    private static Optional<StyleAffix> converterFor(Player player, LivingEntity target,
+                                                     float amount, ResolvedAffixes resolved) {
+        return resolved.conversionSource()
+                .or(() -> equipmentConverter(player, target, amount));
+    }
+
+    private static Optional<StyleAffix> equipmentConverter(Player player, LivingEntity target,
+                                                           float amount) {
+        if (EquipmentRegistry.isEmpty() || ECHOING.get()) {
+            return Optional.empty();
+        }
+        for (EquipmentRuntime.Match match : EquipmentRuntime.previewFor(player,
+                previewContext(player, target, true, amount), true)) {
+            boolean converts = match.effect().onHit()
+                    .map(onHit -> onHit.allDamage().stream()
+                            .anyMatch(AffixEffects.Damage::converts))
+                    .orElse(false);
+            if (converts) {
+                return Optional.of(EquipmentAffix.of(match));
+            }
+        }
+        return Optional.empty();
+    }
+
     public static void onPlayerHit(Player player, Entity target, float dealtDamage) {
+        onPlayerHit(player, target, dealtDamage, false);
+    }
+
+    public static void onPlayerHit(Player player, Entity target, float dealtDamage,
+                                   boolean converted) {
         if (DamageDealer.isDealing() || !(target instanceof LivingEntity living)) {
             return;
         }
         if (player == null || player.level().isClientSide() || dealtDamage <= 0.0F) {
             return;
+        }
+        if (converted) {
+            CONVERTED.set(Boolean.TRUE);
         }
         SwingHolder.push(player);
 
@@ -1671,6 +1715,14 @@ public final class AffixDamageDealer {
                     "extra hit uses its own " + ownAffixes.size() + " affix(es)");
         } else if (!PendingExtraHit.inheritsAffixes(player, CombatState.swungAttack(player))) {
             CombatDebug.phase(player, "hit", "extra hit does not inherit affixes");
+            if (converted) {
+                DamageDealer.beginDealing();
+                try {
+                    AffixImpacts.dealPhysical(player, living, dealtDamage);
+                } finally {
+                    DamageDealer.endDealing();
+                }
+            }
             return;
         }
 
@@ -1687,13 +1739,24 @@ public final class AffixDamageDealer {
                         + ", " + dealtDamage + " damage, "
                         + names(resolved));
             }
-            StyleAffix converter = resolved.conversionSource().orElse(null);
+            StyleAffix converter = converterFor(player, living, dealtDamage, resolved)
+                    .orElse(null);
+            if (converted) {
+                float physical = dealtDamage
+                        * (1.0F - AffixImpacts.convertedShare(player, converter));
+                AffixImpacts.dealPhysical(player, living, physical);
+                if (CombatDebug.enabled(player)) {
+                    CombatDebug.note(player, "converted by "
+                            + (converter == null ? "nothing" : converter.serializedId())
+                            + ", " + round(physical) + " stays physical");
+                }
+            }
             for (StyleAffix affix : resolved.affixes()) {
                 if (affix.onHit().isEmpty()) {
                     CombatDebug.skipped(player, affix.serializedId(), "no on_hit block");
                     continue;
                 }
-                AffixEffects.OnHit effects = affix.onHit();
+                AffixEffects.OnHit effects = ScaledNumbers.resolved(affix.onHit(), player);
                 if (converter != null && affix != converter) {
                     effects = withoutDamage(effects);
                     if (effects.isEmpty()) {
@@ -1749,11 +1812,13 @@ public final class AffixDamageDealer {
         return String.valueOf(Math.round(value * 100.0D) / 100.0D);
     }
 
+    private static final String CUSTOM_REJECTED = "custom hook rejected";
+
     private static AffixEffects.OnHit withoutDamage(AffixEffects.OnHit onHit) {
-        return new AffixEffects.OnHit(Optional.empty(), List.of(), onHit.statusEffects(), onHit.ignite(),
+        return Customs.copy(onHit, new AffixEffects.OnHit(Optional.empty(), List.of(), onHit.statusEffects(), onHit.ignite(),
                 onHit.lifesteal(), onHit.knockback(), onHit.splash(), onHit.selfEffects(),
                 onHit.sound(), onHit.particles(), onHit.projectiles(), onHit.castSpells(),
-                onHit.slashWave(), onHit.mechanics(), onHit.freezeTicks(), onHit.delayTicks(), onHit.echo());
+                onHit.slashWave(), onHit.mechanics(), onHit.freezeTicks(), onHit.delayTicks(), onHit.echo()));
     }
 
     private static void runGroup(Player player, LivingEntity target, float total,
@@ -2072,8 +2137,9 @@ public final class AffixDamageDealer {
 
     private static void apply(Player player, LivingEntity target, StyleAffix affix,
                               AffixEffects.OnHit onHit, float dealtDamage, ResolvedAffixes resolved) {
+        AffixEffects.OnHit live = ScaledNumbers.resolved(onHit, player);
         withAttackAffixes(resolved,
-                () -> applyPayload(player, target, affix, onHit, dealtDamage, resolved));
+                () -> applyPayload(player, target, affix, live, dealtDamage, resolved));
     }
 
     private static void applyPayload(Player player, LivingEntity target, StyleAffix affix,
@@ -2086,6 +2152,11 @@ public final class AffixDamageDealer {
 
         if (!AffixMechanics.conditionMet(onHit.condition(), player, target, swingContext())) {
             CombatDebug.skipped(player, affix.serializedId(), "condition not met");
+            return;
+        }
+        if (!Customs.allows(CustomScopes.ON_HIT, onHit, player, player, target)
+                || !Customs.allows(CustomScopes.STYLE_AFFIX, affix, player, player, target)) {
+            CombatDebug.skipped(player, affix.serializedId(), CUSTOM_REJECTED);
             return;
         }
 
@@ -2119,6 +2190,8 @@ public final class AffixDamageDealer {
         if (onHit.condition().refundSlot()) {
             ComboControl.holdSlot(player);
         }
+        Customs.apply(CustomScopes.STYLE_AFFIX, affix, player, player, target);
+        Customs.apply(CustomScopes.ON_HIT, onHit, player, player, target);
         AffixMechanics.applyAttributes(player, target, affix, onHit.attributes());
 
         float scaled = dealtDamage * onHit.condition().multiplier()
@@ -2262,7 +2335,7 @@ public final class AffixDamageDealer {
                 AffixImpacts.spawnParticles(serverLevel, target, particles);
             }
             for (AffixEffects.Projectile projectile : onHit.projectiles()) {
-                AffixProjectiles.spawn(serverLevel, player, target, projectile, total);
+                ProjectileLaunches.spawn(serverLevel, player, target, projectile, total);
             }
             for (CastSpell cast : onHit.castSpells()) {
                 SpellCasts.cast(player, target, cast, total);
@@ -2285,6 +2358,13 @@ public final class AffixDamageDealer {
             CombatDebug.skipped(player, affix.serializedId(), "condition not met");
             return;
         }
+        if (!Customs.allows(CustomScopes.ON_HIT, onHit, player, player, null)
+                || !Customs.allows(CustomScopes.STYLE_AFFIX, affix, player, player, null)) {
+            CombatDebug.skipped(player, affix.serializedId(), CUSTOM_REJECTED);
+            return;
+        }
+        Customs.apply(CustomScopes.STYLE_AFFIX, affix, player, player, null);
+        Customs.apply(CustomScopes.ON_HIT, onHit, player, player, null);
         boolean echoing = Boolean.TRUE.equals(ECHOING.get());
         if (!echoing && onHit.cooldown().isPresent()
                 && AffixMechanics.onCooldown(player, affix, onHit.cooldown().get(),
@@ -2335,7 +2415,7 @@ public final class AffixDamageDealer {
                 AffixImpacts.spawnParticles(serverLevel, player, particles);
             }
             for (AffixEffects.Projectile projectile : onHit.projectiles()) {
-                AffixProjectiles.spawn(serverLevel, player, null, projectile, base);
+                ProjectileLaunches.spawn(serverLevel, player, null, projectile, base);
             }
             for (CastSpell cast : onHit.castSpells()) {
                 SpellCasts.cast(player, null, cast, base);

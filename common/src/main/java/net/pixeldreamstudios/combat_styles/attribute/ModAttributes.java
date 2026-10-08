@@ -20,6 +20,9 @@ public final class ModAttributes {
     public static final String BUDGET_FLAT_ID = "attack_budget_flat";
     public static final double MULTIPLIER_DEFAULT = 100.0D;
     public static final double FLAT_DEFAULT = 0.0D;
+    public static final String MELEE_KNOCKBACK_ID = "melee_knockback";
+    public static final double MELEE_KNOCKBACK_DEFAULT = 1.0D;
+    private static final double MELEE_KNOCKBACK_MAX = 10.0D;
 
     public static final RegistrySupplier<Attribute> BUDGET_MULTIPLIER =
             ATTRIBUTES.register(BUDGET_MULTIPLIER_ID, () -> new RangedAttribute(
@@ -30,6 +33,11 @@ public final class ModAttributes {
             ATTRIBUTES.register(BUDGET_FLAT_ID, () -> new RangedAttribute(
                     "attribute.name." + CombatStyles.MOD_ID + "." + BUDGET_FLAT_ID,
                     FLAT_DEFAULT, -1024.0D, 1024.0D).setSyncable(true));
+
+    public static final RegistrySupplier<Attribute> MELEE_KNOCKBACK =
+            ATTRIBUTES.register(MELEE_KNOCKBACK_ID, () -> new RangedAttribute(
+                    "attribute.name." + CombatStyles.MOD_ID + "." + MELEE_KNOCKBACK_ID,
+                    MELEE_KNOCKBACK_DEFAULT, 0.0D, MELEE_KNOCKBACK_MAX).setSyncable(true));
 
     private ModAttributes() {
     }
@@ -44,6 +52,7 @@ public final class ModAttributes {
         }
         addTo(builder, BUDGET_MULTIPLIER_ID, MULTIPLIER_DEFAULT);
         addTo(builder, BUDGET_FLAT_ID, FLAT_DEFAULT);
+        addTo(builder, MELEE_KNOCKBACK_ID, MELEE_KNOCKBACK_DEFAULT);
     }
 
     private static void addTo(AttributeSupplier.Builder builder, String path, double base) {

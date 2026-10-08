@@ -116,7 +116,7 @@ public class StylePageItem extends Item {
         for (StyleAffix affix : affixesOf(stack)) {
             known.add(affix.serializedId());
         }
-        return StyleEntry.key(page.styleId(), StyleEntry.sorted(known));
+        return StyleEntry.key(StyleRegistry.representativeOf(page.styleId()), StyleEntry.sorted(known));
     }
 
     @Override

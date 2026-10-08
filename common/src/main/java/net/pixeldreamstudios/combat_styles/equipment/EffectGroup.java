@@ -3,6 +3,8 @@ package net.pixeldreamstudios.combat_styles.equipment;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,17 +33,17 @@ public record EffectGroup(float chance, List<Entry> entries,
 
     public record Entry(String effect, float chance) {
 
-        public static final Codec<Entry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        public static final Codec<Entry> CODEC = Customs.wrap(Entry.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("effect").forGetter(Entry::effect),
                 Codec.FLOAT.optionalFieldOf("chance", ALWAYS).forGetter(Entry::chance)
-        ).apply(instance, Entry::new));
+        ).apply(instance, Entry::new)));
 
         public float share() {
             return Math.max(MIN_SHARE, chance);
         }
     }
 
-    public static final Codec<EffectGroup> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<EffectGroup> CODEC = Customs.wrap(EffectGroup.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.FLOAT.optionalFieldOf("chance", ALWAYS).forGetter(EffectGroup::chance),
             Entry.CODEC.listOf().optionalFieldOf("entries", List.of())
                     .forGetter(EffectGroup::entries),
@@ -55,7 +57,7 @@ public record EffectGroup(float chance, List<Entry> entries,
             Codec.STRING.optionalFieldOf(TriggeredEffect.TOOLTIP_HEADER, "")
                     .forGetter(EffectGroup::tooltipHeader),
             Codec.FLOAT.optionalFieldOf("nothing_chance").forGetter(EffectGroup::nothingChance)
-    ).apply(instance, EffectGroup::new));
+    ).apply(instance, EffectGroup::new)));
 
     public static final EffectGroup EMPTY = new EffectGroup(ALWAYS, List.of(),
             Optional.empty(), Optional.empty(), Optional.empty(),

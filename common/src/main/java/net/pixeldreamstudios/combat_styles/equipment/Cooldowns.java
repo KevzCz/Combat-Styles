@@ -69,6 +69,20 @@ public final class Cooldowns {
         markChanged(player);
     }
 
+    public static void shorten(Player player, String itemId, String effectKey,
+                               int copy, Track track, int ticks) {
+        if (ticks <= 0) {
+            return;
+        }
+        Key key = keyOf(player, itemId, effectKey, copy, track);
+        Long until = ENTRIES.get(key);
+        if (until == null) {
+            return;
+        }
+        ENTRIES.put(key, Math.max(player.level().getGameTime(), until - ticks));
+        markChanged(player);
+    }
+
     public static void clear(Player player, String itemId, Track track) {
         long now = player.level().getGameTime();
         boolean client = player.level().isClientSide();

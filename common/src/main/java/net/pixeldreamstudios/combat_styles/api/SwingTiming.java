@@ -1,6 +1,6 @@
 package net.pixeldreamstudios.combat_styles.api;
 
-import net.pixeldreamstudios.combat_styles.affix.AffixDamageDealer;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.equipment.SequenceSlots;
 import net.minecraft.world.entity.player.Player;
 
@@ -62,7 +62,7 @@ public final class SwingTiming implements SwingTimingInfo {
     @Override
     public int sequenceSlot(Player player, int comboCount, int sequenceSize) {
         return SequenceSlots.liveSlot(player,
-                AffixDamageDealer.swingingWeapon(player, comboCount), comboCount, sequenceSize);
+                CombatEffectDealer.swingingWeapon(player, comboCount), comboCount, sequenceSize);
     }
 
     @Override

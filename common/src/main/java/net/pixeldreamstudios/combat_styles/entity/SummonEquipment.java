@@ -9,6 +9,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 
+import net.pixeldreamstudios.combat_styles.custom.Customs;
+
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
@@ -24,7 +26,7 @@ public record SummonEquipment(Optional<String> mainhand, Optional<String> offhan
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty());
 
-    public static final Codec<SummonEquipment> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<SummonEquipment> CODEC = Customs.wrap(SummonEquipment.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf("mainhand").forGetter(SummonEquipment::mainhand),
             Codec.STRING.optionalFieldOf("offhand").forGetter(SummonEquipment::offhand),
             Codec.STRING.optionalFieldOf("head").forGetter(SummonEquipment::head),
@@ -32,7 +34,7 @@ public record SummonEquipment(Optional<String> mainhand, Optional<String> offhan
             Codec.STRING.optionalFieldOf("legs").forGetter(SummonEquipment::legs),
             Codec.STRING.optionalFieldOf("feet").forGetter(SummonEquipment::feet),
             Codec.STRING.optionalFieldOf("body").forGetter(SummonEquipment::body)
-    ).apply(instance, SummonEquipment::new));
+    ).apply(instance, SummonEquipment::new)));
 
     public boolean isEmpty() {
         return slots().isEmpty();
