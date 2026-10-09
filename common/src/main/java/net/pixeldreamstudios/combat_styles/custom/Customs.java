@@ -1,6 +1,7 @@
 package net.pixeldreamstudios.combat_styles.custom;
 
 import com.google.common.collect.MapMaker;
+import com.google.gson.JsonObject;
 import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
@@ -11,10 +12,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.pixeldreamstudios.combat_styles.damage.CritRolls;
 import net.pixeldreamstudios.combat_styles.damage.ScaledNumbers;
 import net.pixeldreamstudios.combat_styles.equipment.UseScope;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +27,7 @@ public final class Customs {
     public static final String KEY = "custom";
 
     private static final Map<Object, List<CustomUse>> ATTACHED = new MapMaker().weakKeys().makeMap();
+    private static final Map<Entity, Map<CustomUse, JsonObject>> BAKED = new MapMaker().weakKeys().makeMap();
     private static final Codec<List<CustomUse>> USES = Codec.lazyInitialized(() -> CustomUse.CODEC.listOf());
 
     private Customs() {
@@ -138,12 +143,22 @@ public final class Customs {
             if (!CustomRegistry.fits(hook, scope)) {
                 continue;
             }
-            CustomContext context = new CustomContext(scope, box, use.optionsOrEmpty(), owner, actor, target);
             UseScope.within(actor, () -> ScaledNumbers.withOwner(owner, () -> {
-                call.run(hook, context);
+                call.run(hook, new CustomContext(scope, box, bakedOptions(use, owner, actor),
+                        owner, actor, target));
                 return null;
             }));
         }
+    }
+
+    private static JsonObject bakedOptions(CustomUse use, Player owner, Entity actor) {
+        JsonObject options = use.optionsOrEmpty();
+        if (!(actor instanceof Projectile)) {
+            return ScaledNumbers.baked(options, owner);
+        }
+        return BAKED.computeIfAbsent(actor, ignored -> new IdentityHashMap<>())
+                .computeIfAbsent(use, ignored -> CritRolls.carriedBy(actor,
+                        () -> ScaledNumbers.baked(options, owner)));
     }
 
     public static List<Component> tooltip(String scope, Object box) {
@@ -181,7 +196,7 @@ public final class Customs {
         for (CustomUse use : of(box)) {
             CustomHook hook = CustomRegistry.get(use.hook());
             if (CustomRegistry.fits(hook, scope) && !hook.test(new CustomContext(scope, box,
-                    use.optionsOrEmpty(), owner, actor, target))) {
+                    bakedOptions(use, owner, actor), owner, actor, target))) {
                 return false;
             }
         }
@@ -194,8 +209,8 @@ public final class Customs {
         for (CustomUse use : of(box)) {
             CustomHook hook = CustomRegistry.get(use.hook());
             if (CustomRegistry.fits(hook, scope)) {
-                modified = hook.modifyDamage(new CustomContext(scope, box, use.optionsOrEmpty(), owner,
-                        actor, target), modified);
+                modified = hook.modifyDamage(new CustomContext(scope, box,
+                        bakedOptions(use, owner, actor), owner, actor, target), modified);
             }
         }
         return modified;

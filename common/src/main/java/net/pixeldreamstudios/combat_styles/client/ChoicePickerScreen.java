@@ -220,7 +220,7 @@ public class ChoicePickerScreen extends PickerScreen<String> {
         if (!entity && !spell) {
             return;
         }
-        int panelX = left + PANEL_WIDTH + PREVIEW_GAP;
+        int panelX = sidePanelX(PREVIEW_SIZE, PREVIEW_GAP);
         int panelY = listTop() - PREVIEW_LIFT;
         int inner = PREVIEW_SIZE - PREVIEW_PAD * 2;
         ScreenDraw.panel(graphics, panelX, panelY, PREVIEW_SIZE, PREVIEW_SIZE + PREVIEW_LABEL);
@@ -231,9 +231,8 @@ public class ChoicePickerScreen extends PickerScreen<String> {
             SpellPreviewRenderer.render(graphics, panelX + PREVIEW_PAD, panelY + PREVIEW_PAD,
                     inner, id);
         }
-        graphics.drawString(font,
-                ScreenDraw.trim(font, StyleText.choiceName(id).getString(), inner),
-                panelX + PREVIEW_PAD, panelY + PREVIEW_SIZE + 2, ScreenTheme.MUTED, false);
+        ScreenDraw.drawTrimmed(graphics, font, StyleText.choiceName(id).getString(),
+                panelX + PREVIEW_PAD, panelY + PREVIEW_SIZE + 2, inner, ScreenTheme.MUTED);
     }
 
     @Override
@@ -251,20 +250,15 @@ public class ChoicePickerScreen extends PickerScreen<String> {
                 index, hovered, selected);
         String name = StyleText.choiceName(row).getString();
         if (name.isBlank() || name.equals(row)) {
-            graphics.drawString(font,
-                    ScreenDraw.trim(font, StyleText.prettify(row), width - TRIM_MARGIN),
-                    x + TEXT_INSET, y + TEXT_INSET,
-                    selected ? ScreenTheme.GOOD : ScreenTheme.TEXT, false);
+            ScreenDraw.drawTrimmed(graphics, font, StyleText.prettify(row),
+                    x + TEXT_INSET, y + TEXT_INSET, width - TRIM_MARGIN, selected ? ScreenTheme.GOOD : ScreenTheme.TEXT);
             return;
         }
         String shortId = shortId(row, width);
         int idWidth = font.width(shortId);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, name, width - idWidth - TRIM_MARGIN),
-                x + TEXT_INSET, y + TEXT_INSET,
-                selected ? ScreenTheme.GOOD : ScreenTheme.TEXT, false);
-        graphics.drawString(font, shortId, x + width - idWidth - TEXT_INSET,
-                y + TEXT_INSET, ScreenTheme.DIM, false);
+        ScreenDraw.drawTrimmed(graphics, font, name,
+                x + TEXT_INSET, y + TEXT_INSET, width - idWidth - TRIM_MARGIN, selected ? ScreenTheme.GOOD : ScreenTheme.TEXT);
+        drawId(graphics, row, x + width - TEXT_INSET, y + TEXT_INSET, width, ScreenTheme.DIM);
     }
 
 }

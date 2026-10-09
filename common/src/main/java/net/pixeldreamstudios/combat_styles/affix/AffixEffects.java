@@ -528,9 +528,12 @@ public final class AffixEffects {
                             boolean refundSlot,
                             Optional<Boolean> onMiss, List<String> damageType,
                             List<String> takenDamageType, List<String> targetEffects,
-                            Optional<Boolean> targetBurning) {
+                            Optional<Boolean> targetBurning, Optional<String> crit,
+                            Optional<String> critMissed) {
         public static final String KEY_TARGET_EFFECTS = "target_effects";
         public static final String KEY_TARGET_BURNING = "target_burning";
+        public static final String KEY_CRIT = "crit";
+        public static final String KEY_CRIT_MISSED = "crit_missed";
 
         public boolean needsTarget() {
             return targetHealthBelow.isPresent() || targetHealthAbove.isPresent()
@@ -539,7 +542,8 @@ public final class AffixEffects {
 
         public static final Condition NONE = new Condition(Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), StateGate.ANY, SlotRule.ANY, 1.0F,
-                false, Optional.empty(), List.of(), List.of(), List.of(), Optional.empty());
+                false, Optional.empty(), List.of(), List.of(), List.of(), Optional.empty(),
+                Optional.empty(), Optional.empty());
 
         public static final Codec<Condition> CODEC = Customs.wrap(Condition.class, RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.optionalFieldOf("self_health_below").forGetter(Condition::selfHealthBelow),
@@ -557,13 +561,17 @@ public final class AffixEffects {
                         .forGetter(Condition::takenDamageType),
                 Codec.STRING.listOf().optionalFieldOf(KEY_TARGET_EFFECTS, List.of())
                         .forGetter(Condition::targetEffects),
-                Codec.BOOL.optionalFieldOf(KEY_TARGET_BURNING).forGetter(Condition::targetBurning)
+                Codec.BOOL.optionalFieldOf(KEY_TARGET_BURNING).forGetter(Condition::targetBurning),
+                Codec.STRING.optionalFieldOf(KEY_CRIT).forGetter(Condition::crit),
+                Codec.STRING.optionalFieldOf(KEY_CRIT_MISSED).forGetter(Condition::critMissed)
         ).apply(instance, Condition::new)));
 
         public Condition {
             state = state == null ? StateGate.ANY : state;
             targetEffects = targetEffects == null ? List.of() : List.copyOf(targetEffects);
             targetBurning = targetBurning == null ? Optional.empty() : targetBurning;
+            crit = crit == null ? Optional.empty() : crit;
+            critMissed = critMissed == null ? Optional.empty() : critMissed;
         }
 
         public boolean isEmpty() {
@@ -572,7 +580,7 @@ public final class AffixEffects {
                     && state.isEmpty() && slot.isEmpty() && !refundSlot
                     && onMiss.isEmpty() && damageType.isEmpty()
                     && takenDamageType.isEmpty() && targetEffects.isEmpty()
-                    && targetBurning.isEmpty();
+                    && targetBurning.isEmpty() && crit.isEmpty() && critMissed.isEmpty();
         }
     }
 

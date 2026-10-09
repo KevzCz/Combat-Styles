@@ -168,10 +168,7 @@ public class MultiChoiceScreen extends PickerScreen<String> {
             graphics.drawString(font, tag, x + width - tagWidth, y + TEXT_INSET,
                     ScreenTheme.DIM, false);
         }
-        graphics.drawString(font,
-                ScreenDraw.trim(font, labeler.apply(row).getString(),
-                        width - MARK_WIDTH - 8 - tagWidth),
-                x + MARK_WIDTH, y + TEXT_INSET,
-                on ? ScreenTheme.TEXT : ScreenTheme.MUTED, false);
+        ScreenDraw.drawTrimmed(graphics, font, labeler.apply(row).getString(),
+                x + MARK_WIDTH, y + TEXT_INSET, width - MARK_WIDTH - 8 - tagWidth, on ? ScreenTheme.TEXT : ScreenTheme.MUTED);
     }
 }

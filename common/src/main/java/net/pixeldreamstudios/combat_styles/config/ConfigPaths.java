@@ -16,6 +16,8 @@ public final class ConfigPaths {
     public static final String LEGACY_STYLES = "styles";
     public static final String STYLE_BOOKS = "style_books";
     public static final String WEAPON_ROLLS = "weapon_rolls";
+    public static final String CRIT_GROUPS = "crit_groups";
+    public static final String EQUIPMENT_DROPS = "equipment_drops";
     public static final String SUMMON_ABILITIES = "summon_abilities";
     public static final String AFFIXES = "custom_affixes";
     public static final String STYLE_ID_LEDGER = "style_ids.json";

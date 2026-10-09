@@ -41,6 +41,12 @@ public class FieldBox extends EditBox {
         if (!isVisible()) {
             return;
         }
+        String value = getValue();
+        if (!isFocused() && font.width(value) > getInnerWidth()) {
+            ScreenDraw.clipped(value, getX(), getY(), getWidth(), getHeight());
+        } else if (value.isEmpty() && fullHint != null && font.width(fullHint.getString()) > getInnerWidth()) {
+            ScreenDraw.clipped(fullHint.getString(), getX(), getY(), getWidth(), getHeight());
+        }
         boolean hovered = ScreenDraw.isWithin(mouseX, mouseY, getX(), getY(),
                 getWidth(), getHeight());
         if (!hovered && !isFocused()) {

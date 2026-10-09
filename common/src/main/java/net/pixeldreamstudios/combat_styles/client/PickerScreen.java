@@ -99,6 +99,14 @@ public abstract class PickerScreen<T> extends PanelScreen {
         return fitted;
     }
 
+    protected int sidePanelX(int sideWidth, int gap) {
+        int right = left + panelWidth() + gap;
+        if (right + sideWidth <= width - SCREEN_MARGIN) {
+            return right;
+        }
+        return Math.max(SCREEN_MARGIN, left - gap - sideWidth);
+    }
+
     protected int idWidth(String id) {
         return Math.min(font.width(id), ID_CAP);
     }
@@ -109,7 +117,16 @@ public abstract class PickerScreen<T> extends PanelScreen {
     }
 
     protected String shortId(String id, int rowWidth) {
-        return ScreenDraw.trim(font, id, Math.min(ID_CAP, rowWidth / 2));
+        return ScreenDraw.trim(font, id, idCap(rowWidth));
+    }
+
+    protected int idCap(int rowWidth) {
+        return Math.min(ID_CAP, rowWidth / 2);
+    }
+
+    protected void drawId(GuiGraphics graphics, String id, int right, int y, int rowWidth, int color) {
+        ScreenDraw.drawTrimmed(graphics, font, id, right - font.width(shortId(id, rowWidth)), y,
+                idCap(rowWidth), color);
     }
 
     protected void addFooterButtons(int buttonY) {

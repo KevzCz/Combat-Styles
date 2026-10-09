@@ -7,6 +7,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.api.CombatScheduler;
+import net.pixeldreamstudios.combat_styles.damage.CritRolls;
 import net.pixeldreamstudios.combat_styles.platform.SpellPowerAccess;
 
 import java.util.Locale;
@@ -93,7 +94,7 @@ public record EffectStacking(String source, double per, int minStacks, int maxSt
         boolean repeats = entry.stacking().map(stacking -> stacking.mode() == Mode.REPEAT).orElse(false);
         int times = repeats ? counted[0] : Math.min(SINGLE, counted[0]);
         int spacing = entry.stacking().map(EffectStacking::delayTicks).orElse(NO_DELAY);
-        Runnable scoped = () -> OwnerScope.run(owner, fire);
+        Runnable scoped = () -> OwnerScope.run(owner, () -> CritRolls.firing(fire));
         for (int stack = 0; stack < times; stack++) {
             int delay = entry.delayTicks() + stack * spacing;
             if (!CombatScheduler.after(player, delay, label, scoped)) {

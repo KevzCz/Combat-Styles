@@ -12,6 +12,7 @@ import com.mojang.serialization.JsonOps;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.LibraryRef;
+import net.pixeldreamstudios.combat_styles.damage.ScaledNumber;
 
 import java.util.List;
 import java.util.Map;
@@ -23,11 +24,14 @@ public final class EntityLibraries {
 
     public static final String PROJECTILES = "projectiles";
     public static final String SUMMON_PROFILES = "summon_profiles";
+    public static final String CRITS = "crits";
 
     public static final Codec<Map<String, AffixEffects.Projectile>> PROJECTILES_CODEC =
             Codec.unboundedMap(Codec.STRING, Codec.lazyInitialized(() -> AffixEffects.Projectile.CODEC));
     public static final Codec<Map<String, SummonProfile>> SUMMON_PROFILES_CODEC =
             Codec.unboundedMap(Codec.STRING, Codec.lazyInitialized(() -> SummonProfile.CODEC));
+    public static final Codec<Map<String, ScaledNumber.Crit>> CRITS_CODEC =
+            Codec.unboundedMap(Codec.STRING, ScaledNumber.Crit.CODEC);
 
     private record Library(String key, String refKey, Codec<?> codec) {
     }
@@ -36,9 +40,10 @@ public final class EntityLibraries {
             new Library(PROJECTILES, LibraryRef.PROJECTILE_KEY,
                     Codec.lazyInitialized(() -> AffixEffects.Projectile.CODEC)),
             new Library(SUMMON_PROFILES, LibraryRef.SUMMON_KEY,
-                    Codec.lazyInitialized(() -> SummonProfile.CODEC)));
+                    Codec.lazyInitialized(() -> SummonProfile.CODEC)),
+            new Library(CRITS, ScaledNumber.Crit.KEY_GROUP, ScaledNumber.Crit.CODEC));
 
-    private static final Set<String> LIBRARY_KEYS = Set.of(PROJECTILES, SUMMON_PROFILES);
+    private static final Set<String> LIBRARY_KEYS = Set.of(PROJECTILES, SUMMON_PROFILES, CRITS);
 
     private EntityLibraries() {
     }
@@ -62,7 +67,8 @@ public final class EntityLibraries {
 
         @Override
         public <I> DataResult<I> encode(EquipmentDefinition input, DynamicOps<I> ops, I prefix) {
-            if (input.projectiles().isEmpty() && input.summonProfiles().isEmpty()) {
+            if (input.projectiles().isEmpty() && input.summonProfiles().isEmpty()
+                    && input.crits().isEmpty()) {
                 return delegate.encode(input, ops, prefix);
             }
             return delegate.encodeStart(JsonOps.INSTANCE, input)

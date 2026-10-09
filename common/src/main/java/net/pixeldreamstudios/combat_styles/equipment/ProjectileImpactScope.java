@@ -5,6 +5,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.TraceableEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 
+import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -64,5 +66,14 @@ public final class ProjectileImpactScope {
         }
         Entity attacker = source.getEntity();
         return attacker != null && attacker == landing.getOwner() ? landing : null;
+    }
+
+    public static Projectile hitBy(DamageSource source) {
+        Projectile landing = landingFor(source);
+        if (landing == null || source.getDirectEntity() == landing
+                || SpellEngineCompat.isSpellProjectile(landing)) {
+            return landing;
+        }
+        return null;
     }
 }

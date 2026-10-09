@@ -53,6 +53,14 @@ public abstract class DefinitionListScreen<T> extends ContentListScreen<Definiti
     protected void afterChange() {
     }
 
+    protected T forEditing(String id, T value) {
+        return value;
+    }
+
+    protected T beforeSave(String id, T value) {
+        return value;
+    }
+
     @Override
     protected List<Named<T>> entries() {
         List<Named<T>> entries = new ArrayList<>();
@@ -115,8 +123,8 @@ public abstract class DefinitionListScreen<T> extends ContentListScreen<Definiti
 
     private void edit(String id, T current) {
         minecraft.setScreen(new EffectTreeScreen(this, editorTitle, Component.literal(id),
-                layer.codec(), current,
-                applied -> applied.ifPresent(value -> save(id, value)))
+                layer.codec(), forEditing(id, current),
+                applied -> applied.ifPresent(value -> save(id, beforeSave(id, value))))
                 .withSchema(schemaRoot));
     }
 

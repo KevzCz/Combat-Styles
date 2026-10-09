@@ -11,14 +11,23 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
+import net.pixeldreamstudios.combat_styles.affix.SwingTotals;
+import net.pixeldreamstudios.combat_styles.damage.CritRolls;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.equipment.PendingExtraHit;
 import net.pixeldreamstudios.combat_styles.equipment.SwingDrag;
 
 @Mixin(Player.class)
 public abstract class PlayerAttackEffectsMixin {
+
+    @Unique
+    private static final float NO_DAMAGE = 0.0F;
 
     @Inject(method = "attack", at = @At("HEAD"), require = 1)
     private void combat_styles$markAlive(Entity target, CallbackInfo callback) {
@@ -48,6 +57,10 @@ public abstract class PlayerAttackEffectsMixin {
         }
         DamageDealer.recordConnected(false);
         CombatEffectDealer.markTargetAlive(target);
+        SwingTotals.begin(player);
+        if (!player.level().isClientSide()) {
+            CritRolls.enter();
+        }
     }
 
     @Unique
@@ -67,12 +80,19 @@ public abstract class PlayerAttackEffectsMixin {
                 Math.max(borrowed, accessor.combat_styles$attackStrengthTicker()));
     }
 
-    @Inject(method = "attack", at = @At("TAIL"), require = 1)
+    @Inject(method = "attack", at = @At("TAIL"), order = 1100, require = 1)
     private void combat_styles$applyAffix(Entity target, CallbackInfo callback) {
         Player player = (Player) (Object) this;
         boolean converted = CombatEffectDealer.consumeConverted();
-        float dealt = DamageDealer.lastDealtDamage(
-                (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE));
+        float physical = DamageDealer.lastDealtDamage(NO_DAMAGE);
+        List<SwingTotals.DeferredHit> deferred = SwingTotals.takeDeferred();
+        Set<LivingEntity> resolvedEarly = new HashSet<>();
+        for (SwingTotals.DeferredHit hit : deferred) {
+            resolvedEarly.add(hit.target());
+            CombatEffectDealer.onPlayerHit(player, hit.target(),
+                    hit.physical() + SwingTotals.extrasOn(hit.target()), hit.converted(),
+                    hit.physical());
+        }
 
         if (!(target instanceof LivingEntity living)) {
             return;
@@ -80,11 +100,23 @@ public abstract class PlayerAttackEffectsMixin {
         if (!DamageDealer.consumeConnected()) {
             return;
         }
+        float total = physical + SwingTotals.extrasOn(living);
+        float dealt = total > NO_DAMAGE
+                ? total
+                : (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
         CombatEffectDealer.recordLanded(player, dealt);
 
-        if (converted) {
+        if (converted || resolvedEarly.contains(living)) {
             return;
         }
-        CombatEffectDealer.onPlayerHit(player, living, dealt);
+        CombatEffectDealer.onPlayerHit(player, living, dealt, false, physical);
+    }
+
+    @Inject(method = "attack", at = @At("RETURN"), order = 1200, require = 1)
+    private void combat_styles$endSwingTotals(Entity target, CallbackInfo callback) {
+        SwingTotals.end();
+        if (!((Player) (Object) this).level().isClientSide()) {
+            CritRolls.exit();
+        }
     }
 }

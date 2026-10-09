@@ -1377,10 +1377,8 @@ public class AttackEditorScreen extends PanelScreen {
         ScreenDraw.rowBackground(graphics, x, y, width, ROW_HEIGHT, 0, hovered, false);
         boolean known = AffixRegistry.get(affix) != null;
         boolean tuned = ownTuning != null && ownTuning.containsKey(affix);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, StyleText.prettify(affix), width - REMOVE_WIDTH - 12),
-                x + 6, y + 6,
-                !known ? COLOR_BAD : tuned ? COLOR_CHANGED : COLOR_TEXT, false);
+        ScreenDraw.drawTrimmed(graphics, font, StyleText.prettify(affix),
+                x + 6, y + 6, width - REMOVE_WIDTH - 12, !known ? COLOR_BAD : tuned ? COLOR_CHANGED : COLOR_TEXT);
         int removeX = x + width - REMOVE_WIDTH - 4;
         boolean removeHover = ScreenDraw.isWithin(mouseX, mouseY, removeX, y + 4,
                 REMOVE_WIDTH, ROW_HEIGHT - 8);

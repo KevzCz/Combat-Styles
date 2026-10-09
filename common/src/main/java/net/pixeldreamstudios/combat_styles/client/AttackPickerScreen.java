@@ -118,12 +118,9 @@ public class AttackPickerScreen extends PickerScreen<StylePage> {
         }
         String id = shortId(row.styleId(), width);
         int idWidth = font.width(id);
-        graphics.drawString(font, id,
-                x + width - tagWidth - idWidth - TAG_GAP, y + TEXT_INSET,
-                ScreenTheme.DIM, false);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, StyleText.name(row).getString(),
-                        width - tagWidth - idWidth - NAME_MARGIN),
-                x + TEXT_INSET, y + TEXT_INSET, ScreenTheme.TEXT, false);
+        drawId(graphics, row.styleId(), x + width - tagWidth - TAG_GAP, y + TEXT_INSET, width,
+                ScreenTheme.DIM);
+        ScreenDraw.drawTrimmed(graphics, font, StyleText.name(row).getString(),
+                x + TEXT_INSET, y + TEXT_INSET, width - tagWidth - idWidth - NAME_MARGIN, ScreenTheme.TEXT);
     }
 }

@@ -9,7 +9,10 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.config.DefinitionLayer;
+import net.pixeldreamstudios.combat_styles.damage.CritGroups;
 import net.pixeldreamstudios.combat_styles.loot.BookRolls;
+import net.pixeldreamstudios.combat_styles.loot.DropPools;
+import net.pixeldreamstudios.combat_styles.loot.EquipmentDrops;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRolls;
 
 import java.util.LinkedHashMap;
@@ -17,7 +20,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public record SyncLootPayload(Layer books, Layer rolls, Layer abilities)
+public record SyncLootPayload(Layer books, Layer rolls, Layer abilities, Layer crits, Layer drops,
+                              Map<String, String> tagged)
         implements CustomPacketPayload {
 
     public record Layer(Map<String, String> definitions, Set<String> config, Set<String> data) {
@@ -35,6 +39,7 @@ public record SyncLootPayload(Layer books, Layer rolls, Layer abilities)
             new CustomPacketPayload.Type<>(CombatStyles.id("sync_loot"));
 
     private static final int MAX_JSON_LENGTH = 1 << 20;
+    private static final String ID_SEPARATOR = ",";
 
     private static final StreamCodec<ByteBuf, Map<String, String>> DEFINITIONS_CODEC =
             ByteBufCodecs.map(LinkedHashMap::new, ByteBufCodecs.STRING_UTF8,
@@ -67,7 +72,9 @@ public record SyncLootPayload(Layer books, Layer rolls, Layer abilities)
                 @Override
                 public SyncLootPayload decode(RegistryFriendlyByteBuf buffer) {
                     return new SyncLootPayload(LAYER_CODEC.decode(buffer),
-                            LAYER_CODEC.decode(buffer), LAYER_CODEC.decode(buffer));
+                            LAYER_CODEC.decode(buffer), LAYER_CODEC.decode(buffer),
+                            LAYER_CODEC.decode(buffer), LAYER_CODEC.decode(buffer),
+                            DEFINITIONS_CODEC.decode(buffer));
                 }
 
                 @Override
@@ -75,19 +82,36 @@ public record SyncLootPayload(Layer books, Layer rolls, Layer abilities)
                     LAYER_CODEC.encode(buffer, payload.books());
                     LAYER_CODEC.encode(buffer, payload.rolls());
                     LAYER_CODEC.encode(buffer, payload.abilities());
+                    LAYER_CODEC.encode(buffer, payload.crits());
+                    LAYER_CODEC.encode(buffer, payload.drops());
+                    DEFINITIONS_CODEC.encode(buffer, payload.tagged());
                 }
             };
 
     public static SyncLootPayload capture() {
         return new SyncLootPayload(Layer.of(BookRolls.DEFINITIONS),
-                Layer.of(WeaponRolls.DEFINITIONS), Layer.of(ScriptedAbilities.DEFINITIONS));
+                Layer.of(WeaponRolls.DEFINITIONS), Layer.of(ScriptedAbilities.DEFINITIONS),
+                Layer.of(CritGroups.DEFINITIONS), Layer.of(DropPools.DEFINITIONS), encodeTagged());
     }
 
     public void applyToClient() {
         books.applyTo(BookRolls.DEFINITIONS);
         rolls.applyTo(WeaponRolls.DEFINITIONS);
         abilities.applyTo(ScriptedAbilities.DEFINITIONS);
+        crits.applyTo(CritGroups.DEFINITIONS);
+        drops.applyTo(DropPools.DEFINITIONS);
+        Map<String, List<String>> decoded = new LinkedHashMap<>();
+        tagged.forEach((rarity, ids) -> decoded.put(rarity, ids.isEmpty()
+                ? List.of() : List.of(ids.split(ID_SEPARATOR))));
+        EquipmentDrops.acceptSync(decoded);
         ScriptedAbilities.rebuildFromSync();
+    }
+
+    private static Map<String, String> encodeTagged() {
+        Map<String, String> encoded = new LinkedHashMap<>();
+        EquipmentDrops.taggedForSync().forEach((rarity, ids) ->
+                encoded.put(rarity, String.join(ID_SEPARATOR, ids)));
+        return encoded;
     }
 
     @Override

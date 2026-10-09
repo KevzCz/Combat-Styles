@@ -61,6 +61,8 @@ import net.pixeldreamstudios.combat_styles.loot.EquipmentTagLoader;
 import net.pixeldreamstudios.combat_styles.loot.RandomStyleFunction;
 import net.pixeldreamstudios.combat_styles.loot.StyleLoot;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRollLoader;
+import net.pixeldreamstudios.combat_styles.damage.CritGroupLoader;
+import net.pixeldreamstudios.combat_styles.loot.DropPoolLoader;
 import net.pixeldreamstudios.combat_styles.style.DeclaredClaims;
 import net.pixeldreamstudios.combat_styles.style.CustomAttackLoader;
 import net.pixeldreamstudios.combat_styles.style.CustomStyleLoader;
@@ -97,6 +99,10 @@ public final class ModEvents {
                 CombatStyles.id(DefaultStyleLoader.DIRECTORY));
         ReloadListenerRegistry.register(PackType.SERVER_DATA, new WeaponRollLoader(),
                 CombatStyles.id(WeaponRollLoader.DIRECTORY));
+        ReloadListenerRegistry.register(PackType.SERVER_DATA, new CritGroupLoader(),
+                CombatStyles.id(CritGroupLoader.DIRECTORY));
+        ReloadListenerRegistry.register(PackType.SERVER_DATA, new DropPoolLoader(),
+                CombatStyles.id(DropPoolLoader.DIRECTORY));
         ReloadListenerRegistry.register(PackType.SERVER_DATA, new BookRollLoader(),
                 CombatStyles.id(BookRollLoader.DIRECTORY));
         ReloadListenerRegistry.register(PackType.SERVER_DATA, new ScriptedAbilityLoader(),

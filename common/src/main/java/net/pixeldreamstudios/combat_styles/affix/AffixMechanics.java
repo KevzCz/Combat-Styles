@@ -1,7 +1,9 @@
 package net.pixeldreamstudios.combat_styles.affix;
 import net.pixeldreamstudios.combat_styles.entity.AbilityHosts;
 
+import net.pixeldreamstudios.combat_styles.damage.CritRolls;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
+import net.pixeldreamstudios.combat_styles.damage.ScaledNumber;
 import net.pixeldreamstudios.combat_styles.damage.DamageDealer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.Holder;
@@ -186,6 +188,16 @@ public final class AffixMechanics {
         return true;
     }
 
+    private static boolean critLanded(String group, Player player) {
+        if (player.level().isClientSide()) {
+            return false;
+        }
+        ScaledNumber.Crit crit = new ScaledNumber.Crit(Optional.of(group), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty()).effective();
+        float chance = crit.chanceFor(player);
+        return CritRolls.outcome(crit, () -> player.getRandom().nextFloat() < chance);
+    }
+
     public static boolean conditionMet(AffixEffects.Condition condition, Player player,
                                        LivingEntity target) {
         return conditionMet(condition, player, target, SwingContext.UNKNOWN);
@@ -241,6 +253,12 @@ public final class AffixMechanics {
         }
         if (!DamageTypeMatch.matches(condition.takenDamageType(),
                 CombatState.lastDamageType(player))) {
+            return false;
+        }
+        if (condition.crit().isPresent() && !critLanded(condition.crit().get(), player)) {
+            return false;
+        }
+        if (condition.critMissed().isPresent() && critLanded(condition.critMissed().get(), player)) {
             return false;
         }
         return condition.onMiss().isEmpty()

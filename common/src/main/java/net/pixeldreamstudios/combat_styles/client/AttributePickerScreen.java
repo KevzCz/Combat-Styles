@@ -123,10 +123,8 @@ public class AttributePickerScreen extends PickerScreen<String> {
                 index, hovered, false);
         String idShown = shortId(row, width);
         int idWidth = font.width(idShown);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, labelOf(row).getString(), width - idWidth - 16),
-                x + TEXT_INSET, y + TEXT_INSET, ScreenTheme.TEXT, false);
-        graphics.drawString(font, idShown, x + width - idWidth - 6, y + TEXT_INSET,
-                ScreenTheme.MUTED, false);
+        ScreenDraw.drawTrimmed(graphics, font, labelOf(row).getString(),
+                x + TEXT_INSET, y + TEXT_INSET, width - idWidth - 16, ScreenTheme.TEXT);
+        drawId(graphics, row, x + width - 6, y + TEXT_INSET, width, ScreenTheme.MUTED);
     }
 }

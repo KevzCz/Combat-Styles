@@ -168,9 +168,8 @@ public class InnateAffixScreen extends PanelScreen {
             int y = rowY(index);
             ScreenDraw.rowBackground(graphics, contentLeft() + 1, y,
                     contentWidth() - 2, ROW_HEIGHT - 1, index, index == hovered, false);
-            graphics.drawString(font,
-                    ScreenDraw.trim(font, StyleText.prettify(slot.affix()), slotX() - contentLeft() - 10),
-                    contentLeft() + TEXT_INSET, y + TEXT_INSET, ScreenTheme.TEXT, false);
+            ScreenDraw.drawTrimmed(graphics, font, StyleText.prettify(slot.affix()),
+                    contentLeft() + TEXT_INSET, y + TEXT_INSET, slotX() - contentLeft() - 10, ScreenTheme.TEXT);
 
             Component label = slotLabel(slot);
             ScreenDraw.hoverField(graphics, slotX(), y + 2, SLOT_WIDTH - 6,

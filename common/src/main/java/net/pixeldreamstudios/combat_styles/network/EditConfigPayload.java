@@ -17,7 +17,6 @@ public record EditConfigPayload(Kind kind, String id, String json)
         MAIN_CONFIG,
         STATUS_EFFECT,
         ABILITY,
-        EQUIPMENT_DROP,
         EQUIPMENT,
         EQUIPMENT_CLEAR,
         AFFIX,
@@ -36,7 +35,11 @@ public record EditConfigPayload(Kind kind, String id, String json)
         WEAPON_ROLL_CLEAR,
         SUMMON_ABILITY,
         SUMMON_ABILITY_CLEAR,
-        SUMMON_TUNING;
+        SUMMON_TUNING,
+        CRIT_GROUP,
+        CRIT_GROUP_CLEAR,
+        DROP_POOL,
+        DROP_POOL_CLEAR;
 
         private static final IntFunction<Kind> BY_ID =
                 ByIdMap.continuous(Kind::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

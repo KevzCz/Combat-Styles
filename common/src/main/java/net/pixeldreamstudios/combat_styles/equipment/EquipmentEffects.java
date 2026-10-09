@@ -2,6 +2,7 @@ package net.pixeldreamstudios.combat_styles.equipment;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.AffixTuning;
+import net.pixeldreamstudios.combat_styles.custom.CustomUse;
 import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.style.AttackOverride;
 
@@ -92,6 +93,17 @@ public final class EquipmentEffects {
 
     private static Optional<AffixEffects.OnHit> drop(Optional<AffixEffects.OnHit> value) {
         return value.filter(entry -> !entry.equals(AffixEffects.OnHit.EMPTY) || Customs.has(entry));
+    }
+
+    public static EquipmentEffect withCustom(EquipmentEffect effect, List<CustomUse> uses) {
+        EquipmentEffect copy = new EquipmentEffect(effect.substituteStyle(), effect.augment(),
+                effect.grantAffixes(), effect.onSwing(), effect.onHit(),
+                effect.resetCombo(), effect.tuneAffixes(), effect.echo(),
+                effect.attributes(), effect.substitution(), effect.summonReplacement(),
+                effect.summonProfile(), effect.summonDive(), effect.spells(), effect.damageBonus(),
+                effect.events(), effect.grantAbilities());
+        Customs.attach(copy, uses);
+        return copy;
     }
 
     public static EquipmentEffect withEcho(EquipmentEffect effect,

@@ -71,7 +71,9 @@ public final class ClaimedHits {
                     .withDamageType(Optional.of(declared));
         }
         DamageSpec resolved = spec;
-        CombatEffectDealer.onPlayerHit(player, target, amount);
+        if (!SwingTotals.defer(player, target, amount, false)) {
+            CombatEffectDealer.onPlayerHit(player, target, amount);
+        }
         DamageDealer.beginDealing();
         try {
             CombatEffectDealer.withAttackAffixes(

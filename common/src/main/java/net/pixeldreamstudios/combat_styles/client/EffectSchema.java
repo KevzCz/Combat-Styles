@@ -39,6 +39,7 @@ import net.pixeldreamstudios.combat_styles.affix.CastSpell;
 import net.pixeldreamstudios.combat_styles.damage.DamageBonus;
 import net.pixeldreamstudios.combat_styles.damage.DamageBonusList;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
+import net.pixeldreamstudios.combat_styles.damage.ScaledNumber;
 import net.pixeldreamstudios.combat_styles.affix.LibraryRef;
 import net.pixeldreamstudios.combat_styles.affix.ProjectileSpawn;
 import net.pixeldreamstudios.combat_styles.affix.ProjectileVelocity;
@@ -78,10 +79,12 @@ import net.pixeldreamstudios.combat_styles.equipment.ProjectileHitGate;
 import net.pixeldreamstudios.combat_styles.equipment.CastGate;
 import net.pixeldreamstudios.combat_styles.equipment.CastPhase;
 import net.pixeldreamstudios.combat_styles.equipment.PhaseGate;
+import net.pixeldreamstudios.combat_styles.equipment.Threshold;
 import net.pixeldreamstudios.combat_styles.equipment.UseGate;
 import net.pixeldreamstudios.combat_styles.equipment.UsePhase;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
 import net.pixeldreamstudios.combat_styles.custom.CustomUse;
+import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
 import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.equipment.SpellChainTuning;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLaunchTuning;
@@ -92,6 +95,8 @@ import net.pixeldreamstudios.combat_styles.equipment.SpellTune;
 import net.pixeldreamstudios.combat_styles.equipment.SpellTuning;
 import net.pixeldreamstudios.combat_styles.equipment.StateGate;
 import net.pixeldreamstudios.combat_styles.loot.BookRoll;
+import net.pixeldreamstudios.combat_styles.loot.DropEntry;
+import net.pixeldreamstudios.combat_styles.loot.DropPool;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRoll;
 import net.pixeldreamstudios.combat_styles.equipment.EffectCooldown;
 import net.pixeldreamstudios.combat_styles.equipment.SlotBand;
@@ -207,10 +212,14 @@ public final class EffectSchema {
     public static final String ROOT_DAMAGE_BONUS = "@damage_bonus";
     public static final String ROOT_STYLE_BOOK = "@style_book";
     public static final String ROOT_WEAPON_ROLL = "@weapon_roll";
+    public static final String ROOT_DROP_POOL = "@drop_pool";
     public static final String ROOT_SUMMON_ABILITY = "@summon_ability";
     public static final String ROOT_ABILITY_TUNING = "@ability_tuning";
     public static final String ROOT_PROJECTILE = "@projectile";
+    public static final String ROOT_EFFECT_HOOKS = "@effect_hooks";
     private static final String PATH_SEPARATOR = "/";
+    public static final String ROOT_CRIT = ScaledNumber.SCHEMA + PATH_SEPARATOR
+            + ScaledNumber.KEY_CRIT;
 
     private static final String DEFAULT_TRAIL_COLOR = "#FFFFFF";
     private static final int DEFAULT_NTH_SWING = 3;
@@ -233,6 +242,15 @@ public final class EffectSchema {
     private static final String DEFAULT_SCHOOL = "arcane";
     private static final String DEFAULT_CAST_TYPE = "standard";
     private static final float DEFAULT_TRIGGER_CHANCE = 0.5F;
+    private static final double SAMPLE_DROP_CHANCE = 0.02D;
+    private static final String SAMPLE_LOOT_TABLE = "minecraft:chests/simple_dungeon";
+    private static final String SAMPLE_TABLE_PATTERN = "chests/";
+    private static final String SAMPLE_DROP_ENTITY = "minecraft:zombie";
+    private static final String SAMPLE_ENTITY_TAG = "#minecraft:skeletons";
+    private static final String SAMPLE_STRUCTURE = "minecraft:stronghold";
+    private static final String SAMPLE_STRUCTURE_TAG = "#minecraft:village";
+    private static final String SAMPLE_DROP_ITEM = "minecraft:iron_sword";
+    private static final int SAMPLE_TABLE_BONUS = 5;
     private static final String DEFAULT_SCALING_SOURCE =
             SpellPowerAccess.MOD_ID + ":" + DEFAULT_SCHOOL;
     static final List<String> SCALING_MODES = List.of(
@@ -261,6 +279,11 @@ public final class EffectSchema {
             List.of(SAMPLE_SCALING_ENTRY), DamageSpec.ScalingMode.SUM, List.of(),
             Optional.empty(), Optional.empty(), DamageSpec.FULL_MULTIPLIER);
     private static final int DEFAULT_TUNING_WEIGHT = 10;
+    private static final float SCALED_SAMPLE_BASE = 1.0F;
+    private static final float SCALED_SAMPLE_MIN = 0.0F;
+    private static final float SCALED_SAMPLE_MAX = 10.0F;
+    private static final float SCALED_SAMPLE_STEP = 0.5F;
+    private static final float THRESHOLD_SAMPLE_AT_MOST = 1.0F;
 
     static final List<String> HITBOX_SHAPES =
             List.of("HORIZONTAL_PLANE", "VERTICAL_PLANE", "FORWARD_BOX");
@@ -343,6 +366,7 @@ public final class EffectSchema {
         registerCustomRows(ROOT_STYLE_BOOK, Customs.scopeOf(BookRoll.CODEC));
         registerCustomRows(ROOT_WEAPON_ROLL, Customs.scopeOf(WeaponRoll.CODEC));
         registerCustomRows(ROOT_ABILITY_TUNING, Customs.scopeOf(AbilityTuning.CODEC));
+        registerCustomRows(ROOT_EFFECT_HOOKS, CustomScopes.EQUIPMENT_EFFECT);
     }
 
     public static String customScopeAt(String fullPath) {
@@ -571,16 +595,66 @@ public final class EffectSchema {
         register(root, "proportional", DamageSpec.Share.CODEC.listOf(),
                 List.of(SAMPLE_SHARE));
 
-        String scaling = join(root, "scaling");
-        register(scaling, "source", Codec.STRING, DEFAULT_SCALING_SOURCE);
-        register(scaling, "per_point", Codec.FLOAT, 0.25F);
-        register(scaling, "cap", Codec.FLOAT, 10.0F);
-        register(scaling, "mode", Codec.STRING, SCALING_MODES.getFirst());
-        register(scaling, "baseline", Codec.FLOAT, DamageSpec.ScalingEntry.DEFAULT_BASELINE);
+        registerScalingEntry(join(root, "scaling"));
 
         String shares = join(root, "proportional");
         register(shares, "type", Codec.STRING, DEFAULT_DAMAGE_TYPE);
         register(shares, "share", Codec.FLOAT, 0.5F);
+    }
+
+    private static void registerThresholds(String root) {
+        register(root, Threshold.KEY, Threshold.CODEC.listOf(), List.of(Threshold.SAMPLE));
+        String element = join(root, Threshold.KEY);
+        register(element, Threshold.KEY_SOURCE, Codec.STRING, Threshold.SAMPLE_SOURCE);
+        register(element, Threshold.KEY_AT_LEAST, Codec.FLOAT, Threshold.SAMPLE_AT_LEAST);
+        register(element, Threshold.KEY_AT_MOST, Codec.FLOAT, THRESHOLD_SAMPLE_AT_MOST);
+    }
+
+    private static void registerScalingEntry(String path) {
+        register(path, "source", Codec.STRING, DEFAULT_SCALING_SOURCE);
+        register(path, "per_point", Codec.FLOAT, 0.25F);
+        register(path, "cap", Codec.FLOAT, 10.0F);
+        register(path, "mode", Codec.STRING, SCALING_MODES.getFirst());
+        register(path, "baseline", Codec.FLOAT, DamageSpec.ScalingEntry.DEFAULT_BASELINE);
+    }
+
+    private static void registerDropPool() {
+        String root = ROOT_DROP_POOL;
+        register(root, DropPool.KEY_CHANCE, Codec.DOUBLE, SAMPLE_DROP_CHANCE);
+        register(root, DropPool.KEY_TABLES, Codec.STRING.listOf(), List.of(SAMPLE_LOOT_TABLE));
+        register(root, DropPool.KEY_TABLE_PATTERNS, Codec.STRING.listOf(), List.of(SAMPLE_TABLE_PATTERN));
+        register(root, DropPool.KEY_ENTITIES, Codec.STRING.listOf(), List.of(SAMPLE_DROP_ENTITY));
+        register(root, DropPool.KEY_ENTITY_TAGS, Codec.STRING.listOf(), List.of(SAMPLE_ENTITY_TAG));
+        register(root, DropPool.KEY_STRUCTURES, Codec.STRING.listOf(), List.of(SAMPLE_STRUCTURE));
+        register(root, DropPool.KEY_STRUCTURE_TAGS, Codec.STRING.listOf(), List.of(SAMPLE_STRUCTURE_TAG));
+        register(root, DropPool.KEY_ENTRIES, DropEntry.CODEC.listOf(), List.of(DropEntry.of(SAMPLE_DROP_ITEM)));
+        String entry = join(root, DropPool.KEY_ENTRIES);
+        register(entry, DropEntry.KEY_ITEM, Codec.STRING, SAMPLE_DROP_ITEM);
+        register(entry, DropEntry.KEY_WEIGHT, Codec.INT, DropEntry.DEFAULT_WEIGHT);
+        register(entry, DropEntry.KEY_TABLE_BONUS, Codec.unboundedMap(Codec.STRING, Codec.INT),
+                Map.of(SAMPLE_TABLE_PATTERN, SAMPLE_TABLE_BONUS));
+        register(entry, DropEntry.KEY_ROLL, Codec.BOOL, true);
+    }
+
+    private static void registerScaledNumber() {
+        String root = ScaledNumber.SCHEMA;
+        register(root, ScaledNumber.KEY, Codec.FLOAT, SCALED_SAMPLE_BASE);
+        register(root, ScaledNumber.KEY_BY, DamageSpec.ScalingEntry.CODEC.listOf(),
+                List.of(SAMPLE_SCALING_ENTRY));
+        registerScalingEntry(join(root, ScaledNumber.KEY_BY));
+        register(root, ScaledNumber.KEY_MODE, Codec.STRING, SCALING_COMBINES.getFirst());
+        register(root, ScaledNumber.KEY_MIN, Codec.FLOAT, SCALED_SAMPLE_MIN);
+        register(root, ScaledNumber.KEY_MAX, Codec.FLOAT, SCALED_SAMPLE_MAX);
+        register(root, ScaledNumber.KEY_STEP, Codec.FLOAT, SCALED_SAMPLE_STEP);
+        register(root, ScaledNumber.KEY_CRIT, ScaledNumber.Crit.CODEC, ScaledNumber.Crit.SAMPLE);
+        String crit = join(root, ScaledNumber.KEY_CRIT);
+        register(crit, ScaledNumber.Crit.KEY_GROUP, Codec.STRING, "");
+        register(crit, ScaledNumber.Crit.KEY_CHANCE, Codec.FLOAT, ScaledNumber.Crit.DEFAULT_CHANCE);
+        register(crit, ScaledNumber.Crit.KEY_VALUE, Codec.FLOAT, ScaledNumber.Crit.DEFAULT_MULTIPLIER);
+        register(crit, ScaledNumber.Crit.KEY_MODE, Codec.STRING,
+                ScaledNumber.Crit.Mode.MULTIPLY.serializedName());
+        register(crit, ScaledNumber.Crit.KEY_ON_CRIT, AffixEffects.OnHit.CODEC, AffixEffects.OnHit.EMPTY);
+        mount(join(crit, ScaledNumber.Crit.KEY_ON_CRIT), ROOT_EFFECT);
     }
 
     private static void registerTemplate(String path, String key, JsonElement value) {
@@ -965,6 +1039,9 @@ public final class EffectSchema {
         register("mechanics/condition", AffixEffects.Condition.KEY_TARGET_EFFECTS, Codec.STRING.listOf(),
                 List.of(DEFAULT_TARGET_EFFECT));
         register("mechanics/condition", AffixEffects.Condition.KEY_TARGET_BURNING, Codec.BOOL, true);
+        register("mechanics/condition", AffixEffects.Condition.KEY_CRIT, Codec.STRING, "");
+        register("mechanics/condition", AffixEffects.Condition.KEY_CRIT_MISSED, Codec.STRING, "");
+        registerThresholds("mechanics/condition");
 
         register("mechanics", "condition", AffixEffects.Condition.CODEC,
                 AffixEffects.Condition.NONE);
@@ -1001,6 +1078,8 @@ public final class EffectSchema {
         deriveAll();
         adoptRegistered();
         registerRootCustoms();
+        registerScaledNumber();
+        registerDropPool();
         deriveSubFieldsFromTemplates();
         fillTemplatesFromSubFields();
         auditAll();
@@ -1091,6 +1170,7 @@ public final class EffectSchema {
         register(root, SummonGate.ON_KILL, Codec.BOOL, true);
         register(root, SummonGate.ENTITIES, Codec.STRING.listOf(), List.of(DEFAULT_SUMMON_ENTITY));
         register(root, StateGate.SUMMONS_ACTIVE, Codec.INT, 1);
+        registerThresholds(root);
         register(root, "on_hurt", HurtGate.CODEC, HurtGate.ANY);
         String hurtRoot = join(root, "on_hurt");
         register(hurtRoot, "taken_damage_type", Codec.STRING.listOf(),

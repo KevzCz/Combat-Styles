@@ -88,6 +88,10 @@ public abstract class ContentListScreen<T> extends PanelScreen {
 
     protected abstract boolean remove(T entry);
 
+    protected boolean canCreate() {
+        return true;
+    }
+
     protected Component searchHint() {
         return Component.translatable(KEY_SEARCH);
     }
@@ -118,7 +122,7 @@ public abstract class ContentListScreen<T> extends PanelScreen {
         addRenderableWidget(searchBox);
 
         int buttonY = top + PANEL_HEIGHT - ScreenTheme.BUTTON_HEIGHT - 6;
-        if (creative) {
+        if (creative && canCreate()) {
             addRenderableWidget(PanelButton.of(Component.translatable(KEY_NEW),
                             button -> openEditor(null))
                     .bounds(left + PADDING, buttonY, BUTTON_WIDTH + 10,
@@ -206,11 +210,10 @@ public abstract class ContentListScreen<T> extends PanelScreen {
             Component sourceLabel = source.label();
             int sourceWidth = font.width(sourceLabel);
             int textWidth = rowWidth - ACTION_WIDTH - sourceWidth - TEXT_INSET * 2 - SOURCE_GAP;
-            graphics.drawString(font,
-                    ScreenDraw.trim(font, StyleText.prettify(shortId(idOf(entry))), textWidth),
-                    x + TEXT_INSET, y + NAME_Y, ScreenTheme.TEXT, false);
-            graphics.drawString(font, ScreenDraw.trim(font, subtitleOf(entry), textWidth),
-                    x + TEXT_INSET, y + SUBTITLE_Y, ScreenTheme.DIM, false);
+            ScreenDraw.drawTrimmed(graphics, font, StyleText.prettify(shortId(idOf(entry))),
+                    x + TEXT_INSET, y + NAME_Y, textWidth, ScreenTheme.TEXT);
+            ScreenDraw.drawTrimmed(graphics, font, subtitleOf(entry),
+                    x + TEXT_INSET, y + SUBTITLE_Y, textWidth, ScreenTheme.DIM);
             graphics.drawString(font, sourceLabel,
                     x + rowWidth - ACTION_WIDTH - SOURCE_GAP - sourceWidth, y + ACTION_Y,
                     source == Source.OVERRIDDEN ? ScreenTheme.CHANGED : ScreenTheme.MUTED, false);
@@ -236,8 +239,8 @@ public abstract class ContentListScreen<T> extends PanelScreen {
 
     private void drawFooter(GuiGraphics graphics, int x, int listWidth) {
         Component footer = error == null ? Component.translatable(KEY_HINT) : error;
-        graphics.drawString(font, ScreenDraw.trim(font, footer.getString(), listWidth),
-                x, listBottom() + 8, error == null ? ScreenTheme.DIM : ScreenTheme.BAD, false);
+        ScreenDraw.drawTrimmed(graphics, font, footer.getString(),
+                x, listBottom() + 8, listWidth, error == null ? ScreenTheme.DIM : ScreenTheme.BAD);
     }
 
     protected static String shortId(String id) {

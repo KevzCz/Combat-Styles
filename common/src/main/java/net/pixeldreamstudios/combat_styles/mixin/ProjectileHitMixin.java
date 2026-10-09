@@ -28,7 +28,7 @@ public abstract class ProjectileHitMixin {
         if (self.level().isClientSide()) {
             return;
         }
-        Projectile shot = ProjectileImpactScope.landingFor(source);
+        Projectile shot = ProjectileImpactScope.hitBy(source);
         ProjectileUpkeep.SpellShotSpec spellShot = ProjectileUpkeep.spellShotFor(shot);
         if (spellShot != null) {
             if (CombatDebug.enabled(spellShot.owner())) {

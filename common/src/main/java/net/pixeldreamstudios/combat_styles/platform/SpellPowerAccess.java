@@ -9,6 +9,7 @@ import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.equipment.EnchantLevels;
 import net.pixeldreamstudios.combat_styles.equipment.UseScope;
+import net.pixeldreamstudios.combat_styles.item.HeldPreview;
 
 import java.util.List;
 
@@ -59,7 +60,7 @@ public final class SpellPowerAccess {
         if (attribute == null || player.getAttribute(attribute) == null) {
             return 0.0D;
         }
-        return player.getAttributeValue(attribute);
+        return HeldPreview.valueOf(player, attribute);
     }
 
     public static double valueOf(Player player, List<String> sources, boolean strongest) {

@@ -487,20 +487,14 @@ public class EffectGroupScreen extends PanelScreen {
         String summary = trigger.isAlways()
                 ? Component.translatable(KEY_ALWAYS).getString()
                 : trigger.describe();
-        graphics.drawString(font,
-                ScreenDraw.trim(font, summary,
-                        left + PANEL_WIDTH - ScreenTheme.PADDING - summaryX),
-                summaryX, top + TRIGGER_Y + 3,
-                trigger.isAlways() ? ScreenTheme.DIM : ScreenTheme.ACCENT, false);
+        ScreenDraw.drawTrimmed(graphics, font, summary,
+                summaryX, top + TRIGGER_Y + 3, left + PANEL_WIDTH - ScreenTheme.PADDING - summaryX, trigger.isAlways() ? ScreenTheme.DIM : ScreenTheme.ACCENT);
         graphics.drawString(font, Component.translatable(KEY_COOLDOWN),
                 labelX, top + WINDOW_Y + 3, ScreenTheme.MUTED, false);
         graphics.drawString(font, Component.translatable(KEY_TOOLTIP),
                 labelX, top + TOOLTIP_Y + 3, ScreenTheme.MUTED, false);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, cooldownSummary(),
-                        left + PANEL_WIDTH - ScreenTheme.PADDING - summaryX),
-                summaryX, top + WINDOW_Y + 3,
-                cooldown.isEmpty() ? ScreenTheme.DIM : ScreenTheme.ACCENT, false);
+        ScreenDraw.drawTrimmed(graphics, font, cooldownSummary(),
+                summaryX, top + WINDOW_Y + 3, left + PANEL_WIDTH - ScreenTheme.PADDING - summaryX, cooldown.isEmpty() ? ScreenTheme.DIM : ScreenTheme.ACCENT);
 
         int listWidth = PANEL_WIDTH - ScreenTheme.PADDING * 2;
         graphics.drawString(font, Component.translatable(KEY_COL_EFFECT),
@@ -524,8 +518,8 @@ public class EffectGroupScreen extends PanelScreen {
                     listWidth, ROW_HEIGHT);
             ScreenDraw.rowBackground(graphics, labelX + 1, y, listWidth - 2,
                     ROW_HEIGHT - 1, index, hovered, false);
-            graphics.drawString(font, trim(entry.effect(), chanceX() - labelX - 12),
-                    labelX + TEXT_INSET, y + TEXT_INSET, ScreenTheme.TEXT, false);
+            ScreenDraw.drawTrimmed(graphics, font, entry.effect(),
+                    labelX + TEXT_INSET, y + TEXT_INSET, chanceX() - labelX - 12, ScreenTheme.TEXT);
             graphics.drawString(font, PERCENT_MARK,
                     chanceX() + SMALL_FIELD + 2, y + TEXT_INSET, ScreenTheme.MUTED, false);
             graphics.drawString(font, Component.translatable(KEY_REMOVE),
@@ -563,15 +557,6 @@ public class EffectGroupScreen extends PanelScreen {
             return Component.translatable(KEY_LIVE_WHILE_SWING);
         }
         return trigger.liveWhileUsing() ? Component.translatable(KEY_LIVE_WHILE_USING) : null;
-    }
-
-    private String trim(String text, int maxWidth) {
-        if (maxWidth <= 0) {
-            return "";
-        }
-        return font.width(text) <= maxWidth
-                ? text
-                : font.plainSubstrByWidth(text, maxWidth - 6) + "…";
     }
 
     @Override

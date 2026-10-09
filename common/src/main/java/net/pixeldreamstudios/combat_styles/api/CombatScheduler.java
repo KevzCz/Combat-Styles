@@ -3,6 +3,8 @@ package net.pixeldreamstudios.combat_styles.api;
 import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
+import net.pixeldreamstudios.combat_styles.damage.CritRolls;
+import net.pixeldreamstudios.combat_styles.equipment.OwnerScope;
 
 import java.util.Set;
 import java.util.UUID;
@@ -34,7 +36,8 @@ public final class CombatScheduler {
             return false;
         }
         PENDING.add(new Task(player.getUUID(),
-                player.level().getGameTime() + delayTicks, label, action, requiresAlive));
+                player.level().getGameTime() + delayTicks, label,
+                OwnerScope.bound(CritRolls.bound(action)), requiresAlive));
         return true;
     }
 

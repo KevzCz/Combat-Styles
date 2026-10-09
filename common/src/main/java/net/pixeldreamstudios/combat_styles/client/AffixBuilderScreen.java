@@ -600,10 +600,8 @@ public class AffixBuilderScreen extends PanelScreen {
         Component message = error != null
                 ? Component.literal(error)
                 : Component.translatable(KEY_ID + HINT_SUFFIX);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, message.getString(), FORM_WIDTH + LABEL_WIDTH),
-                left + ScreenTheme.PADDING, footerY,
-                error != null ? ScreenTheme.BAD : ScreenTheme.MUTED, false);
+        ScreenDraw.drawTrimmed(graphics, font, message.getString(),
+                left + ScreenTheme.PADDING, footerY, FORM_WIDTH + LABEL_WIDTH, error != null ? ScreenTheme.BAD : ScreenTheme.MUTED);
     }
 
     @Override

@@ -42,6 +42,7 @@ public enum TooltipGem {
     private static final String PLAIN_INDENT = "  ";
     private static final String LEAD = " ";
     private static final String DETAIL_MARK = CombatStyles.MOD_ID + ":detail";
+    private static final String HEADER_MARK = CombatStyles.MOD_ID + ":header";
 
     private final int glyph;
 
@@ -76,11 +77,25 @@ public enum TooltipGem {
         return line != null && DETAIL_MARK.equals(line.getStyle().getInsertion());
     }
 
+    public static MutableComponent header(Component line) {
+        return Component.empty().withStyle(style -> style.withInsertion(HEADER_MARK)).append(line);
+    }
+
+    public static boolean isHeader(Component line) {
+        return line != null && HEADER_MARK.equals(line.getStyle().getInsertion());
+    }
+
     public MutableComponent place(Component line) {
+        if (isHeader(line)) {
+            return line.copy();
+        }
         return isDetail(line) ? hang(bullet(line)) : bullet(line);
     }
 
     public static MutableComponent hangPlace(Component line) {
+        if (isHeader(line)) {
+            return hang(line);
+        }
         return isDetail(line) ? hang(hang(line)) : hang(line);
     }
 

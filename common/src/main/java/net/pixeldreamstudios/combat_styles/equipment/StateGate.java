@@ -1,5 +1,6 @@
 package net.pixeldreamstudios.combat_styles.equipment;
 
+import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -26,7 +27,8 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
                         Optional<Boolean> dualWielding, Optional<Boolean> twoHanded,
                         ItemGate items, List<String> playerTags,
                         Optional<Integer> playerTagsMin, List<String> missingPlayerTags,
-                        Optional<Integer> summonsActive, List<String> heldSpellSchools) {
+                        Optional<Integer> summonsActive, List<String> heldSpellSchools,
+                        List<Threshold> thresholds) {
 
     public static final String PLAYER_TAGS = "player_tags";
     public static final String PLAYER_TAGS_MIN = "player_tags_min";
@@ -42,9 +44,9 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
     public static final StateGate ANY = new StateGate(Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), ItemGate.NONE,
-            List.of(), Optional.empty(), List.of(), Optional.empty(), List.of());
+            List.of(), Optional.empty(), List.of(), Optional.empty(), List.of(), List.of());
 
-    public static final MapCodec<StateGate> CODEC = RecordCodecBuilder.mapCodec(
+    private static final MapCodec<StateGate> CORE = RecordCodecBuilder.mapCodec(
             instance -> instance.group(
                     Codec.BOOL.optionalFieldOf("sprinting").forGetter(StateGate::sprinting),
                     Codec.BOOL.optionalFieldOf("airborne").forGetter(StateGate::airborne),
@@ -70,6 +72,11 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
                             .forGetter(StateGate::heldSpellSchools)
             ).apply(instance, StateGate::new));
 
+    public static final MapCodec<StateGate> CODEC = Codec.mapPair(CORE,
+                    Threshold.CODEC.listOf().optionalFieldOf(Threshold.KEY, List.of()))
+            .xmap(pair -> pair.getFirst().withThresholds(pair.getSecond()),
+                    gate -> Pair.of(gate, gate.thresholds()));
+
     public StateGate {
         items = items == null ? ItemGate.NONE : items;
         playerTags = meaningful(playerTags);
@@ -77,6 +84,26 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
         missingPlayerTags = meaningful(missingPlayerTags);
         summonsActive = summonsActive == null ? Optional.empty() : summonsActive;
         heldSpellSchools = meaningful(heldSpellSchools);
+        thresholds = thresholds == null ? List.of() : List.copyOf(thresholds);
+    }
+
+    public StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
+                     Optional<Boolean> behindTarget, Optional<Boolean> night,
+                     Optional<Integer> damagedWithin, Optional<Boolean> hasSpell,
+                     Optional<Boolean> castingSpell, Optional<Boolean> crouching,
+                     Optional<Boolean> dualWielding, Optional<Boolean> twoHanded,
+                     ItemGate items, List<String> playerTags,
+                     Optional<Integer> playerTagsMin, List<String> missingPlayerTags,
+                     Optional<Integer> summonsActive, List<String> heldSpellSchools) {
+        this(sprinting, airborne, behindTarget, night, damagedWithin, hasSpell, castingSpell,
+                crouching, dualWielding, twoHanded, items, playerTags, playerTagsMin,
+                missingPlayerTags, summonsActive, heldSpellSchools, List.of());
+    }
+
+    public StateGate withThresholds(List<Threshold> value) {
+        return new StateGate(sprinting, airborne, behindTarget, night, damagedWithin, hasSpell,
+                castingSpell, crouching, dualWielding, twoHanded, items, playerTags, playerTagsMin,
+                missingPlayerTags, summonsActive, heldSpellSchools, value);
     }
 
     public int tagsNeeded() {
@@ -96,7 +123,7 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
                 && night.isEmpty() && damagedWithin.isEmpty() && hasSpell.isEmpty()
                 && castingSpell.isEmpty() && crouching.isEmpty() && dualWielding.isEmpty() && twoHanded.isEmpty()
                 && items.isEmpty() && playerTags.isEmpty() && missingPlayerTags.isEmpty()
-                && summonsActive.isEmpty() && heldSpellSchools.isEmpty();
+                && summonsActive.isEmpty() && heldSpellSchools.isEmpty() && thresholds.isEmpty();
     }
 
     public boolean needsTarget() {
@@ -108,7 +135,8 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
                 ? this
                 : new StateGate(sprinting, airborne, Optional.empty(), night, damagedWithin,
                         hasSpell, castingSpell, crouching, dualWielding, twoHanded, items,
-                        playerTags, playerTagsMin, missingPlayerTags, summonsActive, heldSpellSchools);
+                        playerTags, playerTagsMin, missingPlayerTags, summonsActive, heldSpellSchools,
+                        thresholds);
     }
 
     public String rejects(Player player, LivingEntity target) {
@@ -181,6 +209,11 @@ public record StateGate(Optional<Boolean> sprinting, Optional<Boolean> airborne,
         if (summonsActive.isPresent()
                 && SummonRoster.count(player, true) < summonsActive.get()) {
             return SUMMONS_ACTIVE + " (has " + SummonRoster.count(player, true) + ")";
+        }
+        for (Threshold threshold : thresholds) {
+            if (!threshold.met(player)) {
+                return Threshold.KEY + " (" + threshold.source() + ")";
+            }
         }
         return items.rejects(player);
     }

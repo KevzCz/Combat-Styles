@@ -12,6 +12,8 @@ import net.pixeldreamstudios.combat_styles.style.CustomStyleConfig;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.loot.BookRolls;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRolls;
+import net.pixeldreamstudios.combat_styles.damage.CritGroups;
+import net.pixeldreamstudios.combat_styles.loot.DropPools;
 import net.pixeldreamstudios.combat_styles.style.DefaultStyles;
 
 import java.util.Map;
@@ -25,6 +27,8 @@ public final class ServerDataReset {
         DefaultStyles.clear();
         BookRolls.DEFINITIONS.forget();
         WeaponRolls.DEFINITIONS.forget();
+        CritGroups.DEFINITIONS.forget();
+        DropPools.DEFINITIONS.forget();
         ScriptedAbilities.DEFINITIONS.forget();
         AbilityHosts.clear();
         CustomStyles.accept(Map.of());

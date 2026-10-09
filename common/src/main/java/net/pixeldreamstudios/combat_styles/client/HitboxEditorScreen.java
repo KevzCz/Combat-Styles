@@ -709,9 +709,8 @@ public class HitboxEditorScreen extends PanelScreen {
             Row row = rows.get(index);
             int y = rowY(index);
             if (row.header()) {
-                graphics.drawString(font,
-                        ScreenDraw.trim(font, groups.get(row.group()).label, LIST_WIDTH - 6),
-                        x + 2, y + 3, ScreenTheme.HEADING, false);
+                ScreenDraw.drawTrimmed(graphics, font, groups.get(row.group()).label,
+                        x + 2, y + 3, LIST_WIDTH - 6, ScreenTheme.HEADING);
                 continue;
             }
             if (row.shape() < 0) {
@@ -727,9 +726,8 @@ public class HitboxEditorScreen extends PanelScreen {
                 String affixId = shape.affixes().get(row.affix());
                 String tuned = shape.tuning().containsKey(affixId)
                         ? Component.translatable(KEY_TUNED).getString() : "";
-                graphics.drawString(font, ScreenDraw.trim(font,
-                                "• " + StyleText.prettify(affixId) + tuned, LIST_WIDTH - 20),
-                        x + 18, y + 3, ScreenTheme.MUTED, false);
+                ScreenDraw.drawTrimmed(graphics, font, "• " + StyleText.prettify(affixId) + tuned,
+                        x + 18, y + 3, LIST_WIDTH - 20, ScreenTheme.MUTED);
                 continue;
             }
             String label = Component.translatable(KEY_BOX,
@@ -737,9 +735,8 @@ public class HitboxEditorScreen extends PanelScreen {
             if (shape.tunes()) {
                 label += Component.translatable(KEY_TUNED).getString();
             }
-            graphics.drawString(font, ScreenDraw.trim(font, label, LIST_WIDTH - 12),
-                    x + 10, y + 3,
-                    shape.tunes() ? ScreenTheme.HEADING : ScreenTheme.TEXT, false);
+            ScreenDraw.drawTrimmed(graphics, font, label,
+                    x + 10, y + 3, LIST_WIDTH - 12, shape.tunes() ? ScreenTheme.HEADING : ScreenTheme.TEXT);
         }
         graphics.disableScissor();
     }

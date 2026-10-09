@@ -3,6 +3,8 @@ import net.pixeldreamstudios.combat_styles.damage.DamageBonus;
 import net.pixeldreamstudios.combat_styles.damage.DamageHurt;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.damage.DamageDealer;
+import net.pixeldreamstudios.combat_styles.damage.CritRolls;
+import net.pixeldreamstudios.combat_styles.equipment.OwnerScope;
 import net.pixeldreamstudios.combat_styles.damage.ScaledNumbers;
 import net.bettercombat.api.AttackHand;
 import net.bettercombat.api.ComboState;
@@ -71,6 +73,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -97,6 +100,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 public final class CombatEffectDealer {
     private static final ThreadLocal<Boolean> ECHOING = ThreadLocal.withInitial(() -> Boolean.FALSE);
     private static final ThreadLocal<Boolean> CONVERTED = ThreadLocal.withInitial(() -> Boolean.FALSE);
+    private static final ThreadLocal<Float> HIT_PHYSICAL_SHARE = new ThreadLocal<>();
 
     private static final ThreadLocal<Boolean> RESOLVING_EXTRA =
             ThreadLocal.withInitial(() -> Boolean.FALSE);
@@ -160,7 +164,8 @@ public final class CombatEffectDealer {
             if (onHit.execute().isEmpty() || onHit.execute().get().instantKill()) {
                 continue;
             }
-            if (!AffixMechanics.conditionMet(onHit.condition(), player, target, swingContext())) {
+            if (!conditionWithReactions(player, target, affix, onHit, amount,
+                    swingingWeapon(player))) {
                 continue;
             }
             if (onHit.cooldown().isPresent()
@@ -177,6 +182,17 @@ public final class CombatEffectDealer {
         return bonus;
     }
 
+    private static boolean conditionWithReactions(Player player, LivingEntity target, StyleAffix affix,
+                                                  AffixEffects.OnHit onHit, float amount,
+                                                  ItemStack owner) {
+        boolean[] met = new boolean[1];
+        OwnerScope.run(owner, () -> CritRolls.reacting(
+                onCrit -> reactToCrit(player, target, affix, onCrit, amount, ResolvedAffixes.EMPTY),
+                () -> met[0] = AffixMechanics.conditionMet(onHit.condition(), player, target,
+                        swingContext())));
+        return met[0];
+    }
+
     public static float amplifyBonusFor(Player player, LivingEntity target, float amount) {
         if (player == null || target == null || amount <= 0.0F || DamageDealer.isDealing()) {
             return 0.0F;
@@ -184,7 +200,9 @@ public final class CombatEffectDealer {
         ResolvedAffixes resolved = affixesForCurrentAttack(player, swingingWeapon(player));
 
         List<StyleAffix> amplifiers = new ArrayList<>(resolved.affixes());
-        amplifiers.addAll(equipmentAmplifiers(player, target, amount));
+        Map<StyleAffix, ItemStack> owners = new IdentityHashMap<>();
+        amplifiers.addAll(equipmentAmplifiers(player, target, amount, owners));
+        ItemStack weapon = swingingWeapon(player);
         if (amplifiers.isEmpty()) {
             return 0.0F;
         }
@@ -197,7 +215,8 @@ public final class CombatEffectDealer {
             if (amplifying.isEmpty() && onHit.momentum().isEmpty()) {
                 continue;
             }
-            if (!AffixMechanics.conditionMet(onHit.condition(), player, target, swingContext())) {
+            if (!conditionWithReactions(player, target, affix, onHit, amount,
+                    owners.getOrDefault(affix, weapon))) {
                 continue;
             }
             if (onHit.cooldown().isPresent()
@@ -1681,6 +1700,34 @@ public final class CombatEffectDealer {
 
     public static void onPlayerHit(Player player, Entity target, float dealtDamage,
                                    boolean converted) {
+        onPlayerHit(player, target, dealtDamage, converted, dealtDamage);
+    }
+
+    public static void onPlayerHit(Player player, Entity target, float dealtDamage,
+                                   boolean converted, float physicalDamage) {
+        Float previous = HIT_PHYSICAL_SHARE.get();
+        HIT_PHYSICAL_SHARE.set(dealtDamage > 0.0F
+                ? Math.max(0.0F, Math.min(1.0F, physicalDamage / dealtDamage))
+                : 1.0F);
+        try {
+            CritRolls.firing(() -> resolvePlayerHit(player, target, dealtDamage, converted,
+                    physicalDamage));
+        } finally {
+            if (previous == null) {
+                HIT_PHYSICAL_SHARE.remove();
+            } else {
+                HIT_PHYSICAL_SHARE.set(previous);
+            }
+        }
+    }
+
+    private static float physicalShare() {
+        Float share = HIT_PHYSICAL_SHARE.get();
+        return share == null ? 1.0F : share;
+    }
+
+    private static void resolvePlayerHit(Player player, Entity target, float dealtDamage,
+                                         boolean converted, float physicalDamage) {
         if (DamageDealer.isDealing() || !(target instanceof LivingEntity living)) {
             return;
         }
@@ -1718,7 +1765,7 @@ public final class CombatEffectDealer {
             if (converted) {
                 DamageDealer.beginDealing();
                 try {
-                    AffixImpacts.dealPhysical(player, living, dealtDamage);
+                    AffixImpacts.dealPhysical(player, living, physicalDamage);
                 } finally {
                     DamageDealer.endDealing();
                 }
@@ -1742,7 +1789,7 @@ public final class CombatEffectDealer {
             StyleAffix converter = converterFor(player, living, dealtDamage, resolved)
                     .orElse(null);
             if (converted) {
-                float physical = dealtDamage
+                float physical = physicalDamage
                         * (1.0F - AffixImpacts.convertedShare(player, converter));
                 AffixImpacts.dealPhysical(player, living, physical);
                 if (CombatDebug.enabled(player)) {
@@ -2001,7 +2048,8 @@ public final class CombatEffectDealer {
     }
 
     private static List<StyleAffix> equipmentAmplifiers(Player player, LivingEntity target,
-                                                        float amount) {
+                                                        float amount,
+                                                        Map<StyleAffix, ItemStack> owners) {
         if (EquipmentRegistry.isEmpty() || ECHOING.get()) {
             return List.of();
         }
@@ -2015,7 +2063,9 @@ public final class CombatEffectDealer {
             boolean amplifies = onHit.allDamage().stream()
                     .anyMatch(AffixEffects.Damage::amplifies);
             if (amplifies || !onHit.momentum().isEmpty()) {
-                found.add(EquipmentAffix.of(match));
+                StyleAffix amplifier = EquipmentAffix.of(match);
+                owners.put(amplifier, match.stackOf(player));
+                found.add(amplifier);
             }
         }
         return found;
@@ -2093,7 +2143,8 @@ public final class CombatEffectDealer {
             return false;
         }
         PENDING_GROUPS.add(new PendingGroup(player,
-                player.level().getGameTime() + delayTicks, action));
+                player.level().getGameTime() + delayTicks,
+                OwnerScope.bound(CritRolls.bound(action))));
         return true;
     }
 
@@ -2137,9 +2188,33 @@ public final class CombatEffectDealer {
 
     private static void apply(Player player, LivingEntity target, StyleAffix affix,
                               AffixEffects.OnHit onHit, float dealtDamage, ResolvedAffixes resolved) {
-        AffixEffects.OnHit live = ScaledNumbers.resolved(onHit, player);
-        withAttackAffixes(resolved,
-                () -> applyPayload(player, target, affix, live, dealtDamage, resolved));
+        Runnable payload = () -> CritRolls.reacting(
+                onCrit -> reactToCrit(player, target, affix, onCrit, dealtDamage, resolved), () -> {
+                    AffixEffects.OnHit live = ScaledNumbers.resolved(onHit, player);
+                    withAttackAffixes(resolved,
+                            () -> applyPayload(player, target, affix, live, dealtDamage, resolved));
+                });
+        if (OwnerScope.current() == null) {
+            OwnerScope.run(swingingWeapon(player), payload);
+        } else {
+            payload.run();
+        }
+    }
+
+    private static void reactToCrit(Player player, LivingEntity target, StyleAffix affix,
+                                    AffixEffects.OnHit onCrit, float dealtDamage,
+                                    ResolvedAffixes resolved) {
+        boolean dealing = DamageDealer.isDealing();
+        if (!dealing) {
+            DamageDealer.beginDealing();
+        }
+        try {
+            apply(player, isPresent(target) ? target : null, affix, onCrit, dealtDamage, resolved);
+        } finally {
+            if (!dealing) {
+                DamageDealer.endDealing();
+            }
+        }
     }
 
     private static void applyPayload(Player player, LivingEntity target, StyleAffix affix,
@@ -2205,7 +2280,8 @@ public final class CombatEffectDealer {
         float elemental = 0.0F;
         for (AffixEffects.Damage entry : onHit.allDamage()) {
             if (!entry.amplifies() || echoing) {
-                elemental += AffixImpacts.dealDamage(player, target, entry, scaled);
+                elemental += AffixImpacts.dealDamage(player, target, entry,
+                        entry.converts() ? scaled * physicalShare() : scaled);
             }
         }
 

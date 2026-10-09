@@ -4,7 +4,9 @@ import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
 import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
 import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.pixeldreamstudios.combat_styles.entity.ConfigurableSummon;
+import net.pixeldreamstudios.combat_styles.damage.CritRolls;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
+import net.pixeldreamstudios.combat_styles.damage.FiringItem;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.mixin.ArrowPickupAccessor;
 import net.pixeldreamstudios.combat_styles.debug.CombatDebug;
@@ -143,6 +145,8 @@ public final class ProjectileLaunches {
                             .combat_styles$setPickupItemStack(new ItemStack(Items.ARROW));
                 }
             }
+            FiringItem.stamp(spawned);
+            CritRolls.stamp(spawned);
             ProjectileUpkeep.track(player, spawned, projectile, triggeringDamage, carriedDamage, false);
             level.addFreshEntity(spawned);
             Customs.spawned(CustomScopes.PROJECTILE, projectile, player, player, spawned);
@@ -225,6 +229,12 @@ public final class ProjectileLaunches {
                             .combat_styles$setPickupItemStack(new ItemStack(Items.ARROW));
                 }
             }
+            if (viaSummon) {
+                FiringItem.stamp(spawned, ItemStack.EMPTY);
+            } else {
+                FiringItem.stamp(spawned);
+            }
+            CritRolls.stamp(spawned);
             ProjectileUpkeep.track(player, spawned, projectile, triggeringDamage, carriedDamage,
                     viaSummon);
             level.addFreshEntity(spawned);

@@ -4,6 +4,8 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 
+import net.pixeldreamstudios.combat_styles.client.ScreenDraw;
+
 import java.util.List;
 
 public final class TooltipPanel {
@@ -24,6 +26,7 @@ public final class TooltipPanel {
         if (components.isEmpty()) {
             return;
         }
+        ScreenDraw.markTooltip();
 
         int width = 0;
         int height = 0;

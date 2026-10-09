@@ -28,6 +28,7 @@ import net.pixeldreamstudios.combat_styles.affix.EffectLines;
 import net.pixeldreamstudios.combat_styles.affix.EquipmentAffix;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
+import net.pixeldreamstudios.combat_styles.item.HeldPreview;
 import net.pixeldreamstudios.combat_styles.item.ItemTooltip;
 import net.pixeldreamstudios.combat_styles.item.TooltipGem;
 import net.pixeldreamstudios.combat_styles.item.TooltipIcon;
@@ -299,7 +300,7 @@ public final class EquipmentTooltip {
         previewStack = stack;
         previewDefinition = definition;
         try {
-            return body.get();
+            return HeldPreview.showing(stack, body);
         } finally {
             previewStack = priorStack;
             previewDefinition = priorDefinition;
@@ -1079,6 +1080,7 @@ public final class EquipmentTooltip {
         state.summonsActive().ifPresent(count ->
                 parts.add(Component.translatable(KEY_SUMMONS_ACTIVE, count)));
         parts.addAll(ItemGateText.parts(state));
+        parts.addAll(ThresholdText.parts(state));
     }
 
     private static void dealtParts(DealtGate dealt, List<Component> parts) {

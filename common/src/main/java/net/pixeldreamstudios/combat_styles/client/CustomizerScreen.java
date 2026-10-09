@@ -539,7 +539,6 @@ public class CustomizerScreen extends PanelScreen {
         return Math.max(0, categoryEntries().size() - visibleRows());
     }
 
-
     private int categoryWidth() {
         return Math.round(categoryReveal * CATEGORY_WIDTH);
     }
@@ -1020,10 +1019,13 @@ public class CustomizerScreen extends PanelScreen {
 
         ItemStack weapon = state.weapon();
         if (!weapon.isEmpty()) {
-            String name = trim(weapon.getHoverName().getString(), 170);
+            String fullName = weapon.getHoverName().getString();
+            String name = ScreenDraw.trim(font, fullName, 170);
             int nameWidth = font.width(name);
             graphics.drawString(font, name, left + PANEL_WIDTH - PADDING - nameWidth - 20,
                     top + PADDING, COLOR_MUTED, false);
+            ScreenDraw.clippedIf(fullName, name, left + PANEL_WIDTH - PADDING - nameWidth - 20,
+                    top + PADDING, nameWidth, font.lineHeight);
             graphics.renderItem(weapon, left + PANEL_WIDTH - PADDING - 17, top + PADDING - 4);
         }
 
@@ -1114,8 +1116,8 @@ public class CustomizerScreen extends PanelScreen {
             String label = categoryLabel(category);
             String count = String.valueOf(state.categoryCount(category));
             int countWidth = font.width(count);
-            graphics.drawString(font, trim(label, CATEGORY_WIDTH - countWidth - 14), x + 6, y + 3,
-                    active ? COLOR_TEXT : COLOR_MUTED, false);
+            ScreenDraw.drawTrimmed(graphics, font, label,
+                    x + 6, y + 3, CATEGORY_WIDTH - countWidth - 14, active ? COLOR_TEXT : COLOR_MUTED);
             graphics.drawString(font, count, x + CATEGORY_WIDTH - countWidth - 4, y + 3, COLOR_LOCKED, false);
             y += ROW_HEIGHT;
         }
@@ -1134,8 +1136,8 @@ public class CustomizerScreen extends PanelScreen {
 
         if (libraryRows.isEmpty()) {
             String key = state.totalCount() == 0 ? KEY_NO_STYLES : KEY_NO_MATCH;
-            graphics.drawString(font, trim(Component.translatable(key).getString(), LIBRARY_WIDTH - 8),
-                    x + 4, listTop + 4, COLOR_LOCKED, false);
+            ScreenDraw.drawTrimmed(graphics, font, Component.translatable(key).getString(),
+                    x + 4, listTop + 4, LIBRARY_WIDTH - 8, COLOR_LOCKED);
             return;
         }
 
@@ -1230,7 +1232,8 @@ public class CustomizerScreen extends PanelScreen {
             if (variant) {
                 nameColor = spare && affordable ? affixColor(row.affix()) : COLOR_BAD;
             }
-            graphics.drawString(font, trim(label, textWidth), textLeft, y + 3, nameColor, false);
+            ScreenDraw.drawTrimmed(graphics, font, label,
+                    textLeft, y + 3, textWidth, nameColor);
 
             if (!copies.isEmpty()) {
                 graphics.drawString(font, copies, x + LIBRARY_WIDTH - costWidth - copiesWidth - 5, y + 3,
@@ -1250,8 +1253,8 @@ public class CustomizerScreen extends PanelScreen {
         int width = rightWidth();
 
         if (!state.weaponSupported()) {
-            graphics.drawString(font, trim(Component.translatable(KEY_UNSUPPORTED).getString(), width),
-                    x, listTop(), COLOR_BAD, false);
+            ScreenDraw.drawTrimmed(graphics, font, Component.translatable(KEY_UNSUPPORTED).getString(),
+                    x, listTop(), width, COLOR_BAD);
             if (state.creative()) {
                 int buttonY = listTop() + 16;
                 boolean hovered = ScreenDraw.isWithin(mouseX, mouseY, x, buttonY,
@@ -1261,9 +1264,8 @@ public class CustomizerScreen extends PanelScreen {
                 graphics.renderOutline(x, buttonY, IMPROVISE_WIDTH, IMPROVISE_HEIGHT, COLOR_SCROLL);
                 graphics.drawString(font, Component.translatable(KEY_IMPROVISE), x + 6, buttonY + 4,
                         hovered ? COLOR_ACCENT : COLOR_TEXT, false);
-                graphics.drawString(font,
-                        trim(Component.translatable(KEY_IMPROVISE_HINT).getString(), width),
-                        x, buttonY + IMPROVISE_HEIGHT + 6, COLOR_MUTED, false);
+                ScreenDraw.drawTrimmed(graphics, font, Component.translatable(KEY_IMPROVISE_HINT).getString(),
+                        x, buttonY + IMPROVISE_HEIGHT + 6, width, COLOR_MUTED);
             }
             return;
         }
@@ -1329,8 +1331,8 @@ public class CustomizerScreen extends PanelScreen {
                 int labelColour = page == null || unlearned
                         ? COLOR_BAD
                         : (leadAffix != null ? affixColor(leadAffix) : COLOR_TEXT);
-                graphics.drawString(font, trim(label, available - 14), textLeft, y + 3,
-                        labelColour, false);
+                ScreenDraw.drawTrimmed(graphics, font, label,
+                        textLeft, y + 3, available - 14, labelColour);
                 if (unlearned) {
                     graphics.drawString(font, "!", textLeft - 6, y + 3, COLOR_BAD, false);
                 }
@@ -1352,7 +1354,8 @@ public class CustomizerScreen extends PanelScreen {
                         ? Component.translatable(state.sequence().isEmpty() ? KEY_EMPTY : KEY_SLOT_EMPTY).getString()
                         : "";
                 if (!hint.isEmpty()) {
-                    graphics.drawString(font, trim(hint, slotWidth - 10), x + 7, y + 3, COLOR_LOCKED, false);
+                    ScreenDraw.drawTrimmed(graphics, font, hint,
+                            x + 7, y + 3, slotWidth - 10, COLOR_LOCKED);
                 }
             }
             y += (filled ? SLOT_HEIGHT : ROW_HEIGHT) + 2;
@@ -1387,9 +1390,8 @@ public class CustomizerScreen extends PanelScreen {
         }
 
         graphics.drawString(font, "~", x + 6, y + 1, custom ? COLOR_ACCENT : COLOR_LOCKED, false);
-        String text = trim(label, width - SOUND_TEXT_LEFT - SOUND_ARROW_WIDTH);
-        graphics.drawString(font, text, x + SOUND_TEXT_LEFT, y + 1,
-                custom ? COLOR_ACCENT : COLOR_LOCKED, false);
+        ScreenDraw.drawTrimmed(graphics, font, label, x + SOUND_TEXT_LEFT, y + 1,
+                width - SOUND_TEXT_LEFT - SOUND_ARROW_WIDTH, custom ? COLOR_ACCENT : COLOR_LOCKED);
         graphics.drawString(font, ">", x + width - 9, y + 1, hovered ? COLOR_ACCENT : COLOR_LOCKED, false);
     }
 
@@ -1419,8 +1421,8 @@ public class CustomizerScreen extends PanelScreen {
                 ? size + " of " + minimum
                 : size + "/" + state.maxAttacks();
         int slotsWidth = font.width(slots);
-        graphics.drawString(font, trim(label, width - slotsWidth - 6), x, y + 7,
-                over ? COLOR_BAD : COLOR_MUTED, false);
+        ScreenDraw.drawTrimmed(graphics, font, label,
+                x, y + 7, width - slotsWidth - 6, over ? COLOR_BAD : COLOR_MUTED);
         graphics.drawString(font, slots, x + width - slotsWidth, y + 7,
                 short_ ? COLOR_BAD : COLOR_LOCKED, false);
     }
@@ -1433,8 +1435,8 @@ public class CustomizerScreen extends PanelScreen {
             return;
         }
         if (!CombatStylesConfig.get().animationPreviewEnabled() || !preview.isAvailable()) {
-            graphics.drawString(font, trim(Component.translatable(KEY_PREVIEW_UNAVAILABLE).getString(),
-                            PREVIEW_SIZE - 6), x + 4, y + PREVIEW_SIZE / 2 - 4, COLOR_LOCKED, false);
+            ScreenDraw.drawTrimmed(graphics, font, Component.translatable(KEY_PREVIEW_UNAVAILABLE).getString(),
+                    x + 4, y + PREVIEW_SIZE / 2 - 4, PREVIEW_SIZE - 6, COLOR_LOCKED);
             return;
         }
         graphics.enableScissor(x + 1, y + 1, x + PREVIEW_SIZE - 1, y + PREVIEW_SIZE - 1);
@@ -1473,8 +1475,8 @@ public class CustomizerScreen extends PanelScreen {
         String label = StyleText.prettify(animationLabel(row.groupAnimation()));
         String count = String.valueOf(row.groupSize());
         int countWidth = font.width(count);
-        graphics.drawString(font, trim(label, LIBRARY_WIDTH - countWidth - 24),
-                x + 16, y + 3, COLOR_TEXT, false);
+        ScreenDraw.drawTrimmed(graphics, font, label,
+                x + 16, y + 3, LIBRARY_WIDTH - countWidth - 24, COLOR_TEXT);
         graphics.drawString(font, count, x + LIBRARY_WIDTH - countWidth - 6, y + 3,
                 COLOR_MUTED, false);
     }
@@ -1725,16 +1727,6 @@ public class CustomizerScreen extends PanelScreen {
     private int rarityColor(StylePage page) {
         Integer color = page.rarity().color().getColor();
         return color == null ? COLOR_MUTED : 0xFF000000 | color;
-    }
-
-    private String trim(String text, int maxWidth) {
-        if (maxWidth <= 0) {
-            return "";
-        }
-        if (font.width(text) <= maxWidth) {
-            return text;
-        }
-        return font.plainSubstrByWidth(text, Math.max(0, maxWidth - font.width("..."))) + "...";
     }
 
     @Override

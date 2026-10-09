@@ -87,8 +87,8 @@ public class NamePromptScreen extends PanelScreen {
         drawPanel(graphics);
         drawTitle(graphics, title, top + TITLE_Y);
         if (error != null) {
-            graphics.drawString(font, ScreenDraw.trim(font, error.getString(), contentWidth()),
-                    contentLeft(), top + ERROR_Y, ScreenTheme.BAD, false);
+            ScreenDraw.drawTrimmed(graphics, font, error.getString(),
+                    contentLeft(), top + ERROR_Y, contentWidth(), ScreenTheme.BAD);
         }
         drawWidgets(graphics, mouseX, mouseY, partialTick);
     }

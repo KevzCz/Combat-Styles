@@ -182,9 +182,8 @@ public class UseEditorScreen extends PanelScreen {
 
         drawPanel(graphics);
         drawTitle(graphics, Component.translatable(KEY_TITLE), top + TITLE_Y);
-        graphics.drawString(font, ScreenDraw.trim(font,
-                        Component.translatable(KEY_HINT).getString(), contentWidth()),
-                contentLeft(), top + TITLE_Y + HINT_GAP, ScreenTheme.MUTED, false);
+        ScreenDraw.drawTrimmed(graphics, font, Component.translatable(KEY_HINT).getString(),
+                contentLeft(), top + TITLE_Y + HINT_GAP, contentWidth(), ScreenTheme.MUTED);
         for (int row = 0; row < ROWS; row++) {
             drawRow(graphics, row, mouseX, mouseY);
         }

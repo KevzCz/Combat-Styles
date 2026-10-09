@@ -84,6 +84,21 @@ public abstract class PanelScreen extends ListScreen {
         ScreenDraw.panel(graphics, left, top, panelWidth(), panelHeight());
     }
 
+    @Override
+    public void removed() {
+        super.removed();
+        ScreenDraw.stopCollecting();
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        String clipped = ScreenDraw.beginFrame(mouseX, mouseY);
+        super.render(graphics, mouseX, mouseY, partialTick);
+        if (clipped != null) {
+            setTooltipForNextRenderPass(Component.literal(clipped));
+        }
+    }
+
     protected void drawWidgets(GuiGraphics graphics, int mouseX, int mouseY, float partial) {
         for (GuiEventListener child : children()) {
             if (child instanceof Renderable renderable) {

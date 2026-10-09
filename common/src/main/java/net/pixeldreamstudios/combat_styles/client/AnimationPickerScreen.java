@@ -110,9 +110,8 @@ public class AnimationPickerScreen extends PickerScreen<String> {
     protected void renderRow(GuiGraphics graphics, String row, int index,
                              int x, int y, int width, boolean hovered) {
         ScreenDraw.rowBackground(graphics, x, y, width, ROW_HEIGHT, index, hovered, false);
-        graphics.drawString(font, ScreenDraw.trim(font, rowText(row), width - 16),
-                x + TEXT_INSET, y + TEXT_INSET,
-                hovered ? ScreenTheme.ACCENT : ScreenTheme.TEXT, false);
+        ScreenDraw.drawTrimmed(graphics, font, rowText(row),
+                x + TEXT_INSET, y + TEXT_INSET, width - 16, hovered ? ScreenTheme.ACCENT : ScreenTheme.TEXT);
     }
 
     protected String rowText(String row) {
@@ -132,13 +131,12 @@ public class AnimationPickerScreen extends PickerScreen<String> {
         if (!preview.isAvailable() || animation.isBlank()) {
             return;
         }
-        int panelX = left + PANEL_WIDTH + PREVIEW_GAP;
+        int panelX = sidePanelX(PREVIEW_SIZE, PREVIEW_GAP);
         int panelY = listTop() - PREVIEW_LIFT;
         ScreenDraw.panel(graphics, panelX, panelY, PREVIEW_SIZE, PREVIEW_SIZE + PREVIEW_LABEL);
         PreviewRenderer.render(graphics, panelX + 4, panelY + 4, PREVIEW_SIZE - 8, preview);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, shortName(animation), PREVIEW_SIZE - 8),
-                panelX + 4, panelY + PREVIEW_SIZE + 2, ScreenTheme.MUTED, false);
+        ScreenDraw.drawTrimmed(graphics, font, shortName(animation),
+                panelX + 4, panelY + PREVIEW_SIZE + 2, PREVIEW_SIZE - 8, ScreenTheme.MUTED);
     }
 
     private static String shortName(String animation) {

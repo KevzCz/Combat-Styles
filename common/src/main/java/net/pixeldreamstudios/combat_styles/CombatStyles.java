@@ -16,7 +16,6 @@ import net.pixeldreamstudios.combat_styles.component.ModComponents;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
 import net.pixeldreamstudios.combat_styles.config.OptionSources;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
-import net.pixeldreamstudios.combat_styles.config.EquipmentDropConfig;
 import net.pixeldreamstudios.combat_styles.config.SpellCompatState;
 import net.pixeldreamstudios.combat_styles.config.StatusEffectConfig;
 import net.pixeldreamstudios.combat_styles.config.SummonTuning;
@@ -61,7 +60,6 @@ public final class CombatStyles {
     public static void init() {
         CombatStylesConfig.load();
         SpellCompatState.load();
-        EquipmentDropConfig.load();
         StatusEffectConfig.load();
         AbilityConfig.load();
         OptionSources.register(new AbilityChoices());

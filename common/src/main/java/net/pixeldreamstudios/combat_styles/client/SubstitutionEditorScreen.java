@@ -401,10 +401,8 @@ public class SubstitutionEditorScreen extends PanelScreen {
                 graphics.drawString(font, Component.literal(index + 1 + "."),
                         left + ScreenTheme.PADDING + TEXT_INSET, y + TEXT_INSET,
                         ScreenTheme.MUTED, false);
-                graphics.drawString(font, ScreenDraw.trim(font, styleName(style).getString(),
-                                PANEL_WIDTH - 80),
-                        left + ScreenTheme.PADDING + TEXT_INSET + 18, y + TEXT_INSET,
-                        ScreenTheme.TEXT, false);
+                ScreenDraw.drawTrimmed(graphics, font, styleName(style).getString(),
+                        left + ScreenTheme.PADDING + TEXT_INSET + 18, y + TEXT_INSET, PANEL_WIDTH - 80, ScreenTheme.TEXT);
                 graphics.drawString(font, Component.translatable(KEY_REMOVE),
                         removeX() + 3, y + TEXT_INSET, ScreenTheme.BAD, false);
                 if (hovered) {

@@ -107,6 +107,11 @@ public final class ScaledNumbers {
         return attached == null ? List.of() : List.copyOf(attached.numbers().values());
     }
 
+    public static Map<String, ScaledNumber> entriesOf(Object value) {
+        Attached attached = value == null ? null : ATTACHED.get(value);
+        return attached == null ? Map.of() : attached.numbers();
+    }
+
     public static List<String> sourcesOf(Object value) {
         List<String> sources = new ArrayList<>();
         for (ScaledNumber number : of(value)) {
@@ -131,11 +136,54 @@ public final class ScaledNumbers {
             return value;
         }
         for (Map.Entry<String, ScaledNumber> number : attached.numbers().entrySet()) {
-            put(json.get(), number.getKey(), new JsonPrimitive(number.getValue().resolve(player)));
+            String path = number.getKey();
+            put(json.get(), path, valueAt(json.get(), path, valueOf(number.getValue(), player)));
         }
         return plain.parse(JsonOps.INSTANCE, json.get()).result()
                 .map(result -> Customs.copy(value, result))
                 .orElse(value);
+    }
+
+    public static JsonObject baked(JsonObject options, Player owner) {
+        if (options == null || owner == null || owner.level().isClientSide()) {
+            return options;
+        }
+        Map<String, ScaledNumber> found = new LinkedHashMap<>();
+        JsonElement stripped = strip(options, ROOT, found);
+        if (found.isEmpty() || !stripped.isJsonObject()) {
+            return options;
+        }
+        for (Map.Entry<String, ScaledNumber> number : found.entrySet()) {
+            put(stripped, number.getKey(), new JsonPrimitive(valueOf(number.getValue(), owner)));
+        }
+        return stripped.getAsJsonObject();
+    }
+
+    private static float valueOf(ScaledNumber number, Player player) {
+        return player != null && !player.level().isClientSide()
+                ? number.roll(player, player.getRandom())
+                : number.resolve(player);
+    }
+
+    private static JsonPrimitive valueAt(JsonElement root, String path, float value) {
+        JsonElement existing = at(root, path);
+        boolean whole = existing != null && existing.isJsonPrimitive()
+                && existing.getAsJsonPrimitive().isNumber()
+                && isWholeType(existing.getAsJsonPrimitive().getAsNumber());
+        return whole ? new JsonPrimitive(Math.round(value)) : new JsonPrimitive(value);
+    }
+
+    private static boolean isWholeType(Number number) {
+        return number instanceof Integer || number instanceof Long
+                || number instanceof Short || number instanceof Byte;
+    }
+
+    private static JsonElement at(JsonElement root, String path) {
+        JsonElement node = root;
+        for (String part : path.split(PATH_SEPARATOR)) {
+            node = node == null ? null : child(node, part);
+        }
+        return node;
     }
 
     public static <T> T withOwner(Player owner, Supplier<T> body) {

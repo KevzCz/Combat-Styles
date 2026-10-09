@@ -16,6 +16,15 @@ public final class OwnerScope {
         return stack == null ? ItemStack.EMPTY : stack;
     }
 
+    public static ItemStack current() {
+        return CURRENT.get();
+    }
+
+    public static Runnable bound(Runnable action) {
+        ItemStack owner = CURRENT.get();
+        return owner == null ? action : () -> run(owner, action);
+    }
+
     public static boolean test(ItemStack owner, BooleanSupplier check) {
         ItemStack previous = CURRENT.get();
         CURRENT.set(owner);

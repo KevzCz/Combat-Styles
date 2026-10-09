@@ -6,6 +6,7 @@ import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.damage.ScaledNumber;
 import net.pixeldreamstudios.combat_styles.damage.ScaledNumbers;
 import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
+import net.pixeldreamstudios.combat_styles.custom.CustomUse;
 import net.pixeldreamstudios.combat_styles.custom.Customs;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -25,14 +26,19 @@ import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
 import net.pixeldreamstudios.combat_styles.equipment.AbilityTuning;
 import net.pixeldreamstudios.combat_styles.equipment.ItemGateText;
+import net.pixeldreamstudios.combat_styles.equipment.ThresholdText;
 import net.pixeldreamstudios.combat_styles.entity.SummonTargeting;
 
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 public final class AffixText {
 
@@ -88,9 +94,35 @@ public final class AffixText {
     private static final String KEY_SPEC_SCALE_CAP = "affix.combat_styles.spec.scale_cap";
     private static final String KEY_SPEC_STRONGEST = "affix.combat_styles.spec.strongest";
     private static final String KEY_SPEC_OR = "affix.combat_styles.spec.or";
-    private static final String KEY_SCALES_WITH = "affix.combat_styles.effect.scales_with";
+    private static final String KEY_CRIT_LINE = "affix.combat_styles.effect.crit";
+    private static final String KEY_CRIT_HINT = "affix.combat_styles.effect.crit_hint";
+    private static final String KEY_CONDITION_SCOPE = "condition";
+    private static final String HEADER_END = ":";
+    private static final String KEY_ONLY_CRIT = "affix.combat_styles.condition.only_crit";
+    private static final String KEY_ONLY_CRIT_MISSED = "affix.combat_styles.condition.only_crit_missed";
+    private static final String KEY_RATIO_PLUS_FLAT = "affix.combat_styles.effect.ratio_plus_flat";
+    private static final String KEY_CRIT_GROUP = "affix.combat_styles.effect.crit_group";
+    private static final String KEY_CRIT_PART = "affix.combat_styles.effect.crit_part";
+    private static final String KEY_CRIT_TIMES = "affix.combat_styles.effect.crit_times";
+    private static final String KEY_CRIT_PLUS = "affix.combat_styles.effect.crit_plus";
+    private static final String KEY_LIST_PAIR = "affix.combat_styles.effect.list_pair";
+    private static final String KEY_ON_CRIT = "affix.combat_styles.effect.on_crit";
+    private static final String KEY_DAMAGE_PATH = "damage";
+    private static final String KEY_DAMAGES_PATH = "damages";
+    private static final String KEY_IGNITE_PATH = "ignite";
+    private static final String KEY_SPLASH_PATH = "splash";
+    private static final String KEY_PROJECTILES_PATH = "projectiles";
+    private static final List<String> PLACED_CRIT_PREFIXES = List.of(KEY_DAMAGE_PATH,
+            KEY_DAMAGES_PATH, KEY_IGNITE_PATH, KEY_SPLASH_PATH, KEY_PROJECTILES_PATH);
+    private static final String KEY_CRIT_SCALES = "affix.combat_styles.effect.crit_scales";
+    private static final String LIST_JOIN = ", ";
+    private static final String PATH_SEPARATOR = "/";
     private static final String KEY_WITH_BONUS = "affix.combat_styles.effect.with_bonus";
     private static final String KEY_WITH_MULTIPLIER = "affix.combat_styles.effect.with_multiplier";
+    private static final String KEY_WITH_PENALTY = "affix.combat_styles.effect.with_penalty";
+    private static final String KEY_SCALED_VALUE = "affix.combat_styles.effect.scaled_value";
+    private static final String KEY_SCALED_DETAIL_SCOPE = "scaled";
+    private static final float BONUS_EPSILON = 0.0001F;
     private static final double PERCENT_SCALE = 100.0D;
     private static final String KEY_DAMAGE_MULTIPLIED = "affix.combat_styles.effect.damage_multiplied";
     private static final String KEY_DAMAGE_FIELD = "damage";
@@ -476,25 +508,226 @@ public final class AffixText {
         return Component.translatable(KEY_WITH_BONUS, percentOf(base), percentOf(now - base)).getString();
     }
 
-    private static void appendScaling(StyleAffix affix, List<Component> lines) {
-        List<String> sources = new ArrayList<>(ScaledNumbers.sourcesOf(affix.onSwing()));
-        for (String source : ScaledNumbers.sourcesOf(affix.onHit())) {
-            if (!sources.contains(source)) {
-                sources.add(source);
-            }
+    private static String damageAmount(AffixEffects.Damage damage) {
+        float flat = Math.max(0.0F, damage.flat());
+        boolean ratioShown = damage.ratio() > 0.0F || damage.scaling().isPresent()
+                || damage.converts() || damage.amplifies();
+        if (flat <= 0.0F) {
+            return scaledPercent(damage);
         }
-        if (sources.isEmpty()) {
+        String flatText = StyleText.formatDecimal(flat);
+        return ratioShown
+                ? Component.translatable(KEY_RATIO_PLUS_FLAT, scaledPercent(damage), flatText).getString()
+                : flatText;
+    }
+
+    private static void appendScaling(StyleAffix affix, List<Component> lines) {
+        Map<String, ScaledNumber> numbers = new LinkedHashMap<>(ScaledNumbers.entriesOf(affix.onSwing()));
+        numbers.putAll(ScaledNumbers.entriesOf(affix.onHit()));
+        List<String> sources = new ArrayList<>();
+        boolean crits = false;
+        for (ScaledNumber number : numbers.values()) {
+            for (String source : number.sources()) {
+                if (!sources.contains(source)) {
+                    sources.add(source);
+                }
+            }
+            crits |= number.crit().isPresent();
+        }
+        if (sources.isEmpty() && !crits) {
             return;
         }
         scopeOf(lines, KEY_SCALING_SCOPE);
+        if (!ItemTooltip.detailed()) {
+            if (crits) {
+                lines.add(TooltipGem.detail(ItemTooltip.marked(
+                        Component.translatable(KEY_CRIT_HINT).withStyle(FRAME))));
+            }
+            return;
+        }
+        appendCrits(affix, numbers, lines);
+    }
+
+    private static MutableComponent sourceNames(List<String> sources) {
         MutableComponent names = Component.empty();
         for (int index = 0; index < sources.size(); index++) {
             if (index > 0) {
-                names.append(Component.literal(", "));
+                names.append(Component.literal(LIST_JOIN));
             }
             names.append(StyleText.scalingSourceName(sources.get(index)));
         }
-        lines.add(TooltipGem.detail(Component.translatable(KEY_SCALES_WITH, names).withStyle(FRAME)));
+        return names;
+    }
+
+    private static void appendCrits(StyleAffix affix, Map<String, ScaledNumber> numbers,
+                                    List<Component> lines) {
+        Player viewer = TooltipContextAccess.viewer();
+        Map<String, ScaledNumber.Crit> reactions = new LinkedHashMap<>();
+        Map<String, ScaledNumber> unplaced = new LinkedHashMap<>();
+        for (Map.Entry<String, ScaledNumber> entry : numbers.entrySet()) {
+            if (!placedUnderLine(entry.getKey())) {
+                unplaced.put(entry.getKey(), entry.getValue());
+            }
+            ScaledNumber.Crit crit = entry.getValue().crit().map(ScaledNumber.Crit::effective).orElse(null);
+            if (crit != null && crit.onCrit().isPresent()) {
+                reactions.putIfAbsent(crit.group().orElse(entry.getKey()), crit);
+            }
+        }
+        appendScaledDetails(unplaced, viewer, lines);
+        for (Map.Entry<String, ScaledNumber.Crit> reaction : reactions.entrySet()) {
+            ScaledNumber.Crit crit = reaction.getValue();
+            Component name = crit.group().isPresent()
+                    ? Component.literal(critName(crit.group().get()))
+                    : valueLabel(reaction.getKey());
+            List<Component> payload = new ArrayList<>();
+            appendTrigger(affix, crit.onCrit().get(), payload);
+            if (payload.isEmpty()) {
+                continue;
+            }
+            lines.add(TooltipGem.detail(Component.translatable(KEY_ON_CRIT, name).withStyle(HEADER)));
+            for (Component line : payload) {
+                lines.add(TooltipGem.detail(line));
+            }
+        }
+    }
+
+    private static boolean placedUnderLine(String path) {
+        for (String prefix : PLACED_CRIT_PREFIXES) {
+            if (path.equals(prefix) || path.startsWith(prefix + PATH_SEPARATOR)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void appendCritsUnder(AffixEffects.OnHit onHit, String prefix,
+                                         List<Component> lines) {
+        if (!ItemTooltip.detailed()) {
+            return;
+        }
+        Map<String, ScaledNumber> placed = new LinkedHashMap<>();
+        for (Map.Entry<String, ScaledNumber> entry : ScaledNumbers.entriesOf(onHit).entrySet()) {
+            String path = entry.getKey();
+            if (path.equals(prefix) || path.startsWith(prefix + PATH_SEPARATOR)) {
+                placed.put(path, entry.getValue());
+            }
+        }
+        appendScaledDetails(placed, TooltipContextAccess.viewer(), lines);
+    }
+
+    private static void appendScaledDetails(Map<String, ScaledNumber> numbers, Player viewer,
+                                            List<Component> lines) {
+        List<EffectLines.Tagged> detail = new ArrayList<>();
+        Map<String, List<Map.Entry<String, ScaledNumber.Crit>>> crits = new LinkedHashMap<>();
+        for (Map.Entry<String, ScaledNumber> entry : numbers.entrySet()) {
+            String path = entry.getKey();
+            ScaledNumber number = entry.getValue();
+            if (!number.sources().isEmpty()) {
+                detail.add(new EffectLines.Tagged(KEY_SCALED_DETAIL_SCOPE, TooltipGem.detail(
+                        Component.translatable(KEY_SCALED_VALUE, valueLabel(path),
+                                withBonus(number.base(), number.resolve(viewer), StyleText::formatDecimal),
+                                sourceNames(number.sources())).withStyle(FRAME))));
+            }
+            number.crit().map(ScaledNumber.Crit::effective).ifPresent(crit ->
+                    crits.computeIfAbsent(crit.group().orElse(path), ignored -> new ArrayList<>())
+                            .add(Map.entry(path, crit)));
+        }
+        for (List<Map.Entry<String, ScaledNumber.Crit>> shared : crits.values()) {
+            detail.add(new EffectLines.Tagged(KEY_SCALED_DETAIL_SCOPE,
+                    TooltipGem.detail(critLine(shared, viewer))));
+        }
+        if (lines instanceof EffectLines target) {
+            target.addNested(detail, UnaryOperator.identity());
+            return;
+        }
+        for (EffectLines.Tagged line : detail) {
+            lines.add(line.line());
+        }
+    }
+
+    private static Component withBonus(float base, float total, Function<Float, String> format) {
+        Component shown = Component.literal(format.apply(base));
+        float bonus = total - base;
+        if (Math.abs(bonus) < BONUS_EPSILON) {
+            return shown;
+        }
+        String key = bonus > 0.0F ? KEY_WITH_BONUS : KEY_WITH_PENALTY;
+        return Component.translatable(key, shown, Component.literal(format.apply(Math.abs(bonus))));
+    }
+
+    private static Component scaledShown(Optional<ScaledNumber> number, float fallback, Player viewer,
+                                         Function<Float, String> format) {
+        return number.map(value -> withBonus(value.base(), value.resolve(viewer), format))
+                .orElseGet(() -> Component.literal(format.apply(fallback)));
+    }
+
+    private static Component critLine(List<Map.Entry<String, ScaledNumber.Crit>> shared, Player viewer) {
+        ScaledNumber.Crit first = shared.getFirst().getValue();
+        if (first.group().isEmpty()) {
+            return Component.translatable(KEY_CRIT_LINE, valueLabel(shared.getFirst().getKey()),
+                    critChance(first, viewer), critAmount(first, viewer)).withStyle(FRAME);
+        }
+        List<Component> parts = new ArrayList<>();
+        for (Map.Entry<String, ScaledNumber.Crit> part : shared) {
+            parts.add(Component.translatable(KEY_CRIT_PART, valueLabel(part.getKey()),
+                    critAmount(part.getValue(), viewer)));
+        }
+        return Component.translatable(KEY_CRIT_GROUP, critName(first.group().get()),
+                critChance(first, viewer), joinedParts(parts)).withStyle(FRAME);
+    }
+
+    private static Component joinedParts(List<Component> parts) {
+        Component joined = parts.getLast();
+        for (int index = parts.size() - 2; index >= 0; index--) {
+            joined = Component.translatable(KEY_LIST_PAIR, parts.get(index), joined);
+        }
+        return joined;
+    }
+
+    private static Component critAmount(ScaledNumber.Crit crit, Player viewer) {
+        boolean adds = crit.modeOrDefault() == ScaledNumber.Crit.Mode.ADD_VALUE;
+        Component amount = scaledShown(crit.effective().value(),
+                adds ? ScaledNumber.Crit.NO_ADDITION : ScaledNumber.Crit.DEFAULT_MULTIPLIER,
+                viewer, StyleText::formatDecimal);
+        return Component.translatable(adds ? KEY_CRIT_PLUS : KEY_CRIT_TIMES, amount);
+    }
+
+    private static String damagePrefix(AffixEffects.OnHit onHit, int index) {
+        if (onHit.damage().isEmpty()) {
+            return KEY_DAMAGES_PATH + PATH_SEPARATOR + index;
+        }
+        if (index == 0) {
+            return KEY_DAMAGE_PATH;
+        }
+        return KEY_DAMAGES_PATH + PATH_SEPARATOR + (index - 1);
+    }
+
+    private static String critName(String group) {
+        return StyleText.prettify(LibraryRef.nameOf(group));
+    }
+
+    private static Component critChance(ScaledNumber.Crit crit, Player viewer) {
+        Component chance = scaledShown(crit.chance(), ScaledNumber.Crit.NO_CHANCE, viewer,
+                AffixText::percentOf);
+        List<String> sources = crit.chanceSources();
+        return sources.isEmpty()
+                ? chance
+                : Component.translatable(KEY_CRIT_SCALES, chance, sourceNames(sources));
+    }
+
+    private static Component valueLabel(String path) {
+        String[] parts = path.split(PATH_SEPARATOR);
+        String last = parts[parts.length - 1];
+        if (path.contains(PATH_SEPARATOR + CustomUse.KEY_OPTIONS + PATH_SEPARATOR)) {
+            return Component.literal(StyleText.prettify(last));
+        }
+        for (int index = parts.length - 2; index >= 0; index--) {
+            String part = parts[index];
+            if (!part.isEmpty() && !Character.isDigit(part.charAt(0))) {
+                return Component.literal(StyleText.prettify(part) + " " + StyleText.prettify(last));
+            }
+        }
+        return Component.literal(StyleText.prettify(last));
     }
 
     private static void appendBothPhases(StyleAffix affix, List<Component> lines,
@@ -624,12 +857,25 @@ public final class AffixText {
                 .withStyle(HEADER), onHit, cleave)));
 
         appendAttributes(onHit, lines);
-        double amplifyRatio = onHit.allDamage().stream()
+        appendCondition(onHit.condition(), amplifyRatioOf(onHit), lines, new ArrayList<>());
+    }
+
+    private static double amplifyRatioOf(AffixEffects.OnHit onHit) {
+        return onHit.allDamage().stream()
                 .filter(AffixEffects.Damage::amplifies)
                 .mapToDouble(AffixEffects.Damage::ratio)
                 .findFirst()
                 .orElse(1.0D);
-        appendCondition(onHit.condition(), amplifyRatio, lines);
+    }
+
+    private static void appendLeadingGates(AffixEffects.OnHit onHit, List<Component> lines) {
+        List<Component> gates = new ArrayList<>();
+        appendCondition(onHit.condition(), amplifyRatioOf(onHit), new ArrayList<>(), gates);
+        Component merged = mergeGates(gates);
+        if (merged != null) {
+            scopeOf(lines, KEY_CONDITION_SCOPE);
+            lines.add(TooltipGem.header(recolored(merged, HEADER).append(HEADER_END)));
+        }
     }
 
     private static void appendAttributes(AffixEffects.OnHit onHit, List<Component> lines) {
@@ -896,14 +1142,13 @@ public final class AffixText {
     }
 
     private static void appendCondition(AffixEffects.Condition condition, double amplifyRatio,
-                                        List<Component> lines) {
+                                        List<Component> lines, List<Component> gates) {
         if (condition == null || condition.isEmpty()) {
             return;
         }
         String multiplier = StyleText.formatDecimal(condition.multiplier());
         appendSlotRule(condition.slot(), multiplier, amplifyRatio, lines);
 
-        List<Component> gates = new ArrayList<>();
         List<Component> scaled = isPlain(multiplier) ? gates : lines;
 
         condition.selfHealthBelow().ifPresent(value -> scaled.add(healthLine(
@@ -951,11 +1196,21 @@ public final class AffixText {
         for (Component part : ItemGateText.parts(condition.state())) {
             gates.add(Component.translatable(KEY_ONLY_STATE, part).withStyle(COND));
         }
-
-        Component merged = mergeGates(gates);
-        if (merged != null) {
-            lines.add(merged);
+        for (Component part : ThresholdText.parts(condition.state())) {
+            gates.add(Component.translatable(KEY_ONLY_STATE, part).withStyle(COND));
         }
+        condition.crit().ifPresent(group -> gates.add(Component.translatable(KEY_ONLY_CRIT,
+                critName(group)).withStyle(COND)));
+        condition.critMissed().ifPresent(group -> gates.add(Component.translatable(
+                KEY_ONLY_CRIT_MISSED, critName(group)).withStyle(COND)));
+    }
+
+    private static MutableComponent recolored(Component line, ChatFormatting color) {
+        MutableComponent copy = line.plainCopy().withStyle(line.getStyle().withColor(color));
+        for (Component sibling : line.getSiblings()) {
+            copy.append(recolored(sibling, color));
+        }
+        return copy;
     }
 
     private static Component mergeGates(List<Component> gates) {
@@ -1024,10 +1279,11 @@ public final class AffixText {
     }
 
     private static void appendTrigger(StyleAffix affix, AffixEffects.OnHit onHit, List<Component> lines) {
+        appendLeadingGates(onHit, lines);
         int allDamageAt = 0;
         for (AffixEffects.Damage damage : onHit.allDamage()) {
             scopeOf(lines, "allDamage", allDamageAt++);
-            String percent = scaledPercent(damage);
+            String percent = damageAmount(damage);
 
             String school = attunedSchool(damage);
             boolean typed = school != null || !damage.damageType().isBlank();
@@ -1057,6 +1313,7 @@ public final class AffixText {
                 continue;
             }
             lines.add(styled);
+            appendCritsUnder(onHit, damagePrefix(onHit, allDamageAt - 1), lines);
             if (damage.ignoresArmour()) {
                 lines.add(TooltipGem.detail(Component.translatable(KEY_ARMOUR).withStyle(FRAME)));
             }
@@ -1074,6 +1331,7 @@ public final class AffixText {
         onHit.ignite().ifPresent(ignite -> lines.add(withChance(
                 Component.translatable(KEY_IGNITE, ignite.seconds()).withStyle(HEADER),
                 ignite.chance())));
+        appendCritsUnder(onHit, KEY_IGNITE_PATH, lines);
 
         scopeOf(lines, "freezeTicks");
         if (onHit.freezeTicks() > 0.0F) {
@@ -1158,6 +1416,8 @@ public final class AffixText {
             for (Component custom : Customs.tooltip(CustomScopes.PROJECTILE, projectile)) {
                 lines.add(TooltipGem.detail(custom.copy().withStyle(COND)));
             }
+            appendCritsUnder(onHit, KEY_PROJECTILES_PATH + PATH_SEPARATOR + (projectilesAt - 1),
+                    lines);
         }
 
         int castsAt = 0;
@@ -1180,6 +1440,7 @@ public final class AffixText {
                         StyleText.formatDecimal(splash.radius()),
                         StyleText.formatDecimal(splash.ratio() * 100.0D) + "%")
                 .withStyle(HEADER), onHit, splash)));
+        appendCritsUnder(onHit, KEY_SPLASH_PATH, lines);
 
         int selfEffectsAt = 0;
         for (AffixEffects.SelfEffect effect : onHit.selfEffects()) {

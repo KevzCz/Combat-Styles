@@ -287,11 +287,9 @@ public class PoseEditorScreen extends PanelScreen {
             ScreenDraw.rowBackground(graphics, x, y, boneWidth(), ROW_HEIGHT - 2,
                     index, hovered, active);
             Component label = Component.translatable(boneKey(bone));
-            graphics.drawString(font, ScreenDraw.trim(font, label.getString(), boneWidth() - 8),
-                    x + TEXT_INSET, y + 4,
-                    active ? ScreenTheme.HEADING
-                            : tuning.boneOf(bone).isEmpty() ? ScreenTheme.MUTED : ScreenTheme.TEXT,
-                    false);
+            ScreenDraw.drawTrimmed(graphics, font, label.getString(),
+                    x + TEXT_INSET, y + 4, boneWidth() - 8, active ? ScreenTheme.HEADING
+                            : tuning.boneOf(bone).isEmpty() ? ScreenTheme.MUTED : ScreenTheme.TEXT);
         }
 
         int fieldsY = top + BONE_ROW_Y + BONE_ROW_HEIGHT + GAP + ROW_HEIGHT;

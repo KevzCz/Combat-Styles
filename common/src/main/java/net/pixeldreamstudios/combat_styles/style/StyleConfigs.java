@@ -4,9 +4,10 @@ import net.pixeldreamstudios.combat_styles.entity.ScriptedAbilities;
 import net.pixeldreamstudios.combat_styles.affix.CustomAffixConfig;
 import net.pixeldreamstudios.combat_styles.affix.TrailPlacements;
 import net.pixeldreamstudios.combat_styles.config.ConfigMigration;
-import net.pixeldreamstudios.combat_styles.config.EquipmentDropConfig;
 import net.pixeldreamstudios.combat_styles.loot.BookRolls;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRolls;
+import net.pixeldreamstudios.combat_styles.damage.CritGroups;
+import net.pixeldreamstudios.combat_styles.loot.DropPools;
 
 public final class StyleConfigs {
 
@@ -19,9 +20,10 @@ public final class StyleConfigs {
         CustomAttackConfig.reload();
         CustomStyleConfig.reload();
         CustomAffixConfig.reload();
-        EquipmentDropConfig.load();
         BookRolls.DEFINITIONS.reloadConfig();
         WeaponRolls.DEFINITIONS.reloadConfig();
+        CritGroups.DEFINITIONS.reloadConfig();
+        DropPools.DEFINITIONS.reloadConfig();
         ScriptedAbilities.DEFINITIONS.reloadConfig();
         int overrides = AttackOverrides.reload();
         StyleRegistry.rebuild();

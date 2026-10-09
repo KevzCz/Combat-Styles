@@ -30,7 +30,7 @@ public final class DamageHurt {
         target.invulnerableTime = 0;
         accessor.combat_styles$setLastHurt(0.0F);
         try {
-            return target.hurt(source, amount);
+            return target.hurt(FiringItem.stated(source), amount);
         } finally {
             target.invulnerableTime = Math.max(previousInvulnerable, target.invulnerableTime);
             accessor.combat_styles$setLastHurt(

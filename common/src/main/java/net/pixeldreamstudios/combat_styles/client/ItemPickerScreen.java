@@ -159,8 +159,6 @@ public class ItemPickerScreen extends PickerScreen<ItemStack> {
         graphics.renderItem(row, x + 2, y);
         graphics.drawString(font, row.getHoverName(), x + ICON_SIZE + 6, y + TEXT_INSET,
                 selected ? ScreenTheme.GOOD : ScreenTheme.TEXT, false);
-        String shortId = shortId(id, width);
-        graphics.drawString(font, shortId, x + width - font.width(shortId) - 4,
-                y + TEXT_INSET, ScreenTheme.MUTED, false);
+        drawId(graphics, id, x + width - 4, y + TEXT_INSET, width, ScreenTheme.MUTED);
     }
 }

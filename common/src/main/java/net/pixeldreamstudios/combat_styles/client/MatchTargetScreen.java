@@ -56,6 +56,8 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
     private static final String KEY_SLOT_COUNT = "screen.combat_styles.slot_count";
     private static final String KEY_SLOT_NONE = "screen.combat_styles.slot_none";
     private static final String KEY_TAB_FITS = "screen.combat_styles.match_kind_fits";
+    private static final String KEY_STACK_TITLE = "screen.combat_styles.drop_entry_picker";
+    private static final int SINGLE = 1;
 
     public enum Tab {
         INVENTORY,
@@ -82,6 +84,7 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
     private EquipmentSlot slot;
     private String picked = "";
     private Consumer<String> onPick;
+    private Consumer<ItemStack> onStack;
 
     private Tab tab = Tab.INVENTORY;
     private boolean emptyMeansAny;
@@ -125,6 +128,13 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
         return screen;
     }
 
+    public static MatchTargetScreen forStack(Screen parent, Consumer<ItemStack> onStack) {
+        MatchTargetScreen screen = new MatchTargetScreen(parent, Component.translatable(KEY_STACK_TITLE));
+        screen.onStack = onStack;
+        screen.tab = Tab.INVENTORY;
+        return screen;
+    }
+
     private static boolean fits(EquipmentSlot slot, ItemStack stack) {
         Equipable equipable = Equipable.get(stack);
         if (slot.isArmor() || slot == EquipmentSlot.BODY) {
@@ -155,14 +165,12 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
         fitting.clear();
         Set<String> seen = new LinkedHashSet<>();
         if (minecraft != null && minecraft.player != null) {
-            for (ItemStack stack : minecraft.player.getInventory().items) {
-                if (!stack.isEmpty() && seen.add(idOf(stack))) {
+            List<ItemStack> held = new ArrayList<>(minecraft.player.getInventory().items);
+            held.add(minecraft.player.getOffhandItem());
+            for (ItemStack stack : held) {
+                if (!stack.isEmpty() && (onStack == null ? seen.add(idOf(stack)) : distinct(stack))) {
                     inventory.add(rowOf(stack));
                 }
-            }
-            ItemStack offhand = minecraft.player.getOffhandItem();
-            if (!offhand.isEmpty() && seen.add(idOf(offhand))) {
-                inventory.add(rowOf(offhand));
             }
         }
         for (Item item : BuiltInRegistries.ITEM) {
@@ -185,8 +193,17 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
         }
     }
 
+    private boolean distinct(ItemStack stack) {
+        for (Row row : inventory) {
+            if (ItemStack.isSameItemSameComponents(row.icon(), stack)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static Row rowOf(ItemStack stack) {
-        return new Row(idOf(stack), stack, stack.getHoverName());
+        return new Row(idOf(stack), stack.copyWithCount(SINGLE), stack.getHoverName());
     }
 
     private static String idOf(ItemStack stack) {
@@ -279,7 +296,7 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
 
     @Override
     protected boolean closeOnPick() {
-        return slot != null;
+        return slot != null || onStack != null;
     }
 
     @Override
@@ -289,6 +306,10 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
 
     @Override
     protected void onPicked(Row row) {
+        if (onStack != null) {
+            onStack.accept(row.icon().copy());
+            return;
+        }
         if (slot != null) {
             onPick.accept(row.id());
             return;
@@ -303,6 +324,11 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
     @Override
     protected void addFooterButtons(int buttonY) {
         super.addFooterButtons(buttonY);
+        if (onStack != null) {
+            addTab(KEY_TAB_INVENTORY, Tab.INVENTORY, 0);
+            addTab(KEY_TAB_ALL, Tab.ALL, 1);
+            return;
+        }
         if (slot != null) {
             addRenderableWidget(PanelButton.of(Component.translatable(KEY_SLOT_NONE), button -> {
                 onPick.accept("");
@@ -343,7 +369,8 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
     @Override
     protected void renderRow(GuiGraphics graphics, Row row, int index,
                              int x, int y, int width, boolean hovered) {
-        boolean chosen = slot != null ? row.id().equals(picked) : targetFor(tab).contains(row.id());
+        boolean chosen = onStack == null
+                && (slot != null ? row.id().equals(picked) : targetFor(tab).contains(row.id()));
         ScreenDraw.rowBackground(graphics, x + 1, y, width - 2, ROW_HEIGHT - 1,
                 index, hovered, chosen);
         int textX = x + 2;
@@ -353,12 +380,8 @@ public class MatchTargetScreen extends PickerScreen<MatchTargetScreen.Row> {
         }
         String shortId = shortId(row.id(), width);
         int idWidth = font.width(shortId);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, row.label().getString(),
-                        width - idWidth - (textX - x) - 8),
-                textX, y + TEXT_INSET,
-                chosen ? ScreenTheme.GOOD : ScreenTheme.TEXT, false);
-        graphics.drawString(font, shortId, x + width - idWidth - 4,
-                y + TEXT_INSET, ScreenTheme.MUTED, false);
+        ScreenDraw.drawTrimmed(graphics, font, row.label().getString(),
+                textX, y + TEXT_INSET, width - idWidth - (textX - x) - 8, chosen ? ScreenTheme.GOOD : ScreenTheme.TEXT);
+        drawId(graphics, row.id(), x + width - 4, y + TEXT_INSET, width, ScreenTheme.MUTED);
     }
 }

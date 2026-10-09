@@ -19,6 +19,13 @@ public final class ScreenDraw {
     private static final int TOOLTIP_MIN_WIDTH = 120;
     private static final int TOOLTIP_EDGE = 16;
 
+    private record Clipped(String full, int x, int y, int width, int height) {
+    }
+
+    private static final List<Clipped> CLIPPED = new ArrayList<>();
+    private static boolean tooltipShown;
+    private static boolean collecting;
+
     private ScreenDraw() {
     }
 
@@ -27,6 +34,8 @@ public final class ScreenDraw {
         if (lines == null || lines.isEmpty()) {
             return;
         }
+        tooltipShown = true;
+        lines = withClipped(lines, mouseX, mouseY);
         int width = Math.max(TOOLTIP_MIN_WIDTH,
                 Math.min(TOOLTIP_MAX_WIDTH, graphics.guiWidth() / 2 - TOOLTIP_EDGE));
         List<FormattedCharSequence> wrapped = new ArrayList<>();
@@ -132,6 +141,71 @@ public final class ScreenDraw {
 
     public static void accentBar(GuiGraphics graphics, int x, int y, int height, int colour) {
         graphics.fill(x, y, x + 2, y + height, colour);
+    }
+
+    public static void drawTrimmed(GuiGraphics graphics, Font font, String text, int x, int y,
+                                   int maxWidth, int color) {
+        String shown = trim(font, text, maxWidth);
+        graphics.drawString(font, shown, x, y, color, false);
+        if (text != null && !shown.equals(text)) {
+            clipped(text, x, y, maxWidth, font.lineHeight);
+        }
+    }
+
+    public static void clipped(String full, int x, int y, int width, int height) {
+        if (collecting && full != null && !full.isEmpty()) {
+            CLIPPED.add(new Clipped(full, x, y, width, height));
+        }
+    }
+
+    public static void clippedIf(String full, String shown, int x, int y, int width, int height) {
+        if (full != null && !full.equals(shown)) {
+            clipped(full, x, y, width, height);
+        }
+    }
+
+    public static void markTooltip() {
+        tooltipShown = true;
+    }
+
+    public static void stopCollecting() {
+        CLIPPED.clear();
+        tooltipShown = false;
+        collecting = false;
+    }
+
+    public static String beginFrame(int mouseX, int mouseY) {
+        String carried = tooltipShown ? null : clippedAt(mouseX, mouseY);
+        CLIPPED.clear();
+        tooltipShown = false;
+        collecting = true;
+        return carried;
+    }
+
+    private static String clippedAt(int mouseX, int mouseY) {
+        for (int index = CLIPPED.size() - 1; index >= 0; index--) {
+            Clipped clipped = CLIPPED.get(index);
+            if (isWithin(mouseX, mouseY, clipped.x(), clipped.y(), clipped.width(), clipped.height())) {
+                return clipped.full();
+            }
+        }
+        return null;
+    }
+
+    private static List<Component> withClipped(List<Component> lines, int mouseX, int mouseY) {
+        String full = clippedAt(mouseX, mouseY);
+        if (full == null) {
+            return lines;
+        }
+        for (Component line : lines) {
+            if (line.getString().contains(full)) {
+                return lines;
+            }
+        }
+        List<Component> merged = new ArrayList<>(lines.size() + 1);
+        merged.add(Component.literal(full));
+        merged.addAll(lines);
+        return merged;
     }
 
     public static String trim(Font font, String text, int maxWidth) {

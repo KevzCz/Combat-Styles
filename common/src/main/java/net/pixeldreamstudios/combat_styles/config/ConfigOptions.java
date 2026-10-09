@@ -1,9 +1,5 @@
 package net.pixeldreamstudios.combat_styles.config;
 
-import net.minecraft.resources.ResourceLocation;
-
-import net.pixeldreamstudios.combat_styles.loot.EquipmentDrops;
-import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 import net.pixeldreamstudios.combat_styles.style.StyleText;
 
 import java.util.ArrayList;
@@ -189,62 +185,6 @@ public final class ConfigOptions {
         return StyleText.prettify(raw);
     }
 
-    public static List<Option> equipmentDrops() {
-        List<Option> options = new ArrayList<>();
-        for (StyleRarity value : StyleRarity.values()) {
-            String id = value.name().toLowerCase(Locale.ROOT);
-            EquipmentDropConfig.Rarity rarity = EquipmentDropConfig.rarity(id);
-            if (rarity == null) {
-                continue;
-            }
-            options.add(decimal(id + ".chance", "Drop chance",
-                    () -> rarity.chance, chance -> rarity.chance = chance)
-                    .describedAs("0 to 1. Odds this rarity drops. 0 disables it.").in(EQUIPMENT));
-            addSources(options, id + ".loot", rarity);
-            List<String> items = new ArrayList<>();
-            for (ResourceLocation item : EquipmentDrops.poolOf(id)) {
-                items.add(item.toString());
-            }
-            for (String known : rarity.items.keySet()) {
-                if (!items.contains(known)) {
-                    items.add(known);
-                }
-            }
-            for (String item : items) {
-                EquipmentDropConfig.Item entry = EquipmentDropConfig.item(id, item);
-                if (entry == null) {
-                    continue;
-                }
-                String label = item.substring(item.indexOf(':') + 1);
-                String base = id + ".items." + label;
-                options.add(integer(base + ".weight", "Base weight",
-                        () -> entry.weight, weight -> entry.weight = weight)
-                        .describedAs("Share of " + id + " drops that are this item. 0 never drops.")
-                        .in(EQUIPMENT));
-                addBonuses(options, base + ".tables", entry.tableBonus, rarity);
-            }
-        }
-        return options;
-    }
-
-    private static void addSources(List<Option> options, String base,
-                                   EquipmentDropConfig.Rarity rarity) {
-        addList(options, EQUIPMENT, base + ".loot_table.tables", rarity.tables,
-                "Exact loot table id. Unknown ids wait until that mod is added.",
-                SUGGEST_LOOT_TABLES);
-        addList(options, EQUIPMENT, base + ".loot_table.patterns", rarity.tablePatterns,
-                "Matches any loot table id containing this text.",
-                SUGGEST_TABLE_PATTERNS);
-        addList(options, EQUIPMENT, base + ".entity.ids", rarity.entities,
-                "Entity id such as minecraft:wither.", SUGGEST_ENTITIES);
-        addList(options, EQUIPMENT, base + ".entity.tags", rarity.entityTags,
-                "Entity tag such as minecraft:skeletons.", SUGGEST_ENTITY_TAGS);
-        addList(options, EQUIPMENT, base + ".structure.ids", rarity.structures,
-                "Structure id such as minecraft:ancient_city.", SUGGEST_STRUCTURES);
-        addList(options, EQUIPMENT, base + ".structure.tags", rarity.structureTags,
-                "Structure tag such as minecraft:on_treasure_maps.", SUGGEST_STRUCTURE_TAGS);
-    }
-
     public static void addList(List<Option> options, String group, String base,
                                List<String> values, String description) {
         addList(options, group, base, values, description, "");
@@ -283,46 +223,6 @@ public final class ConfigOptions {
             return List.of();
         }
         return suggester.apply(kind, typed == null ? "" : typed);
-    }
-
-    private static void addBonuses(List<Option> options, String base,
-                                   Map<String, Integer> bonuses,
-                                   EquipmentDropConfig.Rarity rarity) {
-        List<String> keys = new ArrayList<>(bonuses.keySet());
-        for (int index = 0; index < keys.size(); index++) {
-            String where = keys.get(index);
-            String slot = base + "." + index;
-            options.add(integer(slot + ".bonus", where,
-                    () -> bonuses.getOrDefault(where, 0),
-                    bonus -> bonuses.put(where, bonus))
-                    .describedAs("Added to the base weight in " + where
-                            + ". Negative lowers it.")
-                    .in(EQUIPMENT));
-            options.add(action(slot + ".remove", "   Remove " + where,
-                    () -> bonuses.remove(where))
-                    .describedAs("Stops tuning this item there.").in(EQUIPMENT));
-        }
-        for (String suggestion : suggestions(rarity)) {
-            if (bonuses.containsKey(suggestion)) {
-                continue;
-            }
-            options.add(action(base + ".add_" + slug(suggestion), "+ " + suggestion,
-                    () -> bonuses.putIfAbsent(suggestion, 0))
-                    .describedAs("Tunes this item's weight in " + suggestion + ".")
-                    .in(EQUIPMENT));
-        }
-    }
-
-    private static List<String> suggestions(EquipmentDropConfig.Rarity rarity) {
-        List<String> all = new ArrayList<>(rarity.tablePatterns);
-        all.addAll(rarity.tables);
-        all.addAll(rarity.entities);
-        all.addAll(rarity.structures);
-        return all;
-    }
-
-    private static String slug(String raw) {
-        return raw.replace(':', '_').replace('/', '_').replace('.', '_').replace('#', '_');
     }
 
     public static List<Option> summons() {

@@ -28,12 +28,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.StringRepresentable;
 import net.pixeldreamstudios.combat_styles.style.WeaponCategories;
 import net.pixeldreamstudios.combat_styles.loot.BookRoll;
+import net.pixeldreamstudios.combat_styles.loot.DropPool;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRoll;
 import net.pixeldreamstudios.combat_styles.affix.CastSpell;
 import net.pixeldreamstudios.combat_styles.affix.LibraryRef;
 import net.pixeldreamstudios.combat_styles.equipment.EntityLibraries;
-import net.pixeldreamstudios.combat_styles.equipment.UseScope;
+import net.pixeldreamstudios.combat_styles.damage.CritGroups;
 import net.pixeldreamstudios.combat_styles.damage.ScaledNumber;
+import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.SpawnAnchor;
 import net.pixeldreamstudios.combat_styles.affix.SpreadMode;
 import net.pixeldreamstudios.combat_styles.api.SchemaRegistry;
@@ -45,10 +47,7 @@ import net.pixeldreamstudios.combat_styles.equipment.AttackConditions;
 import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
 import net.pixeldreamstudios.combat_styles.equipment.CastGate;
 import net.pixeldreamstudios.combat_styles.equipment.CastPhase;
-import net.pixeldreamstudios.combat_styles.config.OptionSources;
 import net.pixeldreamstudios.combat_styles.equipment.EffectStacking;
-import net.pixeldreamstudios.combat_styles.equipment.EnchantLevels;
-import net.pixeldreamstudios.combat_styles.equipment.EnchantmentChoices;
 import net.pixeldreamstudios.combat_styles.equipment.StateGate;
 import net.pixeldreamstudios.combat_styles.equipment.SummonGate;
 import net.pixeldreamstudios.combat_styles.equipment.AccessoryCompat;
@@ -80,6 +79,9 @@ import java.util.function.Supplier;
 public final class EffectChoices {
 
     private static final String KEY_SCALING = "scaling";
+    private static final String KEY_CONDITION = "condition";
+    private static final String KEY_SOURCE = "source";
+    private static final String KEY_SCALES_WITH = "scales_with";
     private static final String KEY_TARGETS = "targets";
     private static final String KEY_ORDER = "order";
     private static final String KEY_PARTICLES = "particles";
@@ -126,6 +128,10 @@ public final class EffectChoices {
         return key != null && ENTITY_KEYS.contains(key);
     }
 
+    public static boolean picksScalingSource(String key) {
+        return KEY_SOURCE.equals(key) || KEY_SCALES_WITH.equals(key);
+    }
+
     public static boolean anyWhenEmpty(String listPath, String listKey) {
         return listKey != null && ANY_WHEN_EMPTY.contains(listKey)
                 && EffectSchema.matchListsAt(listPath, listKey) == null;
@@ -162,11 +168,25 @@ public final class EffectChoices {
 
     private static Supplier<? extends Collection<String>> projectileNames = List::of;
     private static Supplier<? extends Collection<String>> summonProfileNames = List::of;
+    private static Supplier<? extends Collection<String>> critNames = List::of;
 
     public static void offerLibraries(Supplier<? extends Collection<String>> projectiles,
-                                      Supplier<? extends Collection<String>> summonProfiles) {
+                                      Supplier<? extends Collection<String>> summonProfiles,
+                                      Supplier<? extends Collection<String>> crits) {
         projectileNames = projectiles == null ? List::of : projectiles;
         summonProfileNames = summonProfiles == null ? List::of : summonProfiles;
+        critNames = crits == null ? List::of : crits;
+    }
+
+    private static List<String> critRefs() {
+        List<String> refs = new ArrayList<>(refsTo(critNames));
+        for (String id : CritGroups.globalIds()) {
+            String ref = LibraryRef.refTo(id);
+            if (!refs.contains(ref)) {
+                refs.add(ref);
+            }
+        }
+        return refs;
     }
 
     private static List<String> refsTo(Supplier<? extends Collection<String>> names) {
@@ -214,6 +234,10 @@ public final class EffectChoices {
             case LibraryRef.PROJECTILE_KEY -> within(scope, EntityLibraries.PROJECTILES)
                     ? refsTo(projectileNames) : List.of();
             case LibraryRef.SUMMON_KEY -> refsTo(summonProfileNames);
+            case ScaledNumber.Crit.KEY_GROUP -> within(scope, ScaledNumber.KEY_CRIT)
+                    ? critRefs() : List.of();
+            case AffixEffects.Condition.KEY_CRIT, AffixEffects.Condition.KEY_CRIT_MISSED ->
+                    within(scope, KEY_CONDITION) ? critRefs() : List.of();
             case "hitbox" -> EffectSchema.HITBOX_SHAPES;
             case EffectSchema.KEY_CONDITIONS -> EffectSchema.KEY_OVERRIDE.equals(ownerOf(scope))
                     ? AttackConditions.names()
@@ -235,6 +259,9 @@ public final class EffectChoices {
                 yield AttributeBonus.SLOTS;
             }
             case "mode" -> {
+                if (ScaledNumber.KEY_CRIT.equals(ownerOf(scope))) {
+                    yield ScaledNumber.Crit.Mode.names();
+                }
                 if (scope.contains(EffectSchema.ROOT_STYLE_BOOK)) {
                     yield BookRoll.Mode.NAMES;
                 }
@@ -270,7 +297,7 @@ public final class EffectChoices {
             case "entity", "summon", "become_entity", "attacker",
                     "replaced_summoned_entities", SummonGate.ENTITIES -> entityIds();
             case "attribute" -> attributeIds();
-            case "source", "scales_with" -> scalingSourceIds();
+            case KEY_SOURCE, KEY_SCALES_WITH -> scalingSourceIds();
             case "damage_type", "taken_damage_type" -> damageTypeIds();
             case "type" -> {
                 if (EffectSchema.KEY_ACTION.equals(ownerOf(scope))
@@ -334,7 +361,14 @@ public final class EffectChoices {
             case SummonCadence.KEY_PASSIVES -> passiveAbilityIds();
             case "applies" -> effectIds();
             case "tags" -> scope.contains(EffectSchema.ROOT_WEAPON_ROLL) ? itemTagIds() : List.of();
+            case DropPool.KEY_TABLE_PATTERNS -> scope.contains(EffectSchema.ROOT_DROP_POOL)
+                    ? DropSuggestions.of(DropSuggestions.TABLE_PATTERNS) : List.of();
+            case DropPool.KEY_STRUCTURES -> scope.contains(EffectSchema.ROOT_DROP_POOL)
+                    ? DropSuggestions.of(DropSuggestions.STRUCTURES) : List.of();
+            case DropPool.KEY_STRUCTURE_TAGS -> scope.contains(EffectSchema.ROOT_DROP_POOL)
+                    ? DropSuggestions.of(DropSuggestions.STRUCTURE_TAGS) : List.of();
             case "tables" -> scope.contains(EffectSchema.ROOT_WEAPON_ROLL)
+                    || scope.contains(EffectSchema.ROOT_DROP_POOL)
                     ? DropSuggestions.of(DropSuggestions.LOOT_TABLES)
                     : List.of();
             case "style" -> scope.contains(EffectSchema.ROOT_STYLE_BOOK)
@@ -473,13 +507,7 @@ public final class EffectChoices {
     }
 
     private static List<String> scalingSourceIds() {
-        Set<String> ids = new TreeSet<>(attributeIds());
-        ids.addAll(SpellPowerAccess.schoolIds());
-        for (String enchantment : OptionSources.values(EnchantmentChoices.SELECTOR)) {
-            ids.add(EnchantLevels.SOURCE_PREFIX + EnchantLevels.SEPARATOR + enchantment);
-        }
-        ids.addAll(List.of(UseScope.CHARGE, UseScope.HELD_SECONDS, UseScope.HELD_TICKS));
-        return List.copyOf(ids);
+        return ScalingSources.ids();
     }
 
     private static List<String> spellSchoolIds() {

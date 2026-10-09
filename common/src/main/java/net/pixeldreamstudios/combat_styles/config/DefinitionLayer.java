@@ -34,6 +34,7 @@ public final class DefinitionLayer<T> {
     private final Map<String, T> data = new ConcurrentHashMap<>();
     private final Map<String, T> config = new ConcurrentHashMap<>();
     private final Map<String, T> synced = new ConcurrentHashMap<>();
+    private final Map<String, T> pending = new ConcurrentHashMap<>();
     private final Set<String> syncedConfig = ConcurrentHashMap.newKeySet();
     private final Set<String> syncedData = ConcurrentHashMap.newKeySet();
 
@@ -54,6 +55,7 @@ public final class DefinitionLayer<T> {
 
     public void acceptData(Map<String, T> loaded) {
         data.clear();
+        pending.clear();
         if (loaded != null) {
             data.putAll(loaded);
         }
@@ -145,6 +147,7 @@ public final class DefinitionLayer<T> {
                 .orElse(Boolean.FALSE);
         if (written) {
             config.put(id, value);
+            pending.remove(id);
             onChange.run();
         }
         return written;
@@ -161,6 +164,7 @@ public final class DefinitionLayer<T> {
             CombatStyles.LOGGER.error("Unable to delete {}", file, exception);
             return false;
         }
+        pending.remove(id);
         config.remove(id);
         onChange.run();
         return true;
@@ -175,6 +179,7 @@ public final class DefinitionLayer<T> {
     public Map<String, T> view() {
         Map<String, T> merged = new TreeMap<>(synced);
         merged.putAll(authoritative());
+        merged.putAll(pending);
         return merged;
     }
 
@@ -199,6 +204,7 @@ public final class DefinitionLayer<T> {
     }
 
     public void acceptSync(Map<String, T> merged, Set<String> fromConfig, Set<String> fromData) {
+        pending.clear();
         synced.clear();
         synced.putAll(merged);
         syncedConfig.clear();
@@ -209,6 +215,7 @@ public final class DefinitionLayer<T> {
 
     public void acceptLocal(String id, T value) {
         if (id != null && value != null) {
+            pending.put(id, value);
             synced.put(id, value);
             syncedConfig.add(id);
         }
@@ -218,6 +225,7 @@ public final class DefinitionLayer<T> {
         if (id == null) {
             return;
         }
+        pending.remove(id);
         syncedConfig.remove(id);
         if (!hasDatapackVersion(id)) {
             synced.remove(id);
@@ -225,6 +233,7 @@ public final class DefinitionLayer<T> {
     }
 
     public void clearSync() {
+        pending.clear();
         synced.clear();
         syncedConfig.clear();
         syncedData.clear();

@@ -1,13 +1,11 @@
 package net.pixeldreamstudios.combat_styles.client;
 
-import com.google.gson.JsonObject;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
-import net.pixeldreamstudios.combat_styles.config.EquipmentDropConfig;
 import net.pixeldreamstudios.combat_styles.config.ConfigOptions.Option;
 import net.pixeldreamstudios.combat_styles.config.ConfigOptions;
 import net.pixeldreamstudios.combat_styles.config.StatusEffectConfig;
@@ -27,6 +25,8 @@ public class ConfigScreen extends PanelScreen {
     private static final String KEY_CANCEL = "screen.combat_styles.config.cancel";
     private static final String KEY_SEARCH = "screen.combat_styles.config.search";
     private static final String KEY_HUD_MOVE = "screen.combat_styles.hud_move";
+    private static final String KEY_DROP_POOLS = "screen.combat_styles.drop_pools_open";
+    private static final String KEY_DROP_POOLS_HINT = "screen.combat_styles.drop_pools_open.hint";
     private static final String KEY_RESET = "screen.combat_styles.config.reset";
     private static final String KEY_RESET_HINT = "screen.combat_styles.config.reset.hint";
     private static final String KEY_TOGGLE_ON = "screen.combat_styles.config.on";
@@ -79,7 +79,6 @@ public class ConfigScreen extends PanelScreen {
 
     private final Set<EditConfigPayload> baseline = ConfigEdits.settings();
     private final Map<String, String> snapshot = new LinkedHashMap<>();
-    private final JsonObject dropSnapshot = EquipmentDropConfig.toJson();
 
     public ConfigScreen(Screen parent) {
         super(Component.translatable(KEY_TITLE), parent);
@@ -114,6 +113,11 @@ public class ConfigScreen extends PanelScreen {
                 () -> minecraft.setScreen(new HudPlacementScreen(this)))
                 .describedAs("Drag the cooldown HUD to a new spot.")
                 .in(ConfigOptions.VISUALS));
+        all.add(ConfigOptions.action("dropPools",
+                Component.translatable(KEY_DROP_POOLS).getString(),
+                () -> minecraft.setScreen(new DropPoolListScreen(this, true)))
+                .describedAs(Component.translatable(KEY_DROP_POOLS_HINT).getString())
+                .in(ConfigOptions.EQUIPMENT));
         if (snapshot.isEmpty()) {
             for (Option option : all) {
                 if (!option.isAction()) {
@@ -172,7 +176,6 @@ public class ConfigScreen extends PanelScreen {
         List<Option> all = new ArrayList<>();
         all.addAll(ConfigOptions.of(CombatStylesConfig.get()));
         all.addAll(ConfigOptions.statusEffects());
-        all.addAll(ConfigOptions.equipmentDrops());
         all.addAll(ConfigOptions.summons());
         return all;
     }
@@ -186,9 +189,6 @@ public class ConfigScreen extends PanelScreen {
     }
 
     private boolean dirty() {
-        if (!dropSnapshot.equals(EquipmentDropConfig.toJson())) {
-            return true;
-        }
         for (Map.Entry<Option, EditBox> entry : boxes.entrySet()) {
             if (!entry.getValue().getValue().equals(entry.getKey().read())) {
                 return true;
@@ -213,7 +213,6 @@ public class ConfigScreen extends PanelScreen {
     }
 
     private void discard() {
-        EquipmentDropConfig.accept(dropSnapshot.deepCopy());
         for (int pass = 0; pass < DISCARD_PASSES; pass++) {
             for (Option option : allOptions()) {
                 String was = snapshot.get(option.key());
@@ -286,9 +285,6 @@ public class ConfigScreen extends PanelScreen {
                 option.write(fallback);
             }
         }
-        if (!searching() && ConfigOptions.EQUIPMENT.equals(selected)) {
-            EquipmentDropConfig.restoreDefaults();
-        }
         rebuild();
     }
 
@@ -333,7 +329,6 @@ public class ConfigScreen extends PanelScreen {
         CombatStylesConfig.save();
         if (!ConfigEdits.connected()) {
             StatusEffectConfig.save();
-            EquipmentDropConfig.save();
         } else {
             sendChanges();
         }
@@ -477,6 +472,7 @@ public class ConfigScreen extends PanelScreen {
         renderOptions(graphics, mouseX, mouseY);
         renderSuggestions(graphics, mouseX, mouseY);
         if (hovered != null && !hovered.description().isBlank() && matches.isEmpty()) {
+            ScreenDraw.markTooltip();
             graphics.renderTooltip(font,
                     font.split(Component.literal(hovered.description()), TOOLTIP_WIDTH),
                     mouseX, mouseY);
@@ -524,9 +520,8 @@ public class ConfigScreen extends PanelScreen {
                 graphics.fill(listLeft, y, listLeft + width, y + SUGGESTION_ROW,
                         ScreenTheme.HOVER);
             }
-            graphics.drawString(font,
-                    ScreenDraw.trim(font, matches.get(row), width - 4),
-                    listLeft + 2, y + 1, over ? ScreenTheme.ACCENT : ScreenTheme.TEXT, false);
+            ScreenDraw.drawTrimmed(graphics, font, matches.get(row),
+                    listLeft + 2, y + 1, width - 4, over ? ScreenTheme.ACCENT : ScreenTheme.TEXT);
         }
         suggestLeft = listLeft;
         suggestTop = top;
@@ -568,9 +563,8 @@ public class ConfigScreen extends PanelScreen {
 
             ScreenDraw.rowBackground(graphics, listLeft, y, width, ROW_HEIGHT - 2,
                     index, hovered, active);
-            graphics.drawString(font, ScreenDraw.trim(font, group, width - LABEL_INSET * 2),
-                    listLeft + LABEL_INSET, y + 6,
-                    active ? ScreenTheme.ACCENT : ScreenTheme.TEXT, false);
+            ScreenDraw.drawTrimmed(graphics, font, group,
+                    listLeft + LABEL_INSET, y + 6, width - LABEL_INSET * 2, active ? ScreenTheme.ACCENT : ScreenTheme.TEXT);
         }
         graphics.disableScissor();
     }
@@ -738,13 +732,12 @@ public class ConfigScreen extends PanelScreen {
             }
             String label = searching() ? option.group() + " · " + option.label() : option.label();
             if (option.isAction()) {
-                graphics.drawString(font, ScreenDraw.trim(font, label, width - LABEL_INSET * 2),
-                        listLeft + LABEL_INSET, y + 6,
-                        over ? ScreenTheme.ACCENT : ScreenTheme.MUTED, false);
+                ScreenDraw.drawTrimmed(graphics, font, label,
+                        listLeft + LABEL_INSET, y + 6, width - LABEL_INSET * 2, over ? ScreenTheme.ACCENT : ScreenTheme.MUTED);
                 continue;
             }
-            graphics.drawString(font, ScreenDraw.trim(font, label, labelWidth),
-                    listLeft + LABEL_INSET, y + 6, ScreenTheme.TEXT, false);
+            ScreenDraw.drawTrimmed(graphics, font, label,
+                    listLeft + LABEL_INSET, y + 6, labelWidth, ScreenTheme.TEXT);
 
             if (option.isToggle()) {
                 drawToggle(graphics, option, listLeft + width - FIELD_WIDTH - LABEL_INSET,

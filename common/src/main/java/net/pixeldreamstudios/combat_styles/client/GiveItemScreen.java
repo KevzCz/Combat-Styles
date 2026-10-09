@@ -254,12 +254,8 @@ public class GiveItemScreen extends PickerScreen<ItemStack> {
         graphics.renderItem(row, x + 2, y);
         String shortId = shortId(idOf(row), width);
         int idWidth = font.width(shortId);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, row.getHoverName().getString(),
-                        width - idWidth - ICON_SIZE - 14),
-                x + ICON_SIZE + 6, y + TEXT_INSET,
-                selected ? ScreenTheme.GOOD : ScreenTheme.TEXT, false);
-        graphics.drawString(font, shortId, x + width - idWidth - 4,
-                y + TEXT_INSET, ScreenTheme.MUTED, false);
+        ScreenDraw.drawTrimmed(graphics, font, row.getHoverName().getString(),
+                x + ICON_SIZE + 6, y + TEXT_INSET, width - idWidth - ICON_SIZE - 14, selected ? ScreenTheme.GOOD : ScreenTheme.TEXT);
+        drawId(graphics, idOf(row), x + width - 4, y + TEXT_INSET, width, ScreenTheme.MUTED);
     }
 }

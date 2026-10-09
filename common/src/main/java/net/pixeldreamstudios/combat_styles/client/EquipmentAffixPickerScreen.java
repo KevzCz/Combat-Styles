@@ -112,10 +112,8 @@ public class EquipmentAffixPickerScreen extends PickerScreen<StyleAffix> {
                              int x, int y, int width, boolean hovered) {
         ScreenDraw.rowBackground(graphics, x + 1, y, width - 2, ROW_HEIGHT - 1,
                 index, hovered, false);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, StyleText.prettify(row.serializedId()),
-                        width - NAME_MARGIN),
-                x + TEXT_INSET, y + TEXT_INSET, ScreenTheme.TEXT, false);
+        ScreenDraw.drawTrimmed(graphics, font, StyleText.prettify(row.serializedId()),
+                x + TEXT_INSET, y + TEXT_INSET, width - NAME_MARGIN, ScreenTheme.TEXT);
         Component rarity = Component.translatable(row.rarity().translationKey())
                 .copy().withStyle(row.rarity().color());
         graphics.drawString(font, rarity, x + width - font.width(rarity) - 6,

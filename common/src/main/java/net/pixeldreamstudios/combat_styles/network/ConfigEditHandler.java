@@ -17,7 +17,6 @@ import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.config.DefinitionLayer;
-import net.pixeldreamstudios.combat_styles.config.EquipmentDropConfig;
 import net.pixeldreamstudios.combat_styles.config.StatusEffectConfig;
 import net.pixeldreamstudios.combat_styles.config.SummonTuning;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
@@ -25,6 +24,8 @@ import net.pixeldreamstudios.combat_styles.equipment.EquipmentOverrides;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.loot.BookRolls;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRolls;
+import net.pixeldreamstudios.combat_styles.damage.CritGroups;
+import net.pixeldreamstudios.combat_styles.loot.DropPools;
 import net.pixeldreamstudios.combat_styles.style.AttackOverride;
 import net.pixeldreamstudios.combat_styles.style.AttackOverrides;
 import net.pixeldreamstudios.combat_styles.style.CustomAttack;
@@ -60,7 +61,6 @@ public final class ConfigEditHandler {
             case MAIN_CONFIG -> CombatStylesConfig.applyEdit(json);
             case STATUS_EFFECT -> StatusEffectConfig.applyEntry(payload.id(), json);
             case ABILITY -> AbilityConfig.applyEntry(payload.id(), json);
-            case EQUIPMENT_DROP -> EquipmentDropConfig.applyRarity(payload.id(), json);
             case EQUIPMENT -> saveEquipment(json);
             case EQUIPMENT_CLEAR -> clearEquipment(payload.id());
             case AFFIX -> saveAffix(json);
@@ -80,6 +80,10 @@ public final class ConfigEditHandler {
             case SUMMON_ABILITY -> saveDefinition(ScriptedAbilities.DEFINITIONS, payload.id(), json);
             case SUMMON_ABILITY_CLEAR -> ScriptedAbilities.DEFINITIONS.delete(payload.id());
             case SUMMON_TUNING -> SummonTuning.applyEdit(json);
+            case CRIT_GROUP -> saveDefinition(CritGroups.DEFINITIONS, payload.id(), json);
+            case CRIT_GROUP_CLEAR -> CritGroups.DEFINITIONS.delete(payload.id());
+            case DROP_POOL -> saveDefinition(DropPools.DEFINITIONS, payload.id(), json);
+            case DROP_POOL_CLEAR -> DropPools.DEFINITIONS.delete(payload.id());
         };
         if (!applied) {
             CombatStyles.LOGGER.warn("Edit {} {} from {} was not applied",
@@ -108,7 +112,7 @@ public final class ConfigEditHandler {
 
     private static boolean isSetting(EditConfigPayload.Kind kind) {
         return switch (kind) {
-            case MAIN_CONFIG, STATUS_EFFECT, ABILITY, EQUIPMENT_DROP, SUMMON_TUNING -> true;
+            case MAIN_CONFIG, STATUS_EFFECT, ABILITY, SUMMON_TUNING -> true;
             default -> false;
         };
     }

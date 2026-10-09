@@ -7,7 +7,7 @@ import net.minecraft.network.chat.Component;
 public class LootMenuScreen extends PanelScreen {
 
     private static final int PANEL_WIDTH = 200;
-    private static final int PANEL_HEIGHT = 154;
+    private static final int PANEL_HEIGHT = 198;
     private static final int TITLE_Y = 10;
     private static final int FIRST_BUTTON_Y = 30;
     private static final int BUTTON_SPACING = 22;
@@ -17,6 +17,8 @@ public class LootMenuScreen extends PanelScreen {
     private static final String KEY_BOOKS = "screen.combat_styles.loot_menu_books";
     private static final String KEY_ROLLS = "screen.combat_styles.loot_menu_rolls";
     private static final String KEY_ABILITIES = "screen.combat_styles.loot_menu_abilities";
+    private static final String KEY_CRITS = "screen.combat_styles.loot_menu_crits";
+    private static final String KEY_DROPS = "screen.combat_styles.loot_menu_drops";
     private static final String KEY_CLOSE = "gui.back";
 
     private final boolean creative;
@@ -53,6 +55,14 @@ public class LootMenuScreen extends PanelScreen {
         y += BUTTON_SPACING;
         addRenderableWidget(PanelButton.of(Component.translatable(KEY_ABILITIES),
                         button -> minecraft.setScreen(new SummonAbilityListScreen(this, creative)))
+                .bounds(contentLeft(), y, contentWidth(), ScreenTheme.BUTTON_HEIGHT).build());
+        y += BUTTON_SPACING;
+        addRenderableWidget(PanelButton.of(Component.translatable(KEY_CRITS),
+                        button -> minecraft.setScreen(new CritGroupListScreen(this, creative)))
+                .bounds(contentLeft(), y, contentWidth(), ScreenTheme.BUTTON_HEIGHT).build());
+        y += BUTTON_SPACING;
+        addRenderableWidget(PanelButton.of(Component.translatable(KEY_DROPS),
+                        button -> minecraft.setScreen(new DropPoolListScreen(this, creative)))
                 .bounds(contentLeft(), y, contentWidth(), ScreenTheme.BUTTON_HEIGHT).build());
         addRenderableWidget(PanelButton.of(Component.translatable(KEY_CLOSE),
                         button -> minecraft.setScreen(parent))

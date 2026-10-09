@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.ClaimedHits;
+import net.pixeldreamstudios.combat_styles.affix.SwingTotals;
 import net.pixeldreamstudios.combat_styles.equipment.CombatState;
 import net.pixeldreamstudios.combat_styles.damage.DamageSpec;
 import net.pixeldreamstudios.combat_styles.style.HitboxClaims;
@@ -53,6 +54,16 @@ public abstract class HitDamageMixin {
         DamageDealer.recordConnected(Boolean.TRUE.equals(callback.getReturnValue()));
     }
 
+    @Inject(method = "hurt", at = @At("RETURN"), require = 1)
+    private void combat_styles$tallySwing(DamageSource source, float amount,
+                                          CallbackInfoReturnable<Boolean> callback) {
+        if (DamageDealer.isDealing() || !callback.getReturnValueZ()
+                || source.is(DamageTypes.PLAYER_ATTACK)) {
+            return;
+        }
+        SwingTotals.add(source.getEntity(), (LivingEntity) (Object) this, amount);
+    }
+
     @Inject(method = "hurt", at = @At("HEAD"), cancellable = true, require = 1)
     private void combat_styles$convertPhysical(DamageSource source, float amount,
                                                CallbackInfoReturnable<Boolean> callback) {
@@ -79,7 +90,9 @@ public abstract class HitDamageMixin {
         if (player.level().isClientSide() || !CombatEffectDealer.convertsHit(player, self, amount)) {
             return;
         }
-        CombatEffectDealer.onPlayerHit(player, self, amount, true);
+        if (!SwingTotals.defer(player, self, amount, true)) {
+            CombatEffectDealer.onPlayerHit(player, self, amount, true);
+        }
         callback.setReturnValue(true);
     }
 }

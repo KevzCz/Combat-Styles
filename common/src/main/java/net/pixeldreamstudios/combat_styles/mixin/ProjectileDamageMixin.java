@@ -31,7 +31,7 @@ public abstract class ProjectileDamageMixin {
         if (self.level().isClientSide() || DamageDealer.isDealing()) {
             return;
         }
-        Projectile landing = ProjectileImpactScope.landingFor(source);
+        Projectile landing = ProjectileImpactScope.hitBy(source);
         Entity direct = landing != null ? landing : source.getDirectEntity();
         if (amount <= 0.0F && !ProjectileUpkeep.dealsOwnDamage(direct)) {
             return;

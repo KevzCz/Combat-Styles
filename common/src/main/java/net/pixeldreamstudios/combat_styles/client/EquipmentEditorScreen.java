@@ -169,7 +169,7 @@ public class EquipmentEditorScreen extends PanelScreen {
                 source.weaponCategories(), source.excludedItems(), source.excludedTags(),
                 source.excludedCategories(), source.use(), source.weaponCategory(),
                 source.activeIn(), source.swings(), source.hideScopeTooltip(), source.hideRarity(),
-                source.projectiles(), source.summonProfiles());
+                source.projectiles(), source.summonProfiles(), source.crits());
     }
 
     private EquipmentDefinition blankForStack(ItemStack stack) {

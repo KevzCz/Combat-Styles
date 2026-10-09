@@ -217,10 +217,8 @@ public class EquipmentListScreen extends PanelScreen {
             ScreenDraw.rowBackground(graphics, left + ScreenTheme.PADDING + 1, y,
                     PANEL_WIDTH - ScreenTheme.PADDING * 2 - 2, ROW_HEIGHT - 1,
                     index, isHovered, false);
-            graphics.drawString(font, ScreenDraw.trim(font,
-                            StyleText.prettify(entry.id()), PANEL_WIDTH - 150),
-                    left + ScreenTheme.PADDING + TEXT_INSET, y + TEXT_INSET,
-                    ScreenTheme.TEXT, false);
+            ScreenDraw.drawTrimmed(graphics, font, StyleText.prettify(entry.id()),
+                    left + ScreenTheme.PADDING + TEXT_INSET, y + TEXT_INSET, PANEL_WIDTH - 150, ScreenTheme.TEXT);
             if (entry.value() != null) {
                 graphics.drawString(font, entry.value(),
                         removeX() - font.width(entry.value()) - 6, y + TEXT_INSET,

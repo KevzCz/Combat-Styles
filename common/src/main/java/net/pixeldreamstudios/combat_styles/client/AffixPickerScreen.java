@@ -216,8 +216,8 @@ public class AffixPickerScreen extends PanelScreen {
                 : Component.translatable(KEY_COMBINATIONS, available.size() - 1).getString();
         int countX = left + PANEL_WIDTH - PADDING - font.width(count);
         graphics.drawString(font, count, countX, top + 10, COLOR_MUTED, false);
-        graphics.drawString(font, trim(title.getString(), countX - left - PADDING - GAP),
-                left + PADDING, top + 10, COLOR_HEADING, false);
+        ScreenDraw.drawTrimmed(graphics, font, title.getString(),
+                left + PADDING, top + 10, countX - left - PADDING - GAP, COLOR_HEADING);
 
         ResolvedAffixes preview = ResolvedAffixes.of(chosen);
         String cost = Component.translatable(KEY_COST,
@@ -228,8 +228,10 @@ public class AffixPickerScreen extends PanelScreen {
 
         int swatchWidth = preview.blendedTrail().isPresent() ? SWATCH_WIDTH + GAP : 0;
         int nameWidth = costX - left - PADDING - GAP - swatchWidth;
-        String name = trim(StyleText.affixedName(entry, page).getString(), nameWidth);
+        String fullName = StyleText.affixedName(entry, page).getString();
+        String name = ScreenDraw.trim(font, fullName, nameWidth);
         graphics.drawString(font, name, left + PADDING, top + 22, COLOR_MUTED, false);
+        ScreenDraw.clippedIf(fullName, name, left + PADDING, top + 22, nameWidth, font.lineHeight);
 
         preview.blendedTrail().ifPresent(trail -> {
             int swatchX = left + PADDING + font.width(name) + GAP;
@@ -292,7 +294,8 @@ public class AffixPickerScreen extends PanelScreen {
                     ? COLOR_MUTED
                     : resolved.blendedTrail().map(StyleAffix.TrailColor::argb).orElse(COLOR_TEXT);
             int labelX = x + (multiSelect() ? 22 : 16);
-            graphics.drawString(font, trim(label, rowWidth - 76), labelX, y + 3, colour, false);
+            ScreenDraw.drawTrimmed(graphics, font, label,
+                    labelX, y + 3, rowWidth - 76, colour);
 
             if (!combination.isEmpty()) {
                 String modifier = "×" + StyleText.formatDecimal(resolved.costMultiplier());
@@ -331,13 +334,6 @@ public class AffixPickerScreen extends PanelScreen {
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
-    }
-
-    private String trim(String text, int maxWidth) {
-        if (maxWidth <= 0) {
-            return "";
-        }
-        return font.width(text) <= maxWidth ? text : font.plainSubstrByWidth(text, maxWidth - 6) + "…";
     }
 
     private void confirm() {

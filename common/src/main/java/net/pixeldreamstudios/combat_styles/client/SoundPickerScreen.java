@@ -234,10 +234,8 @@ public class SoundPickerScreen extends PickerScreen<SoundPickerScreen.Row> {
         boolean selected = Objects.equals(row.soundId(), chosen);
         ScreenDraw.rowBackground(graphics, x + 1, y, width - 2, ROW_HEIGHT - 1,
                 index, hovered, selected);
-        graphics.drawString(font,
-                ScreenDraw.trim(font, row.label(), width - NAME_MARGIN),
-                x + TEXT_INSET, y + 3,
-                selected ? ScreenTheme.GOOD : ScreenTheme.TEXT, false);
+        ScreenDraw.drawTrimmed(graphics, font, row.label(),
+                x + TEXT_INSET, y + 3, width - NAME_MARGIN, selected ? ScreenTheme.GOOD : ScreenTheme.TEXT);
         if (row.isDefault()) {
             Component tag = Component.translatable(KEY_DEFAULT_SOUND);
             graphics.drawString(font, tag, x + width - font.width(tag) - 6, y + 3,

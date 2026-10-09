@@ -24,6 +24,7 @@ import net.pixeldreamstudios.combat_styles.equipment.SwingHands;
 import net.pixeldreamstudios.combat_styles.equipment.AttributeBonus;
 import net.pixeldreamstudios.combat_styles.equipment.EffectCooldown;
 import net.pixeldreamstudios.combat_styles.equipment.EffectGroup;
+import net.pixeldreamstudios.combat_styles.damage.ScaledNumber;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.network.EditConfigPayload;
@@ -128,6 +129,8 @@ public class EquipmentDetailScreen extends PanelScreen {
     private static final String KEY_ENTITIES = "screen.combat_styles.equipment_entities";
     private static final String KEY_REMOVE_OVERRIDE = "screen.combat_styles.equipment_remove_override";
     private static final String KEY_PROJECTILE_HINT = "screen.combat_styles.equipment_projectile.hint";
+    private static final String KEY_CRIT_GROUPS = "screen.combat_styles.equipment_crit_groups";
+    private static final String KEY_CRIT_GROUP_HINT = "screen.combat_styles.equipment_crit_group.hint";
     private static final String NAME_SEPARATOR = "_";
     private static final String WHITESPACE = "\\s+";
 
@@ -139,6 +142,7 @@ public class EquipmentDetailScreen extends PanelScreen {
     private final Map<String, AttributeBonus> passiveAttributes = new LinkedHashMap<>();
     private final Map<String, AffixEffects.Projectile> projectiles = new LinkedHashMap<>();
     private final Map<String, SummonProfile> summonProfiles = new LinkedHashMap<>();
+    private final Map<String, ScaledNumber.Crit> crits = new LinkedHashMap<>();
     private final List<DropdownMenu> menus = new ArrayList<>();
     private Runnable onClear;
     private static final Codec<Map<String, AttributeBonus>> ATTRIBUTE_MAP_CODEC =
@@ -185,6 +189,7 @@ public class EquipmentDetailScreen extends PanelScreen {
         this.passiveAttributes.putAll(definition.attributes());
         this.projectiles.putAll(definition.projectiles());
         this.summonProfiles.putAll(definition.summonProfiles());
+        this.crits.putAll(definition.crits());
         this.rarity = definition.rarity();
         this.pose = definition.pose();
         this.offHandPose = definition.offHandPose();
@@ -302,7 +307,7 @@ public class EquipmentDetailScreen extends PanelScreen {
 
     @Override
     protected void layout() {
-        EffectChoices.offerLibraries(projectiles::keySet, summonProfiles::keySet);
+        EffectChoices.offerLibraries(projectiles::keySet, summonProfiles::keySet, crits::keySet);
         menus.clear();
         dock.place(left, top, PANEL_WIDTH, width, height);
         refreshPreview();
@@ -366,7 +371,9 @@ public class EquipmentDetailScreen extends PanelScreen {
                 DropdownMenu.Option.always(Component.translatable(KEY_PROJECTILES),
                         () -> openLibrary(projectileLibrary())),
                 DropdownMenu.Option.always(Component.translatable(KEY_SUMMON_PROFILES),
-                        () -> openLibrary(summonLibrary())))));
+                        () -> openLibrary(summonLibrary())),
+                DropdownMenu.Option.always(Component.translatable(KEY_CRIT_GROUPS),
+                        () -> openLibrary(critLibrary())))));
         Button looks = footerButton(Component.translatable(KEY_POSE), button -> openPoses());
         footer.add(looks);
         anchors.add(looks);
@@ -441,10 +448,8 @@ public class EquipmentDetailScreen extends PanelScreen {
             Component label = bound.isEmpty()
                     ? Component.translatable(KEY_APPLIES_ID)
                     : Component.translatable(KEY_APPLIES_BOUND, bound);
-            graphics.drawString(font,
-                    ScreenDraw.trim(font, label.getString(), targetListWidth() - TEXT_INSET * 2),
-                    contentLeft() + TEXT_INSET, listY + 2,
-                    bound.isEmpty() ? ScreenTheme.DIM : ScreenTheme.GOOD, false);
+            ScreenDraw.drawTrimmed(graphics, font, label.getString(),
+                    contentLeft() + TEXT_INSET, listY + 2, targetListWidth() - TEXT_INSET * 2, bound.isEmpty() ? ScreenTheme.DIM : ScreenTheme.GOOD);
             return;
         }
         int width = targetListWidth();
@@ -464,10 +469,8 @@ public class EquipmentDetailScreen extends PanelScreen {
                         rowY + TARGET_ROW_HEIGHT, ScreenTheme.HOVER);
             }
             int colour = row.startsWith(EXCLUDE_PREFIX) ? ScreenTheme.BAD : ScreenTheme.TEXT;
-            graphics.drawString(font,
-                    ScreenDraw.trim(font, targetLabel(row), width - REMOVE_WIDTH - 8),
-                    contentLeft() + TEXT_INSET, rowY + 2,
-                    hovered ? ScreenTheme.ACCENT : colour, false);
+            ScreenDraw.drawTrimmed(graphics, font, targetLabel(row),
+                    contentLeft() + TEXT_INSET, rowY + 2, width - REMOVE_WIDTH - 8, hovered ? ScreenTheme.ACCENT : colour);
             graphics.drawString(font, Component.translatable(KEY_REMOVE),
                     contentLeft() + width - REMOVE_WIDTH, rowY + 2,
                     hovered ? ScreenTheme.BAD : ScreenTheme.DIM, false);
@@ -577,6 +580,11 @@ public class EquipmentDetailScreen extends PanelScreen {
                 SummonProfile.EMPTY, SummonProfile.CODEC, EffectSchema.ROOT_SUMMON_PROFILE);
     }
 
+    private Library<ScaledNumber.Crit> critLibrary() {
+        return new Library<>(KEY_CRIT_GROUPS, KEY_CRIT_GROUP_HINT, crits, ScaledNumber.Crit.SAMPLE,
+                ScaledNumber.Crit.CODEC, EffectSchema.ROOT_CRIT);
+    }
+
     private <T> void openLibrary(Library<T> library) {
         minecraft.setScreen(new EquipmentListScreen(this,
                 Component.translatable(library.titleKey()),
@@ -646,7 +654,8 @@ public class EquipmentDetailScreen extends PanelScreen {
                 List.copyOf(excludeItems), List.copyOf(excludeTags),
                 List.copyOf(excludeCategories), use, weaponCategory, activeIn, swings, hideScopeTooltip,
                 hideRarity).withProjectiles(Map.copyOf(projectiles))
-                .withSummonProfiles(Map.copyOf(summonProfiles));
+                .withSummonProfiles(Map.copyOf(summonProfiles))
+                .withCrits(Map.copyOf(crits));
     }
 
     private void export() {
