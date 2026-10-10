@@ -193,7 +193,7 @@ public final class AffixMechanics {
             return false;
         }
         ScaledNumber.Crit crit = new ScaledNumber.Crit(Optional.of(group), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty()).effective();
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()).effective();
         float chance = crit.chanceFor(player);
         return CritRolls.outcome(crit, () -> player.getRandom().nextFloat() < chance);
     }

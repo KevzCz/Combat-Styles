@@ -14,6 +14,9 @@ public final class ScreenDraw {
     private static final int SHADOW_COLOR = 0x40000000;
     private static final int THUMB_MIN = 12;
     private static final int FIELD_PAD = 3;
+    private static final int ROW_TEXT_INSET = 6;
+    private static final int ROW_TEXT_DROP = 5;
+    private static final int ROW_FIELD_INSET = 2;
     private static final String ELLIPSIS = "…";
     private static final int TOOLTIP_MAX_WIDTH = 240;
     private static final int TOOLTIP_MIN_WIDTH = 120;
@@ -108,6 +111,20 @@ public final class ScreenDraw {
         } else if ((index & 1) == 1) {
             graphics.fill(x, y, x + width, y + height, ScreenTheme.ROW_ALT);
         }
+    }
+
+    public static int valueRow(GuiGraphics graphics, Font font, Component label, Component value,
+                               int x, int y, int width, int height, int mouseX, int mouseY) {
+        boolean hovered = isWithin(mouseX, mouseY, x, y, width, height);
+        rowBackground(graphics, x, y, width, height, 0, hovered, false);
+        graphics.drawString(font, label, x + ROW_TEXT_INSET, y + ROW_TEXT_DROP, ScreenTheme.TEXT, false);
+        int valueWidth = font.width(value);
+        int valueLeft = x + width - ROW_TEXT_INSET - valueWidth;
+        hoverField(graphics, valueLeft, y + ROW_FIELD_INSET, valueWidth, height - ROW_FIELD_INSET * 2,
+                mouseX, mouseY);
+        graphics.drawString(font, value, valueLeft, y + ROW_TEXT_DROP,
+                hovered ? ScreenTheme.ACCENT : ScreenTheme.MUTED, false);
+        return y + height;
     }
 
     public static void hoverField(GuiGraphics graphics, int textLeft, int y, int textWidth,

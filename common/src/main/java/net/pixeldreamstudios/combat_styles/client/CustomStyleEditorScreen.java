@@ -33,20 +33,34 @@ import java.util.function.Consumer;
 
 public class CustomStyleEditorScreen extends PanelScreen {
 
-    private static final int PANEL_WIDTH = 320;
-    private static final int PANEL_HEIGHT = 256;
-    private static final int ROW_HEIGHT = 20;
-    private static final int BUTTON_WIDTH = 84;
-    private static final int LABEL_WIDTH = 92;
-    private static final int FIELD_HEIGHT = 14;
-    private static final int GAP = 6;
+    private static final int PANEL_WIDTH = 340;
+    private static final int PANEL_HEIGHT = 218;
+    private static final int PADDING = ScreenTheme.PADDING;
     private static final int TITLE_Y = 10;
-    private static final int FORM_TOP = 30;
-    private static final int ERROR_OFFSET = 14;
+    private static final int FIELD_TOP = 24;
+    private static final int FIELD_STEP = 18;
+    private static final int LABEL_DROP = 3;
+    private static final int SECTION_Y = 78;
+    private static final int HEADER = 88;
+    private static final int FOOTER = 40;
+    private static final int ROW_HEIGHT = 18;
+    private static final int FIELD_HEIGHT = 14;
+    private static final int BUTTON_WIDTH = 74;
+    private static final int BUTTON_BOTTOM = 6;
+    private static final int GAP = 6;
+    private static final int LABEL_WIDTH = 54;
+    private static final int NOTICE_DROP = 2;
     private static final int MAX_ID_LENGTH = 64;
+    private static final int ROW_BASE = 0;
+    private static final int ROW_CATEGORY = 1;
+    private static final int ROW_RARITY = 2;
+    private static final int ROW_STYLE_PAGE = 3;
+    private static final int ROW_COUNT = 4;
     private static final String NAMESPACE_SEPARATOR = ":";
 
     private static final String KEY_TITLE = "screen.combat_styles.custom_style_editor";
+    private static final String KEY_SECTION = "screen.combat_styles.section_identity";
+    private static final String KEY_HINT = "screen.combat_styles.custom_style_hint";
     private static final String KEY_ID = "screen.combat_styles.custom_style_id";
     private static final String KEY_GROUP = "screen.combat_styles.custom_style_group";
     private static final String KEY_BASE = "screen.combat_styles.custom_style_base";
@@ -68,6 +82,7 @@ public class CustomStyleEditorScreen extends PanelScreen {
     private static final String KEY_CLOSE = "gui.back";
     private static final String HINT_SUFFIX = ".hint";
     private static final String TIP_SUFFIX = ".tip";
+    private static final String[] ROW_KEYS = {KEY_BASE, KEY_CATEGORY, KEY_RARITY, KEY_STYLE_PAGE};
 
     private final CustomStyle existing;
     private final Consumer<CustomStyle> onSaved;
@@ -75,11 +90,7 @@ public class CustomStyleEditorScreen extends PanelScreen {
     private EditBox idBox;
     private EditBox groupBox;
     private EditBox costBox;
-    private Button baseButton;
-    private Button categoryButton;
-    private Button rarityButton;
     private Button detailsButton;
-    private Button stylePageButton;
     private boolean natural;
 
     private String baseStyleId;
@@ -127,64 +138,33 @@ public class CustomStyleEditorScreen extends PanelScreen {
 
     @Override
     protected void layout() {
-        int fieldX = left + ScreenTheme.PADDING + LABEL_WIDTH;
-        int fieldWidth = PANEL_WIDTH - ScreenTheme.PADDING * 2 - LABEL_WIDTH;
-        int y = top + FORM_TOP;
+        int fieldX = left + PADDING + LABEL_WIDTH;
+        int fieldWidth = PANEL_WIDTH - PADDING * 2 - LABEL_WIDTH;
+        int y = top + FIELD_TOP;
 
         idBox = field(fieldX, y, fieldWidth, idBox == null
                 ? (existing == null ? "" : existing.id()) : idBox.getValue(), KEY_ID);
-        y += ROW_HEIGHT;
+        y += FIELD_STEP;
         groupBox = field(fieldX, y, fieldWidth, groupBox == null
                 ? (existing == null ? CustomStyle.DEFAULT_GROUP : existing.group())
                 : groupBox.getValue(), KEY_GROUP);
-        y += ROW_HEIGHT;
-
-        baseButton = addRenderableWidget(tipped(PanelButton.of(baseLabel(),
-                button -> minecraft.setScreen(new AttackPickerScreen(this, (page, override) -> {
-                    baseStyleId = page.styleId();
-                    minecraft.setScreen(this);
-                }))), KEY_BASE).bounds(fieldX, y, fieldWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        y += ROW_HEIGHT;
-
-        categoryButton = addRenderableWidget(tipped(PanelButton.of(categoryLabel(),
-                button -> minecraft.setScreen(new ChoicePickerScreen(this,
-                        Component.translatable(KEY_CATEGORY), WeaponCategories.allNames(),
-                        category.orElse(""), picked -> category = Optional.of(picked))
-                        .offeringAny(category.isEmpty(), () -> category = Optional.empty()))),
-                KEY_CATEGORY).bounds(fieldX, y, fieldWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        y += ROW_HEIGHT;
-
-        rarityButton = addRenderableWidget(tipped(PanelButton.of(rarityLabel(),
-                button -> minecraft.setScreen(new ChoicePickerScreen(this,
-                        Component.translatable(KEY_RARITY), rarityKeys(),
-                        rarity.map(StyleRarity::key).orElse(""),
-                        picked -> rarity = rarityOf(picked))
-                        .offeringAny(rarity.isEmpty(), () -> rarity = Optional.empty()))),
-                KEY_RARITY).bounds(fieldX, y, fieldWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        y += ROW_HEIGHT;
-
+        y += FIELD_STEP;
         costBox = field(fieldX, y, fieldWidth, costBox == null
                 ? (existing == null ? "" : existing.costOverride().map(StyleText::formatDecimal).orElse(""))
                 : costBox.getValue(), KEY_COST);
-        y += ROW_HEIGHT;
 
-        stylePageButton = addRenderableWidget(tipped(PanelButton.of(stylePageLabel(),
-                button -> natural = !natural), KEY_STYLE_PAGE)
-                .bounds(fieldX, y, fieldWidth, ScreenTheme.BUTTON_HEIGHT).build());
-        y += ROW_HEIGHT + GAP;
-
-        detailsButton = addRenderableWidget(tipped(PanelButton.of(
-                Component.translatable(KEY_DETAILS), button -> openDetails()), KEY_DETAILS)
-                .bounds(left + ScreenTheme.PADDING, y, PANEL_WIDTH - ScreenTheme.PADDING * 2,
-                        ScreenTheme.BUTTON_HEIGHT).build());
-
-        int buttonY = top + PANEL_HEIGHT - ScreenTheme.BUTTON_HEIGHT - ScreenTheme.PADDING;
+        int buttonY = top + PANEL_HEIGHT - ScreenTheme.BUTTON_HEIGHT - BUTTON_BOTTOM;
+        int detailsWidth = PANEL_WIDTH - PADDING * 2 - BUTTON_WIDTH * 2 - GAP * 2;
+        detailsButton = addRenderableWidget(PanelButton.of(
+                        Component.translatable(KEY_DETAILS), button -> openDetails())
+                .tooltip(Component.translatable(KEY_DETAILS + TIP_SUFFIX))
+                .bounds(left + PADDING, buttonY, detailsWidth, ScreenTheme.BUTTON_HEIGHT).build());
         addRenderableWidget(PanelButton.of(Component.translatable(KEY_CLOSE),
                         button -> minecraft.setScreen(parent))
-                .bounds(left + PANEL_WIDTH - ScreenTheme.PADDING - BUTTON_WIDTH * 2 - GAP, buttonY,
+                .bounds(left + PANEL_WIDTH - PADDING - BUTTON_WIDTH * 2 - GAP, buttonY,
                         BUTTON_WIDTH, ScreenTheme.BUTTON_HEIGHT).build());
         addRenderableWidget(PanelButton.of(Component.translatable(KEY_SAVE), button -> save())
-                .bounds(left + PANEL_WIDTH - ScreenTheme.PADDING - BUTTON_WIDTH, buttonY,
+                .bounds(left + PANEL_WIDTH - PADDING - BUTTON_WIDTH, buttonY,
                         BUTTON_WIDTH, ScreenTheme.BUTTON_HEIGHT).build());
     }
 
@@ -197,10 +177,6 @@ public class CustomStyleEditorScreen extends PanelScreen {
         box.setTooltip(Tooltip.create(Component.translatable(labelKey + TIP_SUFFIX)));
         addRenderableWidget(box);
         return box;
-    }
-
-    private static PanelButton.Builder tipped(PanelButton.Builder builder, String labelKey) {
-        return builder.tooltip(Component.translatable(labelKey + TIP_SUFFIX));
     }
 
     private static List<String> rarityKeys() {
@@ -241,6 +217,56 @@ public class CustomStyleEditorScreen extends PanelScreen {
         return rarity.isEmpty()
                 ? Component.translatable(KEY_INHERIT).withStyle(ChatFormatting.DARK_GRAY)
                 : StyleText.rarityName(rarity.get());
+    }
+
+    private Component rowValue(int row) {
+        return switch (row) {
+            case ROW_BASE -> baseLabel();
+            case ROW_CATEGORY -> categoryLabel();
+            case ROW_RARITY -> rarityLabel();
+            default -> stylePageLabel();
+        };
+    }
+
+    private void clickRow(int row) {
+        switch (row) {
+            case ROW_BASE -> minecraft.setScreen(new AttackPickerScreen(this, (page, override) -> {
+                baseStyleId = page.styleId();
+                minecraft.setScreen(this);
+            }));
+            case ROW_CATEGORY -> minecraft.setScreen(new ChoicePickerScreen(this,
+                    Component.translatable(KEY_CATEGORY), WeaponCategories.allNames(),
+                    category.orElse(""), picked -> category = Optional.of(picked))
+                    .offeringAny(category.isEmpty(), () -> category = Optional.empty()));
+            case ROW_RARITY -> minecraft.setScreen(new ChoicePickerScreen(this,
+                    Component.translatable(KEY_RARITY), rarityKeys(),
+                    rarity.map(StyleRarity::key).orElse(""),
+                    picked -> rarity = rarityOf(picked))
+                    .offeringAny(rarity.isEmpty(), () -> rarity = Optional.empty()));
+            case ROW_STYLE_PAGE -> natural = !natural;
+            default -> {
+            }
+        }
+    }
+
+    @Override
+    protected int listTop() {
+        return top + HEADER;
+    }
+
+    @Override
+    protected int listBottom() {
+        return top + PANEL_HEIGHT - FOOTER - BUTTON_BOTTOM;
+    }
+
+    @Override
+    protected int rowHeight() {
+        return ROW_HEIGHT;
+    }
+
+    @Override
+    protected int rowCount() {
+        return ROW_COUNT;
     }
 
     private void openDetails() {
@@ -335,27 +361,47 @@ public class CustomStyleEditorScreen extends PanelScreen {
 
         graphics.fill(0, 0, width, height, ScreenTheme.SHADE);
         ScreenDraw.panel(graphics, left, top, PANEL_WIDTH, PANEL_HEIGHT);
-
-        baseButton.setMessage(baseLabel());
-        categoryButton.setMessage(categoryLabel());
-        rarityButton.setMessage(rarityLabel());
-        stylePageButton.setMessage(stylePageLabel());
         detailsButton.active = basePage() != null;
 
-        graphics.drawString(font, title, left + ScreenTheme.PADDING, top + TITLE_Y,
-                ScreenTheme.HEADING, false);
-        int y = top + FORM_TOP + (FIELD_HEIGHT - font.lineHeight) / 2 + 1;
-        for (String key : List.of(KEY_ID, KEY_GROUP, KEY_BASE, KEY_CATEGORY, KEY_RARITY, KEY_COST,
-                KEY_STYLE_PAGE)) {
-            graphics.drawString(font, Component.translatable(key),
-                    left + ScreenTheme.PADDING, y, ScreenTheme.TEXT, false);
-            y += ROW_HEIGHT;
+        graphics.drawString(font, title, left + PADDING, top + TITLE_Y, ScreenTheme.HEADING, false);
+        int labelY = top + FIELD_TOP + LABEL_DROP;
+        for (String key : List.of(KEY_ID, KEY_GROUP, KEY_COST)) {
+            graphics.drawString(font, Component.translatable(key), left + PADDING, labelY,
+                    ScreenTheme.MUTED, false);
+            labelY += FIELD_STEP;
         }
-        if (error != null) {
-            graphics.drawString(font, error, left + ScreenTheme.PADDING,
-                    top + PANEL_HEIGHT - ScreenTheme.BUTTON_HEIGHT - ScreenTheme.PADDING - ERROR_OFFSET,
-                    ScreenTheme.BAD, false);
+        ScreenDraw.sectionHeader(graphics, font, Component.translatable(KEY_SECTION),
+                left + PADDING, top + SECTION_Y, PANEL_WIDTH - PADDING * 2);
+
+        int x = left + PADDING;
+        int listWidth = PANEL_WIDTH - PADDING * 2;
+        ScreenDraw.sunken(graphics, x - 2, listTop() - 2, listWidth + 2, listBottom() - listTop() + 4);
+        int y = listTop();
+        for (int row = 0; row < ROW_COUNT; row++) {
+            y = ScreenDraw.valueRow(graphics, font, Component.translatable(ROW_KEYS[row]), rowValue(row),
+                    x, y, listWidth, ROW_HEIGHT, mouseX, mouseY);
         }
+
+        Component notice = error != null ? Component.literal(error) : Component.translatable(KEY_HINT);
+        graphics.drawString(font, notice, x, top + PANEL_HEIGHT - FOOTER + NOTICE_DROP,
+                error == null ? ScreenTheme.DIM : ScreenTheme.BAD, false);
         drawWidgets(graphics, mouseX, mouseY, partialTick);
+
+        int hovered = rowAt(mouseX, mouseY);
+        if (hovered >= 0) {
+            ScreenDraw.tooltip(graphics, font, Component.translatable(ROW_KEYS[hovered] + TIP_SUFFIX),
+                    mouseX, mouseY);
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int row = rowAt(mouseX, mouseY);
+        if (row >= 0) {
+            setFocused(null);
+            clickRow(row);
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 }

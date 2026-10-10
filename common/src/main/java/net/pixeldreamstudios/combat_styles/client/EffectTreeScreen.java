@@ -266,7 +266,8 @@ public class EffectTreeScreen extends PanelScreen {
         boolean hookOption = last >= CUSTOM_OFFSET
                 && OptionSources.KEY_OPTIONS.equals(parts[last - OPTIONS_OFFSET])
                 && Customs.KEY.equals(parts[last - CUSTOM_OFFSET]);
-        boolean critPayload = Arrays.asList(parts).contains(ScaledNumber.Crit.KEY_ON_CRIT);
+        boolean critPayload = Arrays.asList(parts).contains(ScaledNumber.Crit.KEY_ON_CRIT)
+                || Arrays.asList(parts).contains(ScaledNumber.Crit.KEY_ON_NO_CRIT);
         return hookOption || critPart(node) || critPayload
                 || binding.codec() == AffixEffects.OnHit.CODEC;
     }

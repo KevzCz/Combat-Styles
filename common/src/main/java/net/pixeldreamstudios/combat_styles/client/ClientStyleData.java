@@ -80,7 +80,7 @@ public final class ClientStyleData {
             }
             String styleId = StyleEntry.styleIdOfKey(entry.getKey());
             if (styleId != null && !styleId.isBlank()) {
-                styles.add(styleId);
+                styles.add(StyleRegistry.representativeOf(styleId));
             }
         }
         return styles.size();

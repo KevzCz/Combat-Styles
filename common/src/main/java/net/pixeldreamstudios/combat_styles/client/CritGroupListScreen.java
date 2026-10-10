@@ -33,7 +33,7 @@ public class CritGroupListScreen extends DefinitionListScreen<ScaledNumber.Crit>
                 StyleText.formatDecimal(value.value().map(ScaledNumber::base)
                         .orElse(adds ? ScaledNumber.Crit.NO_ADDITION
                                 : ScaledNumber.Crit.DEFAULT_MULTIPLIER))).getString();
-        return value.onCrit().isPresent()
+        return value.onCrit().isPresent() || value.onNoCrit().isPresent()
                 ? summary + Component.translatable(KEY_REACTS).getString()
                 : summary;
     }

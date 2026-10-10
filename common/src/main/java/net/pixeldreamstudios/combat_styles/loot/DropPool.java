@@ -8,13 +8,17 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
 
+import net.pixeldreamstudios.combat_styles.style.StyleRarity;
+
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 public record DropPool(double chance, List<String> tables, List<String> tablePatterns,
                        List<String> entities, List<String> entityTags, List<String> structures,
-                       List<String> structureTags, List<DropEntry> entries) {
+                       List<String> structureTags, List<DropEntry> entries, int stylePages,
+                       Optional<StyleRarity> rarity) {
 
     public static final String KEY_CHANCE = "chance";
     public static final String KEY_TABLES = "tables";
@@ -24,6 +28,9 @@ public record DropPool(double chance, List<String> tables, List<String> tablePat
     public static final String KEY_STRUCTURES = "structures";
     public static final String KEY_STRUCTURE_TAGS = "structure_tags";
     public static final String KEY_ENTRIES = "entries";
+    public static final String KEY_STYLE_PAGES = "style_pages";
+    public static final String KEY_RARITY = "rarity";
+    public static final int NO_STYLE_PAGES = 0;
     public static final String TAG_MARKER = "#";
     private static final double NEVER = 0.0D;
 
@@ -37,11 +44,13 @@ public record DropPool(double chance, List<String> tables, List<String> tablePat
             Codec.STRING.listOf().optionalFieldOf(KEY_STRUCTURES, List.of()).forGetter(DropPool::structures),
             Codec.STRING.listOf().optionalFieldOf(KEY_STRUCTURE_TAGS, List.of())
                     .forGetter(DropPool::structureTags),
-            DropEntry.CODEC.listOf().optionalFieldOf(KEY_ENTRIES, List.of()).forGetter(DropPool::entries)
+            DropEntry.CODEC.listOf().optionalFieldOf(KEY_ENTRIES, List.of()).forGetter(DropPool::entries),
+            Codec.INT.optionalFieldOf(KEY_STYLE_PAGES, NO_STYLE_PAGES).forGetter(DropPool::stylePages),
+            StyleRarity.CODEC.optionalFieldOf(KEY_RARITY).forGetter(DropPool::rarity)
     ).apply(instance, DropPool::new));
 
     public static final DropPool EMPTY = new DropPool(NEVER, List.of(), List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of());
+            List.of(), List.of(), List.of(), NO_STYLE_PAGES, Optional.empty());
 
     public DropPool {
         tables = copy(tables);
@@ -51,6 +60,8 @@ public record DropPool(double chance, List<String> tables, List<String> tablePat
         structures = copy(structures);
         structureTags = copy(structureTags);
         entries = entries == null ? List.of() : List.copyOf(entries);
+        stylePages = Math.max(NO_STYLE_PAGES, stylePages);
+        rarity = rarity == null ? Optional.empty() : rarity;
     }
 
     private static List<String> copy(List<String> values) {
@@ -59,7 +70,16 @@ public record DropPool(double chance, List<String> tables, List<String> tablePat
 
     public DropPool withEntries(List<DropEntry> replaced) {
         return new DropPool(chance, tables, tablePatterns, entities, entityTags, structures,
-                structureTags, replaced);
+                structureTags, replaced, stylePages, rarity);
+    }
+
+    public DropPool withChance(double replaced) {
+        return new DropPool(replaced, tables, tablePatterns, entities, entityTags, structures,
+                structureTags, entries, stylePages, rarity);
+    }
+
+    public boolean dropsAnything() {
+        return !entries.isEmpty() || stylePages > NO_STYLE_PAGES;
     }
 
     public boolean matches(String tableId, Entity entity, Set<String> structuresHere) {

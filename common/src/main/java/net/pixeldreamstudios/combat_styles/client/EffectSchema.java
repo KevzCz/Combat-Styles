@@ -628,6 +628,8 @@ public final class EffectSchema {
         register(root, DropPool.KEY_STRUCTURES, Codec.STRING.listOf(), List.of(SAMPLE_STRUCTURE));
         register(root, DropPool.KEY_STRUCTURE_TAGS, Codec.STRING.listOf(), List.of(SAMPLE_STRUCTURE_TAG));
         register(root, DropPool.KEY_ENTRIES, DropEntry.CODEC.listOf(), List.of(DropEntry.of(SAMPLE_DROP_ITEM)));
+        register(root, DropPool.KEY_STYLE_PAGES, Codec.INT, DropPool.NO_STYLE_PAGES);
+        register(root, DropPool.KEY_RARITY, StyleRarity.CODEC, StyleRarity.COMMON);
         String entry = join(root, DropPool.KEY_ENTRIES);
         register(entry, DropEntry.KEY_ITEM, Codec.STRING, SAMPLE_DROP_ITEM);
         register(entry, DropEntry.KEY_WEIGHT, Codec.INT, DropEntry.DEFAULT_WEIGHT);
@@ -655,6 +657,8 @@ public final class EffectSchema {
                 ScaledNumber.Crit.Mode.MULTIPLY.serializedName());
         register(crit, ScaledNumber.Crit.KEY_ON_CRIT, AffixEffects.OnHit.CODEC, AffixEffects.OnHit.EMPTY);
         mount(join(crit, ScaledNumber.Crit.KEY_ON_CRIT), ROOT_EFFECT);
+        register(crit, ScaledNumber.Crit.KEY_ON_NO_CRIT, AffixEffects.OnHit.CODEC, AffixEffects.OnHit.EMPTY);
+        mount(join(crit, ScaledNumber.Crit.KEY_ON_NO_CRIT), ROOT_EFFECT);
     }
 
     private static void registerTemplate(String path, String key, JsonElement value) {

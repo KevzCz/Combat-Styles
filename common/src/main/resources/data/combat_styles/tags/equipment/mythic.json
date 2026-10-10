@@ -1,4 +1,6 @@
 {
   "replace": false,
-  "values": []
+  "values": [
+    "combat_styles:style_book_mythic"
+  ]
 }

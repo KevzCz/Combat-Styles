@@ -96,6 +96,7 @@ public final class AffixText {
     private static final String KEY_SPEC_OR = "affix.combat_styles.spec.or";
     private static final String KEY_CRIT_LINE = "affix.combat_styles.effect.crit";
     private static final String KEY_CRIT_HINT = "affix.combat_styles.effect.crit_hint";
+    private static final String KEY_CRIT_HINT_CHANCE = "affix.combat_styles.effect.crit_hint_chance";
     private static final String KEY_CONDITION_SCOPE = "condition";
     private static final String HEADER_END = ":";
     private static final String KEY_ONLY_CRIT = "affix.combat_styles.condition.only_crit";
@@ -107,6 +108,8 @@ public final class AffixText {
     private static final String KEY_CRIT_PLUS = "affix.combat_styles.effect.crit_plus";
     private static final String KEY_LIST_PAIR = "affix.combat_styles.effect.list_pair";
     private static final String KEY_ON_CRIT = "affix.combat_styles.effect.on_crit";
+    private static final String KEY_ON_NO_CRIT = "affix.combat_styles.effect.on_no_crit";
+    private static final int REACTION_DEPTH = 2;
     private static final String KEY_DAMAGE_PATH = "damage";
     private static final String KEY_DAMAGES_PATH = "damages";
     private static final String KEY_IGNITE_PATH = "ignite";
@@ -538,14 +541,37 @@ public final class AffixText {
             return;
         }
         scopeOf(lines, KEY_SCALING_SCOPE);
+        Player viewer = TooltipContextAccess.viewer();
         if (!ItemTooltip.detailed()) {
             if (crits) {
-                lines.add(TooltipGem.detail(ItemTooltip.marked(
-                        Component.translatable(KEY_CRIT_HINT).withStyle(FRAME))));
+                lines.add(TooltipGem.detail(ItemTooltip.marked(critHint(numbers, viewer).withStyle(FRAME))));
             }
-            return;
+        } else {
+            appendUnplacedDetails(numbers, viewer, lines);
         }
-        appendCrits(affix, numbers, lines);
+        appendCritReactions(affix, numbers, lines);
+    }
+
+    private static MutableComponent critHint(Map<String, ScaledNumber> numbers, Player viewer) {
+        Set<String> chances = new LinkedHashSet<>();
+        for (ScaledNumber number : numbers.values()) {
+            number.crit().map(ScaledNumber.Crit::effective)
+                    .ifPresent(crit -> chances.add(percentOf(crit.chanceFor(viewer))));
+        }
+        return chances.isEmpty()
+                ? Component.translatable(KEY_CRIT_HINT)
+                : Component.translatable(KEY_CRIT_HINT_CHANCE, String.join(LIST_JOIN, chances));
+    }
+
+    private static void appendUnplacedDetails(Map<String, ScaledNumber> numbers, Player viewer,
+                                              List<Component> lines) {
+        Map<String, ScaledNumber> unplaced = new LinkedHashMap<>();
+        for (Map.Entry<String, ScaledNumber> entry : numbers.entrySet()) {
+            if (!placedUnderLine(entry.getKey())) {
+                unplaced.put(entry.getKey(), entry.getValue());
+            }
+        }
+        appendScaledDetails(unplaced, viewer, lines);
     }
 
     private static MutableComponent sourceNames(List<String> sources) {
@@ -559,35 +585,35 @@ public final class AffixText {
         return names;
     }
 
-    private static void appendCrits(StyleAffix affix, Map<String, ScaledNumber> numbers,
-                                    List<Component> lines) {
-        Player viewer = TooltipContextAccess.viewer();
+    private static void appendCritReactions(StyleAffix affix, Map<String, ScaledNumber> numbers,
+                                            List<Component> lines) {
         Map<String, ScaledNumber.Crit> reactions = new LinkedHashMap<>();
-        Map<String, ScaledNumber> unplaced = new LinkedHashMap<>();
         for (Map.Entry<String, ScaledNumber> entry : numbers.entrySet()) {
-            if (!placedUnderLine(entry.getKey())) {
-                unplaced.put(entry.getKey(), entry.getValue());
-            }
             ScaledNumber.Crit crit = entry.getValue().crit().map(ScaledNumber.Crit::effective).orElse(null);
-            if (crit != null && crit.onCrit().isPresent()) {
+            if (crit != null && (crit.onCrit().isPresent() || crit.onNoCrit().isPresent())) {
                 reactions.putIfAbsent(crit.group().orElse(entry.getKey()), crit);
             }
         }
-        appendScaledDetails(unplaced, viewer, lines);
         for (Map.Entry<String, ScaledNumber.Crit> reaction : reactions.entrySet()) {
             ScaledNumber.Crit crit = reaction.getValue();
             Component name = crit.group().isPresent()
                     ? Component.literal(critName(crit.group().get()))
                     : valueLabel(reaction.getKey());
-            List<Component> payload = new ArrayList<>();
-            appendTrigger(affix, crit.onCrit().get(), payload);
-            if (payload.isEmpty()) {
-                continue;
-            }
-            lines.add(TooltipGem.detail(Component.translatable(KEY_ON_CRIT, name).withStyle(HEADER)));
-            for (Component line : payload) {
-                lines.add(TooltipGem.detail(line));
-            }
+            crit.onCrit().ifPresent(payload -> appendReaction(affix, KEY_ON_CRIT, name, payload, lines));
+            crit.onNoCrit().ifPresent(payload -> appendReaction(affix, KEY_ON_NO_CRIT, name, payload, lines));
+        }
+    }
+
+    private static void appendReaction(StyleAffix affix, String headerKey, Component name,
+                                       AffixEffects.OnHit reaction, List<Component> lines) {
+        List<Component> payload = new ArrayList<>();
+        appendTrigger(affix, reaction, payload);
+        if (payload.isEmpty()) {
+            return;
+        }
+        lines.add(TooltipGem.detail(Component.translatable(headerKey, name).withStyle(HEADER)));
+        for (Component line : payload) {
+            lines.add(TooltipGem.detail(line, TooltipGem.depthOf(line) + REACTION_DEPTH));
         }
     }
 

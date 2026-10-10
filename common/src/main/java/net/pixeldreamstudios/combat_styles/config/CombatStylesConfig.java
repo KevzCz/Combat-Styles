@@ -31,9 +31,6 @@ public final class CombatStylesConfig {
     private static volatile boolean remote;
 
     private int maxAttacksPerSequence = 10;
-    private boolean lootEnabled = true;
-    private double mobDropChance = 0.15D;
-    private double chestLootChance = 0.35D;
     private boolean requireLearnedStyles = true;
     private int maxAffixesPerSlot = 2;
     private int maxLootAffixes = 2;
@@ -81,8 +78,6 @@ public final class CombatStylesConfig {
     private boolean cooldownHudFlipped = false;
     private boolean cooldownHudHideWhenReady = false;
     private String cooldownHudDensity = ConfigOptions.HUD_DENSITY_DEFAULT;
-    private boolean gameplayLootEnabled = false;
-    private List<String> lootTableBlocklist = new ArrayList<>();
     private int weightCommon = 12;
     private int weightUncommon = 6;
     private int weightRare = 3;
@@ -228,8 +223,6 @@ public final class CombatStylesConfig {
 
     private void clamp() {
         maxAttacksPerSequence = Math.clamp(maxAttacksPerSequence, MIN_ATTACKS, MAX_ATTACKS);
-        mobDropChance = Math.clamp(mobDropChance, 0.0D, 1.0D);
-        chestLootChance = Math.clamp(chestLootChance, 0.0D, 1.0D);
         animationPreviewSpeed = Math.clamp(animationPreviewSpeed, 0.1D, 4.0D);
         affixChance = Math.clamp(affixChance, 0.0D, 1.0D);
     }
@@ -320,10 +313,6 @@ public final class CombatStylesConfig {
         this.cooldownHudOffsetY = offsetY;
     }
 
-    public boolean gameplayLootEnabled() {
-        return gameplayLootEnabled;
-    }
-
     public boolean etchOncePerWeapon() {
         return etchOncePerWeapon;
     }
@@ -358,10 +347,6 @@ public final class CombatStylesConfig {
 
     public boolean countCustomStyles() {
         return countCustomStyles;
-    }
-
-    public List<String> lootTableBlocklist() {
-        return lootTableBlocklist == null ? List.of() : lootTableBlocklist;
     }
 
     public int rarityWeight(String rarityName) {
@@ -409,18 +394,6 @@ public final class CombatStylesConfig {
 
     public int maxAttacksPerSequence() {
         return maxAttacksPerSequence;
-    }
-
-    public boolean lootEnabled() {
-        return lootEnabled;
-    }
-
-    public double mobDropChance() {
-        return mobDropChance;
-    }
-
-    public double chestLootChance() {
-        return chestLootChance;
     }
 
     public int maxAffixesPerSlot() {
@@ -496,9 +469,6 @@ public final class CombatStylesConfig {
                 () -> namedEntriesLocked, value -> namedEntriesLocked = value));
         options.add(ConfigOptions.bool("showAffinityInTooltip", "Show Affinity In Tooltip",
                 () -> showAffinityInTooltip, value -> showAffinityInTooltip = value));
-        options.add(ConfigOptions.bool("gameplayLootEnabled", "Gameplay Loot Enabled",
-                () -> gameplayLootEnabled, value -> gameplayLootEnabled = value)
-                .describedAs("Also drop from gameplay/ tables: fishing, gifts, bartering, sniffer digs."));
         options.add(ConfigOptions.bool("etchOncePerWeapon", "Etch Once Per Weapon",
                 () -> etchOncePerWeapon, value -> etchOncePerWeapon = value));
         options.add(ConfigOptions.bool("etchRequiresCreative", "Etch Requires Creative",
@@ -511,11 +481,6 @@ public final class CombatStylesConfig {
                 () -> countCustomStyles, value -> countCustomStyles = value));
         options.add(ConfigOptions.bool("preserveArc", "Preserve Arc",
                 () -> preserveArc, value -> preserveArc = value));
-        options.add(ConfigOptions.bool("lootEnabled", "Loot Enabled",
-                () -> lootEnabled, value -> lootEnabled = value)
-                .describedAs("Master switch for style page drops."));
-        ConfigOptions.addList(options, "Loot", "lootTableBlocklist", lootTableBlocklist,
-                "Table that never drops pages. Trailing * matches a prefix. Blank removes it.");
         options.add(ConfigOptions.bool("requireLearnedStyles", "Require Learned Styles",
                 () -> requireLearnedStyles, value -> requireLearnedStyles = value));
         options.add(ConfigOptions.bool("showLockedStyles", "Show Locked Styles",
@@ -582,12 +547,6 @@ public final class CombatStylesConfig {
                 () -> budgetStyleSoftCap, value -> budgetStyleSoftCap = value));
         options.add(ConfigOptions.decimal("budgetStyleMax", "Budget Style Max",
                 () -> budgetStyleMax, value -> budgetStyleMax = value));
-        options.add(ConfigOptions.decimal("mobDropChance", "Mob Drop Chance",
-                () -> mobDropChance, value -> mobDropChance = value)
-                .describedAs("0 to 1. Page drop odds from entities/ tables."));
-        options.add(ConfigOptions.decimal("chestLootChance", "Chest Loot Chance",
-                () -> chestLootChance, value -> chestLootChance = value)
-                .describedAs("0 to 1. Page drop odds from chests/ tables."));
         options.add(ConfigOptions.decimal("extraAffixChance", "Extra Affix Chance",
                 () -> extraAffixChance, value -> extraAffixChance = value));
         options.add(ConfigOptions.decimal("extraAffixFalloff", "Extra Affix Falloff",

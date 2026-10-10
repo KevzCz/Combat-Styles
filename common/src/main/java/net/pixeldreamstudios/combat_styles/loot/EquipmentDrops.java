@@ -89,10 +89,18 @@ public final class EquipmentDrops {
         String tableId = table == null ? "" : table.toString();
         Set<String> here = structuresAt(level, entity, origin);
         List<Drop> dropped = new ArrayList<>();
-        for (StyleRarity rarity : StyleRarity.values()) {
-            DropPool pool = DropPools.effective(rarity);
-            if (pool.chance() <= NEVER || pool.entries().isEmpty()
+        for (Map.Entry<String, DropPool> named : DropPools.all().entrySet()) {
+            DropPool pool = named.getValue();
+            StyleRarity rarity = DropPools.rarityFor(named.getKey(), pool);
+            if (pool.chance() <= NEVER || !pool.dropsAnything()
                     || !pool.matches(tableId, entity, here) || random.nextDouble() >= pool.chance()) {
+                continue;
+            }
+            if (picksStylePage(pool, tableId, random)) {
+                ItemStack page = StyleLoot.pageOf(rarity, random);
+                if (!page.isEmpty()) {
+                    dropped.add(new Drop(page, false));
+                }
                 continue;
             }
             DropEntry entry = pick(pool.entries(), tableId, random);
@@ -104,11 +112,22 @@ public final class EquipmentDrops {
                 continue;
             }
             if (BookProvider.isBook(stack.getItem()) && !entry.isInstance()) {
-                BookRolls.fill(stack, rarity, random);
+                BookRolls.fill(stack, rarity == null ? StyleLoot.weightedRarity(random) : rarity, random);
             }
             dropped.add(new Drop(stack, entry.roll()));
         }
         return dropped;
+    }
+
+    private static boolean picksStylePage(DropPool pool, String tableId, RandomSource random) {
+        if (pool.stylePages() <= DropPool.NO_STYLE_PAGES) {
+            return false;
+        }
+        int total = pool.stylePages();
+        for (DropEntry entry : pool.entries()) {
+            total += entry.weightFor(tableId);
+        }
+        return random.nextInt(total) < pool.stylePages();
     }
 
     private static DropEntry pick(List<DropEntry> entries, String tableId, RandomSource random) {

@@ -15,7 +15,6 @@ public final class ConfigOptions {
 
     public static final String GENERAL = "General";
     public static final String STATUS_EFFECTS = "Status Effects";
-    public static final String EQUIPMENT = "Equipment Drops";
     public static final String SUMMONS = "Summons";
 
     public static final String SUGGEST_SCHOOLS = "schools";

@@ -1,11 +1,12 @@
 package net.pixeldreamstudios.combat_styles.loot;
 
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
+import net.pixeldreamstudios.combat_styles.item.StylePageItem;
 import net.pixeldreamstudios.combat_styles.style.CustomStyle;
 import net.pixeldreamstudios.combat_styles.style.CustomStyles;
 import net.pixeldreamstudios.combat_styles.style.StylePage;
@@ -15,14 +16,8 @@ import net.pixeldreamstudios.combat_styles.style.StyleRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public final class StyleLoot {
-
-    private static final String CHEST_PREFIX = "chests/";
-    private static final String ENTITY_PREFIX = "entities/";
-    private static final String GAMEPLAY_PREFIX = "gameplay/";
-    private static final String WILDCARD = "*";
 
     private StyleLoot() {
     }
@@ -58,47 +53,6 @@ public final class StyleLoot {
         return picked;
     }
 
-    public static boolean isChestTable(ResourceLocation table) {
-        return table != null && table.getPath().startsWith(CHEST_PREFIX);
-    }
-
-    public static boolean isEntityTable(ResourceLocation table) {
-        return table != null && table.getPath().startsWith(ENTITY_PREFIX);
-    }
-
-    public static boolean isGameplayTable(ResourceLocation table) {
-        return table != null && table.getPath().startsWith(GAMEPLAY_PREFIX);
-    }
-
-    public static boolean isBlocked(ResourceLocation table) {
-        if (table == null) {
-            return true;
-        }
-        String id = table.toString().toLowerCase(Locale.ROOT);
-        for (String blocked : CombatStylesConfig.get().lootTableBlocklist()) {
-            String entry = blocked.toLowerCase(Locale.ROOT);
-            if (entry.equals(id)
-                    || (entry.endsWith(WILDCARD)
-                            && id.startsWith(entry.substring(0, entry.length() - 1)))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static boolean isEligible(ResourceLocation table) {
-        return CombatStylesConfig.get().lootEnabled()
-                && !StyleRegistry.isEmpty()
-                && !isBlocked(table)
-                && (isChestTable(table) || isEntityTable(table)
-                        || (CombatStylesConfig.get().gameplayLootEnabled() && isGameplayTable(table)));
-    }
-
-    public static double chanceFor(ResourceLocation table) {
-        CombatStylesConfig config = CombatStylesConfig.get();
-        return isChestTable(table) ? config.chestLootChance() : config.mobDropChance();
-    }
-
     public static StylePage weightedPick(RandomSource random) {
         List<StylePage> pages = StylePool.natural(StyleRegistry.distinct());
         if (pages.isEmpty()) {
@@ -115,6 +69,24 @@ public final class StyleLoot {
             return StyleRegistry.variantOf(pages.get(random.nextInt(pages.size())), random);
         }
         return StyleRegistry.variantOf(weighted.get(random.nextInt(weighted.size())), random);
+    }
+
+    public static ItemStack pageOf(StyleRarity rarity, RandomSource random) {
+        if (rarity == null) {
+            StylePage any = weightedPick(random);
+            return any == null ? ItemStack.EMPTY : StylePageItem.of(any.styleId(), rollAffixes(any, random));
+        }
+        List<StylePage> pages = new ArrayList<>();
+        for (StylePage page : StylePool.natural(StyleRegistry.distinct())) {
+            if (page.rarity() == rarity) {
+                pages.add(page);
+            }
+        }
+        if (pages.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        StylePage page = StyleRegistry.variantOf(pages.get(random.nextInt(pages.size())), random);
+        return StylePageItem.of(page.styleId(), rollAffixes(page, random));
     }
 
     private static int weightOf(StyleRarity rarity) {

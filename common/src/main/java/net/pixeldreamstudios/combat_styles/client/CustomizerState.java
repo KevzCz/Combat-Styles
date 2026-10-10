@@ -673,7 +673,7 @@ public class CustomizerState {
     }
 
     public int totalCount() {
-        return StyleRegistry.size();
+        return StyleRegistry.distinct().size();
     }
 
     public void add(String styleId) {

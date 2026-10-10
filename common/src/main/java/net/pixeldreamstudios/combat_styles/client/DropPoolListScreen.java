@@ -12,6 +12,7 @@ import net.pixeldreamstudios.combat_styles.style.StyleText;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class DropPoolListScreen extends DefinitionListScreen<DropPool> {
 
@@ -23,13 +24,8 @@ public class DropPoolListScreen extends DefinitionListScreen<DropPool> {
     public DropPoolListScreen(Screen parent, boolean creative) {
         super(Component.translatable(KEY_TITLE), parent, creative, DropPools.DEFINITIONS,
                 EffectSchema.ROOT_DROP_POOL, EditConfigPayload.Kind.DROP_POOL,
-                EditConfigPayload.Kind.DROP_POOL_CLEAR, DropPool.EMPTY,
+                EditConfigPayload.Kind.DROP_POOL_CLEAR, DropPools.newPool(),
                 Component.translatable(KEY_EDITOR));
-    }
-
-    @Override
-    protected boolean canCreate() {
-        return false;
     }
 
     @Override
@@ -38,20 +34,22 @@ public class DropPoolListScreen extends DefinitionListScreen<DropPool> {
         for (StyleRarity rarity : StyleRarity.values()) {
             entries.add(new Named<>(DropPools.idFor(rarity), DropPools.stored(rarity)));
         }
+        for (Map.Entry<String, DropPool> custom : DropPools.DEFINITIONS.view().entrySet()) {
+            if (!DropPools.isBuiltIn(custom.getKey())) {
+                entries.add(new Named<>(custom.getKey(), custom.getValue()));
+            }
+        }
         return entries;
     }
 
     @Override
     protected DropPool forEditing(String id, DropPool value) {
-        StyleRarity rarity = DropPools.rarityOf(id);
-        return rarity == null ? value : DropPools.withTagged(value, EquipmentDrops.tagged(rarity.key()));
+        return DropPools.withTagged(value, EquipmentDrops.tagged(DropPools.tagKey(id)));
     }
 
     @Override
     protected DropPool beforeSave(String id, DropPool value) {
-        StyleRarity rarity = DropPools.rarityOf(id);
-        return rarity == null ? value
-                : DropPools.withoutDefaultTagged(value, EquipmentDrops.tagged(rarity.key()));
+        return DropPools.withoutDefaultTagged(value, EquipmentDrops.tagged(DropPools.tagKey(id)));
     }
 
     @Override

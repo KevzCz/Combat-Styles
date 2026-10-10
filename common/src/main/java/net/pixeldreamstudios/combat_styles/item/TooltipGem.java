@@ -43,6 +43,9 @@ public enum TooltipGem {
     private static final String LEAD = " ";
     private static final String DETAIL_MARK = CombatStyles.MOD_ID + ":detail";
     private static final String HEADER_MARK = CombatStyles.MOD_ID + ":header";
+    private static final String DEPTH_SEPARATOR = "/";
+    private static final int TOP_LEVEL = 0;
+    private static final int DETAIL_DEPTH = 1;
 
     private final int glyph;
 
@@ -70,11 +73,39 @@ public enum TooltipGem {
     }
 
     public static MutableComponent detail(Component line) {
-        return Component.empty().withStyle(style -> style.withInsertion(DETAIL_MARK)).append(line);
+        return detail(line, DETAIL_DEPTH);
+    }
+
+    public static MutableComponent detail(Component line, int depth) {
+        String mark = depth <= DETAIL_DEPTH ? DETAIL_MARK : DETAIL_MARK + DEPTH_SEPARATOR + depth;
+        return Component.empty().withStyle(style -> style.withInsertion(mark)).append(line);
     }
 
     public static boolean isDetail(Component line) {
-        return line != null && DETAIL_MARK.equals(line.getStyle().getInsertion());
+        return depthOf(line) > TOP_LEVEL;
+    }
+
+    public static int depthOf(Component line) {
+        String insertion = line == null ? null : line.getStyle().getInsertion();
+        if (DETAIL_MARK.equals(insertion)) {
+            return DETAIL_DEPTH;
+        }
+        if (insertion != null && insertion.startsWith(DETAIL_MARK + DEPTH_SEPARATOR)) {
+            try {
+                return Integer.parseInt(insertion.substring(DETAIL_MARK.length() + DEPTH_SEPARATOR.length()));
+            } catch (NumberFormatException ignored) {
+                return DETAIL_DEPTH;
+            }
+        }
+        return TOP_LEVEL;
+    }
+
+    private static MutableComponent hung(Component line, int levels) {
+        MutableComponent current = line.copy();
+        for (int level = 0; level < levels; level++) {
+            current = hang(current);
+        }
+        return current;
     }
 
     public static MutableComponent header(Component line) {
@@ -89,20 +120,20 @@ public enum TooltipGem {
         if (isHeader(line)) {
             return line.copy();
         }
-        return isDetail(line) ? hang(bullet(line)) : bullet(line);
+        return hung(bullet(line), depthOf(line));
     }
 
     public static MutableComponent hangPlace(Component line) {
         if (isHeader(line)) {
             return hang(line);
         }
-        return isDetail(line) ? hang(hang(line)) : hang(line);
+        return hung(line, depthOf(line) + 1);
     }
 
     public static List<Component> indentDetails(List<Component> lines) {
         List<Component> shown = new ArrayList<>(lines.size());
         for (Component line : lines) {
-            shown.add(isDetail(line) ? hang(line) : line);
+            shown.add(hung(line, depthOf(line)));
         }
         return shown;
     }

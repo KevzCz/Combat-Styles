@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -119,9 +120,7 @@ public final class CritRolls {
         String group = crit.group().orElse(null);
         if (group == null) {
             boolean hit = roll.getAsBoolean();
-            if (hit) {
-                queue(scope, crit);
-            }
+            reactionFor(crit, hit).ifPresent(payload -> queue(scope, payload));
             return hit;
         }
         Object owner = ownerKey();
@@ -131,18 +130,23 @@ public final class CritRolls {
         if (known == null) {
             rolled.put(group, hit);
         }
-        if (hit && crit.onCrit().isPresent() && scope.reactor != null
+        Optional<AffixEffects.OnHit> reaction = reactionFor(crit, hit);
+        if (reaction.isPresent() && scope.reactor != null
                 && scope.reacted.computeIfAbsent(owner, ignored -> new HashSet<>()).add(group)) {
-            queue(scope, crit);
+            queue(scope, reaction.get());
         }
         return hit;
     }
 
-    private static void queue(Scope scope, ScaledNumber.Crit crit) {
-        if (crit.onCrit().isEmpty() || scope.reactor == null) {
+    private static Optional<AffixEffects.OnHit> reactionFor(ScaledNumber.Crit crit, boolean hit) {
+        return hit ? crit.onCrit() : crit.onNoCrit();
+    }
+
+    private static void queue(Scope scope, AffixEffects.OnHit payload) {
+        if (scope.reactor == null) {
             return;
         }
-        scope.pending.add(new Reaction(OwnerScope.current(), scope.reactor, crit.onCrit().get()));
+        scope.pending.add(new Reaction(OwnerScope.current(), scope.reactor, payload));
     }
 
     private static Object ownerKey() {

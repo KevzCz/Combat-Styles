@@ -1,0 +1,12 @@
+{
+  "rarity": "common",
+  "roll_weight": 10,
+  "min_attacks": 1,
+  "max_attacks": 2,
+  "roll": {
+    "damage_multiplier": {
+      "min": 0.95,
+      "max": 1.05
+    }
+  }
+}

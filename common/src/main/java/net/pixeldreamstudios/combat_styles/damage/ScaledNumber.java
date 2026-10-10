@@ -29,7 +29,7 @@ public record ScaledNumber(float base, List<DamageSpec.ScalingEntry> by, DamageS
 
     public record Crit(Optional<String> group, Optional<ScaledNumber> chance,
                        Optional<ScaledNumber> value, Optional<Mode> mode,
-                       Optional<AffixEffects.OnHit> onCrit) {
+                       Optional<AffixEffects.OnHit> onCrit, Optional<AffixEffects.OnHit> onNoCrit) {
 
         public enum Mode {
             MULTIPLY("multiply"),
@@ -67,12 +67,13 @@ public record ScaledNumber(float base, List<DamageSpec.ScalingEntry> by, DamageS
         public static final String KEY_LEGACY_MULTIPLIER = "multiplier";
         public static final String KEY_MODE = "mode";
         public static final String KEY_ON_CRIT = "on_crit";
+        public static final String KEY_ON_NO_CRIT = "on_no_crit";
         public static final float NO_CHANCE = 0.0F;
         public static final float DEFAULT_CHANCE = 0.1F;
         public static final float DEFAULT_MULTIPLIER = 2.0F;
         public static final float NO_ADDITION = 0.0F;
         public static final Crit SAMPLE = new Crit(Optional.empty(), Optional.of(plain(DEFAULT_CHANCE)),
-                Optional.of(plain(DEFAULT_MULTIPLIER)), Optional.empty(), Optional.empty());
+                Optional.of(plain(DEFAULT_MULTIPLIER)), Optional.empty(), Optional.empty(), Optional.empty());
         public static final Codec<Crit> CODEC = Codec.lazyInitialized(
                 () -> codec(valueCodec(ScaledNumber.CODEC)));
 
@@ -84,9 +85,11 @@ public record ScaledNumber(float base, List<DamageSpec.ScalingEntry> by, DamageS
                     value.optionalFieldOf(KEY_LEGACY_MULTIPLIER).forGetter(crit -> Optional.<ScaledNumber>empty()),
                     Mode.CODEC.optionalFieldOf(KEY_MODE).forGetter(Crit::mode),
                     Codec.lazyInitialized(() -> AffixEffects.OnHit.CODEC)
-                            .optionalFieldOf(KEY_ON_CRIT).forGetter(Crit::onCrit)
-            ).apply(instance, (group, chance, amount, legacy, mode, onCrit) ->
-                    new Crit(group, chance, amount.or(() -> legacy), mode, onCrit)));
+                            .optionalFieldOf(KEY_ON_CRIT).forGetter(Crit::onCrit),
+                    Codec.lazyInitialized(() -> AffixEffects.OnHit.CODEC)
+                            .optionalFieldOf(KEY_ON_NO_CRIT).forGetter(Crit::onNoCrit)
+            ).apply(instance, (group, chance, amount, legacy, mode, onCrit, onNoCrit) ->
+                    new Crit(group, chance, amount.or(() -> legacy), mode, onCrit, onNoCrit)));
         }
 
         public Crit {
@@ -95,6 +98,7 @@ public record ScaledNumber(float base, List<DamageSpec.ScalingEntry> by, DamageS
             value = value == null ? Optional.empty() : value;
             mode = mode == null ? Optional.empty() : mode;
             onCrit = onCrit == null ? Optional.empty() : onCrit;
+            onNoCrit = onNoCrit == null ? Optional.empty() : onNoCrit;
         }
 
         public Crit effective() {
@@ -103,7 +107,7 @@ public record ScaledNumber(float base, List<DamageSpec.ScalingEntry> by, DamageS
                 return this;
             }
             return new Crit(group, chance.or(base::chance), value.or(base::value),
-                    mode.or(base::mode), onCrit.or(base::onCrit));
+                    mode.or(base::mode), onCrit.or(base::onCrit), onNoCrit.or(base::onNoCrit));
         }
 
         public float chanceFor(Player player) {

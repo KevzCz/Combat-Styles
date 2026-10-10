@@ -356,16 +356,8 @@ public class AttackBuilderScreen extends PanelScreen {
 
     private int cycleRow(GuiGraphics graphics, String labelKey, String value,
                          int x, int y, int listWidth, int mouseX, int mouseY) {
-        boolean hovered = ScreenDraw.isWithin(mouseX, mouseY, x, y, listWidth, ROW_HEIGHT);
-        ScreenDraw.rowBackground(graphics, x, y, listWidth, ROW_HEIGHT, 0, hovered, false);
-        graphics.drawString(font, Component.translatable(labelKey), x + 6, y + 5,
-                ScreenTheme.TEXT, false);
-        int right = x + listWidth - 6;
-        ScreenDraw.hoverField(graphics, right - font.width(value), y + 2,
-                font.width(value), ROW_HEIGHT - 4, mouseX, mouseY);
-        graphics.drawString(font, value, right - font.width(value), y + 5,
-                hovered ? ScreenTheme.ACCENT : ScreenTheme.MUTED, false);
-        return y + ROW_HEIGHT;
+        return ScreenDraw.valueRow(graphics, font, Component.translatable(labelKey), Component.literal(value),
+                x, y, listWidth, ROW_HEIGHT, mouseX, mouseY);
     }
 
     private static String prettify(String raw) {

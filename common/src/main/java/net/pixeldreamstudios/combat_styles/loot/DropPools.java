@@ -7,7 +7,10 @@ import net.pixeldreamstudios.combat_styles.style.StyleRarity;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 public final class DropPools {
@@ -54,10 +57,41 @@ public final class DropPools {
         return withTagged(stored(rarity), EquipmentDrops.tagged(rarity.key()));
     }
 
+    public static Map<String, DropPool> all() {
+        Map<String, DropPool> pools = new LinkedHashMap<>();
+        for (StyleRarity rarity : StyleRarity.values()) {
+            pools.put(idFor(rarity), effective(rarity));
+        }
+        for (Map.Entry<String, DropPool> custom : DEFINITIONS.view().entrySet()) {
+            if (!pools.containsKey(custom.getKey())) {
+                pools.put(custom.getKey(), withTagged(custom.getValue(), EquipmentDrops.tagged(tagKey(custom.getKey()))));
+            }
+        }
+        return pools;
+    }
+
+    public static boolean isBuiltIn(String id) {
+        StyleRarity rarity = rarityOf(id);
+        return rarity != null && idFor(rarity).equals(id);
+    }
+
+    public static StyleRarity rarityFor(String id, DropPool pool) {
+        return pool.rarity().orElseGet(() -> isBuiltIn(id) ? rarityOf(id) : null);
+    }
+
+    public static String tagKey(String id) {
+        return id == null ? "" : id.substring(id.indexOf(NAMESPACE_SEPARATOR) + 1);
+    }
+
+    public static DropPool newPool() {
+        return DropPool.EMPTY.withChance(BASE_CHANCE);
+    }
+
     public static DropPool defaultPool(StyleRarity rarity) {
         double chance = BASE_CHANCE * Math.pow(RARITY_FALLOFF, rarity.ordinal());
         return new DropPool(chance, List.of(), List.of(CHEST_PATTERN, ENTITY_PATTERN), List.of(),
-                List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), DropPool.NO_STYLE_PAGES,
+                Optional.empty());
     }
 
     public static DropPool withTagged(DropPool pool, List<String> tagged) {

@@ -25,8 +25,6 @@ public class ConfigScreen extends PanelScreen {
     private static final String KEY_CANCEL = "screen.combat_styles.config.cancel";
     private static final String KEY_SEARCH = "screen.combat_styles.config.search";
     private static final String KEY_HUD_MOVE = "screen.combat_styles.hud_move";
-    private static final String KEY_DROP_POOLS = "screen.combat_styles.drop_pools_open";
-    private static final String KEY_DROP_POOLS_HINT = "screen.combat_styles.drop_pools_open.hint";
     private static final String KEY_RESET = "screen.combat_styles.config.reset";
     private static final String KEY_RESET_HINT = "screen.combat_styles.config.reset.hint";
     private static final String KEY_TOGGLE_ON = "screen.combat_styles.config.on";
@@ -113,11 +111,6 @@ public class ConfigScreen extends PanelScreen {
                 () -> minecraft.setScreen(new HudPlacementScreen(this)))
                 .describedAs("Drag the cooldown HUD to a new spot.")
                 .in(ConfigOptions.VISUALS));
-        all.add(ConfigOptions.action("dropPools",
-                Component.translatable(KEY_DROP_POOLS).getString(),
-                () -> minecraft.setScreen(new DropPoolListScreen(this, true)))
-                .describedAs(Component.translatable(KEY_DROP_POOLS_HINT).getString())
-                .in(ConfigOptions.EQUIPMENT));
         if (snapshot.isEmpty()) {
             for (Option option : all) {
                 if (!option.isAction()) {

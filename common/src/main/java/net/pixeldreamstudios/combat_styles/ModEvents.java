@@ -2,16 +2,11 @@ package net.pixeldreamstudios.combat_styles;
 
 import dev.architectury.event.events.common.CommandRegistrationEvent;
 import dev.architectury.event.events.common.LifecycleEvent;
-import dev.architectury.event.events.common.LootEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.event.events.common.TickEvent;
 import dev.architectury.registry.ReloadListenerRegistry;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.world.level.storage.loot.LootPool;
-import net.minecraft.world.level.storage.loot.entries.LootItem;
-import net.minecraft.world.level.storage.loot.predicates.LootItemRandomChanceCondition;
-import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 
 import net.pixeldreamstudios.combat_styles.damage.DamageBonuses;
 import net.pixeldreamstudios.combat_styles.network.ConfigEditHandler;
@@ -54,12 +49,9 @@ import net.pixeldreamstudios.combat_styles.equipment.WornItems;
 import net.pixeldreamstudios.combat_styles.api.CombatScheduler;
 import net.pixeldreamstudios.combat_styles.equipment.MissTracker;
 import net.pixeldreamstudios.combat_styles.equipment.PendingGrants;
-import net.pixeldreamstudios.combat_styles.item.ModItems;
 import net.pixeldreamstudios.combat_styles.loot.BookRollLoader;
 import net.pixeldreamstudios.combat_styles.entity.ScriptedAbilityLoader;
 import net.pixeldreamstudios.combat_styles.loot.EquipmentTagLoader;
-import net.pixeldreamstudios.combat_styles.loot.RandomStyleFunction;
-import net.pixeldreamstudios.combat_styles.loot.StyleLoot;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRollLoader;
 import net.pixeldreamstudios.combat_styles.damage.CritGroupLoader;
 import net.pixeldreamstudios.combat_styles.loot.DropPoolLoader;
@@ -192,18 +184,6 @@ public final class ModEvents {
                     NetworkManager.syncCooldowns(player, SyncCooldownsPayload.NO_PROC);
                 }
             }
-        });
-
-        LootEvent.MODIFY_LOOT_TABLE.register((key, context, builtin) -> {
-            if (!builtin || key == null || !StyleLoot.isEligible(key.location())) {
-                return;
-            }
-            float chance = (float) StyleLoot.chanceFor(key.location());
-            context.addPool(LootPool.lootPool()
-                    .setRolls(ConstantValue.exactly(1.0F))
-                    .when(LootItemRandomChanceCondition.randomChance(chance))
-                    .add(LootItem.lootTableItem(ModItems.STYLE_PAGE.get())
-                            .apply(RandomStyleFunction.builder())));
         });
     }
 }
