@@ -99,6 +99,10 @@ public abstract class PickerScreen<T> extends PanelScreen {
         return fitted;
     }
 
+    protected int requiredWidthWithSidePanel(int sideWidth, int gap) {
+        return panelWidth() + (sideWidth + gap + SCREEN_MARGIN) * 2;
+    }
+
     protected int sidePanelX(int sideWidth, int gap) {
         int right = left + panelWidth() + gap;
         if (right + sideWidth <= width - SCREEN_MARGIN) {

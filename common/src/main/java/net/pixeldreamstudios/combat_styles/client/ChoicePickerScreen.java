@@ -109,6 +109,11 @@ public class ChoicePickerScreen extends PickerScreen<String> {
     }
 
     @Override
+    protected int requiredWidth() {
+        return requiredWidthWithSidePanel(PREVIEW_SIZE, PREVIEW_GAP);
+    }
+
+    @Override
     protected int rowWidth(String row) {
         if (ANY_ROW.equals(row)) {
             return font.width(Component.translatable(KEY_ANY)) + TEXT_INSET * 2;

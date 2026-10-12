@@ -52,6 +52,7 @@ public abstract class LootTableRollMixin {
         }
         for (EquipmentDrops.Drop drop : EquipmentDrops.roll(combat_styles$tableId(context),
                 context.getParamOrNull(LootContextParams.THIS_ENTITY),
+                context.hasParam(LootContextParams.DAMAGE_SOURCE),
                 context.getLevel(),
                 context.getParamOrNull(LootContextParams.ORIGIN),
                 context.getRandom())) {

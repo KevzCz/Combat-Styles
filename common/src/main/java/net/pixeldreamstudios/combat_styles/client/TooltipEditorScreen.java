@@ -52,6 +52,7 @@ public class TooltipEditorScreen extends PanelScreen {
     private static final int EDIT_HEIGHT = 14;
     private static final int EDIT_MAX = 512;
     private static final int DOCK_HEIGHT = 112;
+    private static final int MIN_LIST_ROWS = 3;
     private static final int DOCK_PREVIEW_LINES = 3;
     private static final int MAX_NEST = 3;
     private static final int CHIP_HEIGHT = 11;
@@ -192,6 +193,16 @@ public class TooltipEditorScreen extends PanelScreen {
     @Override
     protected int panelHeight() {
         return panelHeight;
+    }
+
+    @Override
+    protected int requiredWidth() {
+        return PANEL_MIN + PREVIEW_MIN + MARGIN * 3;
+    }
+
+    @Override
+    protected int requiredHeight() {
+        return SUBTITLE_Y + LINE_HEIGHT + MIN_LIST_ROWS * (LINE_HEIGHT + ROW_PAD) + DOCK_HEIGHT + FOOTER + MARGIN * 2;
     }
 
     @Override

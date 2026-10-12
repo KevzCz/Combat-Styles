@@ -1,21 +1,30 @@
 package net.pixeldreamstudios.combat_styles.client;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
+import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPositioner;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
 
 import java.util.List;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 
-public abstract class PanelScreen extends ListScreen {
+public abstract class PanelScreen extends ListScreen implements ScaledScreen {
 
     private static final int SCROLLBAR_INSET = 2;
+    protected static final int FIT_MARGIN = 8;
 
     private List<Component> pendingTooltip;
     private boolean draggingBar;
     protected int left;
     protected int top;
+    private float uiScale = FULL_SCALE;
+    private int virtualWidth;
+    private int virtualHeight;
 
     protected PanelScreen(Component title, Screen parent) {
         super(title, parent, null);
@@ -28,6 +37,51 @@ public abstract class PanelScreen extends ListScreen {
     protected abstract int panelWidth();
 
     protected abstract int panelHeight();
+
+    protected int requiredWidth() {
+        return panelWidth() + FIT_MARGIN * 2;
+    }
+
+    protected int requiredHeight() {
+        return panelHeight() + FIT_MARGIN * 2;
+    }
+
+    @Override
+    public void fitTo(int realWidth, int realHeight) {
+        float fit = Math.min((float) realWidth / requiredWidth(), (float) realHeight / requiredHeight());
+        if (fit >= FULL_SCALE) {
+            uiScale = FULL_SCALE;
+            virtualWidth = realWidth;
+            virtualHeight = realHeight;
+            return;
+        }
+        double guiScale = Minecraft.getInstance().getWindow().getGuiScale();
+        int wholeSteps = Mth.floor(guiScale * fit);
+        uiScale = wholeSteps >= 1 ? (float) (wholeSteps / guiScale) : fit;
+        virtualWidth = Mth.ceil(realWidth / uiScale);
+        virtualHeight = Mth.ceil(realHeight / uiScale);
+    }
+
+    @Override
+    public float uiScale() {
+        return uiScale;
+    }
+
+    @Override
+    public int virtualWidth() {
+        return virtualWidth;
+    }
+
+    @Override
+    public int virtualHeight() {
+        return virtualHeight;
+    }
+
+    @Override
+    public void setTooltipForNextRenderPass(List<FormattedCharSequence> tooltip, ClientTooltipPositioner positioner,
+                                            boolean override) {
+        super.setTooltipForNextRenderPass(tooltip, isScaledDown() ? DefaultTooltipPositioner.INSTANCE : positioner, override);
+    }
 
     @Override
     protected int rowHeight() {

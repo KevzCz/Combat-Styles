@@ -7,6 +7,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.phys.Vec3;
@@ -81,9 +83,9 @@ public final class EquipmentDrops {
         }
     }
 
-    public static List<Drop> roll(ResourceLocation table, Entity entity,
+    public static List<Drop> roll(ResourceLocation table, Entity entity, boolean deathDrop,
                                   ServerLevel level, Vec3 origin, RandomSource random) {
-        if (random == null || level == null) {
+        if (random == null || level == null || isLivingRollWithoutDeath(entity, deathDrop)) {
             return List.of();
         }
         String tableId = table == null ? "" : table.toString();
@@ -117,6 +119,10 @@ public final class EquipmentDrops {
             dropped.add(new Drop(stack, entry.roll()));
         }
         return dropped;
+    }
+
+    private static boolean isLivingRollWithoutDeath(Entity entity, boolean deathDrop) {
+        return entity instanceof LivingEntity && !(entity instanceof Player) && !deathDrop;
     }
 
     private static boolean picksStylePage(DropPool pool, String tableId, RandomSource random) {

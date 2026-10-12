@@ -44,6 +44,11 @@ public class AnimationPickerScreen extends PickerScreen<String> {
     }
 
     @Override
+    protected int requiredWidth() {
+        return requiredWidthWithSidePanel(PREVIEW_SIZE, PREVIEW_GAP);
+    }
+
+    @Override
     protected int rowWidth(String row) {
         return font.width(rowText(row)) + 16;
     }

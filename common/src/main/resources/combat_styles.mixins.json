@@ -19,7 +19,10 @@
     "PoseTuningMixin",
     "SpectralRenderMixin",
     "OwnSummonPickMixin",
-    "WeaponRegistrySyncMixin"
+    "WeaponRegistrySyncMixin",
+    "ScreenScaleMixin",
+    "MouseScaleMixin",
+    "ScissorScaleMixin"
   ],
   "mixins": [
     "HitDamageMixin",

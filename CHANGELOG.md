@@ -1,1 +1,2 @@
-First version
+- Menus now fit on screen at every GUI scale
+- Extra drops on entity loot tables now only roll on real deaths.
