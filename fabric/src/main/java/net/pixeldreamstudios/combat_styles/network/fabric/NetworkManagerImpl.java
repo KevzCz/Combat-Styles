@@ -20,6 +20,7 @@ import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
 import net.pixeldreamstudios.combat_styles.network.ExtractStylePayload;
 import net.pixeldreamstudios.combat_styles.network.EditConfigPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncConfigPayload;
+import net.pixeldreamstudios.combat_styles.network.SyncSkillGrantsPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncSpellLocksPayload;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 import net.pixeldreamstudios.combat_styles.network.SwingHastePayload;
@@ -106,6 +107,8 @@ public final class NetworkManagerImpl {
         PayloadTypeRegistry.playS2C().register(SyncConfigPayload.TYPE, SyncConfigPayload.STREAM_CODEC);
         PayloadTypeRegistry.playS2C().register(SyncSpellLocksPayload.TYPE,
                 SyncSpellLocksPayload.STREAM_CODEC);
+        PayloadTypeRegistry.playS2C().register(SyncSkillGrantsPayload.TYPE,
+                SyncSkillGrantsPayload.STREAM_CODEC);
         ServerLifecycleEvents.SYNC_DATA_PACK_CONTENTS.register((player, joined) -> {
             if (!joined) {
                 NetworkManager.syncDefaultStyles(player);
@@ -147,6 +150,10 @@ public final class NetworkManagerImpl {
     }
 
     public static void sendSpellLocksToClient(ServerPlayer player, SyncSpellLocksPayload payload) {
+        ServerPlayNetworking.send(player, payload);
+    }
+
+    public static void sendSkillGrantsToClient(ServerPlayer player, SyncSkillGrantsPayload payload) {
         ServerPlayNetworking.send(player, payload);
     }
 

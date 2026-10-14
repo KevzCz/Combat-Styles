@@ -26,7 +26,9 @@ import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
 import net.pixeldreamstudios.combat_styles.network.ExtractStylePayload;
 import net.pixeldreamstudios.combat_styles.network.EditConfigPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncConfigPayload;
+import net.pixeldreamstudios.combat_styles.network.SyncSkillGrantsPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncSpellLocksPayload;
+import net.pixeldreamstudios.combat_styles.skill.SkillGrants;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLockState;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 import net.pixeldreamstudios.combat_styles.equipment.ComboHold;
@@ -166,6 +168,9 @@ public final class NetworkManagerImpl {
         registrar.playToClient(SyncSpellLocksPayload.TYPE, SyncSpellLocksPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
                         SpellLockState.accept(payload.toState())));
+        registrar.playToClient(SyncSkillGrantsPayload.TYPE, SyncSkillGrantsPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        SkillGrants.accept(payload.toView())));
         registrar.playToClient(SyncConfigPayload.TYPE, SyncConfigPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
                         ClientConfigSync.accept(payload.json())));
@@ -208,6 +213,10 @@ public final class NetworkManagerImpl {
     }
 
     public static void sendSpellLocksToClient(ServerPlayer player, SyncSpellLocksPayload payload) {
+        PacketDistributor.sendToPlayer(player, payload);
+    }
+
+    public static void sendSkillGrantsToClient(ServerPlayer player, SyncSkillGrantsPayload payload) {
         PacketDistributor.sendToPlayer(player, payload);
     }
 

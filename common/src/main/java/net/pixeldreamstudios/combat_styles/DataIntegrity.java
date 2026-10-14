@@ -1,5 +1,6 @@
 package net.pixeldreamstudios.combat_styles;
 
+import net.pixeldreamstudios.combat_styles.affix.AffixGrants;
 import net.pixeldreamstudios.combat_styles.affix.AffixEffects;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
 import net.pixeldreamstudios.combat_styles.affix.StyleAffix;
@@ -101,7 +102,7 @@ public final class DataIntegrity {
                 String where = equipment.id() + "." + named.getKey();
                 EquipmentEffect effect = named.getValue().effect();
                 for (String affixId : effect.grantAffixes()) {
-                    if (AffixRegistry.get(affixId) == null) {
+                    if (AffixRegistry.get(AffixGrants.affixOf(affixId)) == null) {
                         problems.add(where + " grants unknown affix " + affixId);
                     }
                 }

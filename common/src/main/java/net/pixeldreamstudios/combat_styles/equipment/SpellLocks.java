@@ -7,11 +7,13 @@ import net.minecraft.util.StringRepresentable;
 import net.pixeldreamstudios.combat_styles.custom.Customs;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public record SpellLocks(List<String> grant, List<String> disable, List<String> disableSchools,
-                         Mode disableMode, List<SpellTune> tune) {
+                         Mode disableMode, List<SpellTune> tune, Map<String, String> replace) {
 
     public enum Mode implements StringRepresentable {
         BLOCK,
@@ -26,11 +28,11 @@ public record SpellLocks(List<String> grant, List<String> disable, List<String> 
     }
 
     public static final SpellLocks NONE = new SpellLocks(List.of(), List.of(), List.of(), Mode.BLOCK,
-            List.of());
+            List.of(), Map.of());
 
     public static final SpellLocks SAMPLE = new SpellLocks(List.of("wizards:frostbolt"),
             List.of("wizards:fireball"), List.of("fire"), Mode.BLOCK,
-            List.of(new SpellTune("wizards:frostbolt", SpellTuning.NONE)));
+            List.of(new SpellTune("wizards:frostbolt", SpellTuning.NONE)), Map.of());
 
     public static final Codec<SpellLocks> CODEC = Customs.wrap(SpellLocks.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.listOf().optionalFieldOf("grant", List.of()).forGetter(SpellLocks::grant),
@@ -39,7 +41,9 @@ public record SpellLocks(List<String> grant, List<String> disable, List<String> 
                     .forGetter(SpellLocks::disableSchools),
             Mode.CODEC.optionalFieldOf("disable_mode", Mode.BLOCK).forGetter(SpellLocks::disableMode),
             SpellTune.CODEC.listOf().optionalFieldOf("tune", List.of())
-                    .forGetter(SpellLocks::tune)
+                    .forGetter(SpellLocks::tune),
+            Codec.unboundedMap(Codec.STRING, Codec.STRING).optionalFieldOf("replace", Map.of())
+                    .forGetter(SpellLocks::replace)
     ).apply(instance, SpellLocks::new)));
 
     public SpellLocks {
@@ -48,14 +52,16 @@ public record SpellLocks(List<String> grant, List<String> disable, List<String> 
         disableSchools = disableSchools == null ? List.of() : List.copyOf(disableSchools);
         disableMode = disableMode == null ? Mode.BLOCK : disableMode;
         tune = tune == null ? List.of() : List.copyOf(tune);
+        replace = replace == null ? Map.of() : Map.copyOf(replace);
     }
 
     public boolean isEmpty() {
-        return grant.isEmpty() && disable.isEmpty() && disableSchools.isEmpty() && tune.isEmpty();
+        return grant.isEmpty() && disable.isEmpty() && disableSchools.isEmpty() && tune.isEmpty()
+                && replace.isEmpty();
     }
 
     public boolean disables() {
-        return !disable.isEmpty() || !disableSchools.isEmpty();
+        return !disable.isEmpty() || !disableSchools.isEmpty() || !replace.isEmpty();
     }
 
     public SpellLocks mergedWith(SpellLocks other) {
@@ -67,7 +73,14 @@ public record SpellLocks(List<String> grant, List<String> disable, List<String> 
         }
         return new SpellLocks(union(grant, other.grant()), union(disable, other.disable()),
                 union(disableSchools, other.disableSchools()),
-                disables() ? disableMode : other.disableMode(), mergedTune(other.tune()));
+                disables() ? disableMode : other.disableMode(), mergedTune(other.tune()),
+                mergedReplace(other.replace()));
+    }
+
+    private Map<String, String> mergedReplace(Map<String, String> other) {
+        Map<String, String> merged = new LinkedHashMap<>(replace);
+        other.forEach(merged::putIfAbsent);
+        return merged;
     }
 
     private List<SpellTune> mergedTune(List<SpellTune> other) {

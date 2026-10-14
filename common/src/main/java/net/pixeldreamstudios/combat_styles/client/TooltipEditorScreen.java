@@ -5,13 +5,12 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 
-import org.joml.Vector2i;
-
+import net.pixeldreamstudios.combat_styles.client.tooltip.TooltipPanel;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentTooltip;
 import net.pixeldreamstudios.combat_styles.equipment.TooltipOverride;
@@ -1128,9 +1127,8 @@ public class TooltipEditorScreen extends PanelScreen {
         List<FormattedCharSequence> wrapped = previewWrapped();
         int boxX = previewX + PREVIEW_INSET;
         int boxY = previewBoxY();
-        ClientTooltipPositioner fixed = (screenWidth, screenHeight, cursorX, cursorY,
-                                         boxWidth, boxHeight) -> new Vector2i(boxX, boxY);
-        graphics.renderTooltip(font, wrapped, fixed, 0, 0);
+        TooltipPanel.renderAt(graphics, font,
+                wrapped.stream().map(ClientTooltipComponent::create).toList(), boxX, boxY);
         if (draggingLine < 0) {
             return;
         }

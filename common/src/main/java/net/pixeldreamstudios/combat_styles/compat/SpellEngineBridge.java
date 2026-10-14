@@ -37,6 +37,7 @@ import net.pixeldreamstudios.combat_styles.equipment.SpellLockState;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLocks;
 import net.pixeldreamstudios.combat_styles.equipment.SpellTuning;
 import net.pixeldreamstudios.combat_styles.mixin.SpellCloudAccessor;
+import net.pixeldreamstudios.combat_styles.skill.SkillEvents;
 
 import net.spell_engine.api.render.CustomModels;
 import net.spell_engine.api.render.LightEmission;
@@ -46,6 +47,7 @@ import net.spell_engine.api.spell.Spell;
 import net.spell_engine.api.spell.container.SpellContainer;
 import net.spell_engine.api.spell.container.SpellContainerHelper;
 import net.spell_engine.api.spell.registry.SpellRegistry;
+import net.spell_engine.api.event.CombatEvents;
 import net.spell_engine.api.spell.event.SpellEvents;
 import net.spell_engine.entity.SpellCloud;
 import net.spell_engine.entity.SpellProjectile;
@@ -195,6 +197,23 @@ final class SpellEngineBridge {
         EquipmentActivation.cast(caster, new SpellCastEvent(id, school, castTypeOf(spell),
                 channel ? CastPhase.CHANNEL : CastPhase.CAST, args.progress(), target,
                 args.action() == SpellCast.Action.TRIGGER));
+        if (args.action() == SpellCast.Action.RELEASE) {
+            SkillEvents.spellCast(caster, id.toString(), school, target);
+        }
+    }
+
+    private static void spellHealed(SpellEvents.HealEvent.Args args) {
+        if (args.caster() == null || args.caster().level().isClientSide() || args.spell() == null) {
+            return;
+        }
+        String id = args.spell().unwrapKey().map(key -> key.location().toString()).orElse(null);
+        SkillEvents.heal(args.caster(), id, args.target(), args.amount());
+    }
+
+    private static void evaded(CombatEvents.EntityEvasion.Args args) {
+        if (args.entity() != null && !args.entity().level().isClientSide()) {
+            SkillEvents.evaded(args.entity(), args.source());
+        }
     }
 
     public static boolean hasSpell(ItemStack stack) {
@@ -862,6 +881,8 @@ final class SpellEngineBridge {
                 SpellEngineBridge::grantedContainers, SpellLockState::versionOf));
         SpellEvents.CASTING_ATTEMPT.PRE.register(SpellEngineBridge::attemptLocked);
         SpellEvents.SPELL_CAST.register(SpellEngineBridge::spellCast);
+        SpellEvents.HEAL.register(SpellEngineBridge::spellHealed);
+        CombatEvents.ENTITY_EVASION.register(SpellEngineBridge::evaded);
     }
 
     private static List<SpellContainerSource.SourcedContainer> grantedContainers(Player player,
@@ -918,7 +939,14 @@ final class SpellEngineBridge {
         List<Holder<Spell>> actives = kept(player, result.actives());
         List<Holder<Spell>> passives = kept(player, result.passives());
         List<Holder<Spell>> modifiers = kept(player, result.modifiers());
+        Set<String> orphans = orphanedReplacements(player, result);
+        actives.removeIf(spell -> orphans.contains(idOf(spell)));
+        passives.removeIf(spell -> orphans.contains(idOf(spell)));
+        modifiers.removeIf(spell -> orphans.contains(idOf(spell)));
         for (String granted : SpellLockState.grantsFor(player)) {
+            if (orphans.contains(granted)) {
+                continue;
+            }
             ResourceLocation id = ResourceLocation.tryParse(granted);
             Holder<Spell> spell = id == null ? null : holderOf(player.level(), id);
             if (spell == null || removed(player, spell)) {
@@ -945,7 +973,75 @@ final class SpellEngineBridge {
                 && caster.getInteractor() != null) {
             caster.getInteractor().invalidateOptions();
         }
+        applyInherits(player, owner);
         applyTunes(player, owner);
+    }
+
+    private static Set<String> orphanedReplacements(Player player, SpellContainerSource.Result result) {
+        Map<String, String> replacements = SpellLockState.inheritsFor(player);
+        List<String> granted = SpellLockState.grantsFor(player);
+        if (replacements.isEmpty() || granted.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> owned = new HashSet<>();
+        for (SpellContainerSource.SourcedContainer source : result.sources()) {
+            if (!GRANT_SOURCE.equals(source.name()) && source.container() != null) {
+                owned.addAll(source.container().spell_ids());
+            }
+        }
+        for (List<Holder<Spell>> list : List.of(result.actives(), result.passives(), result.modifiers())) {
+            for (Holder<Spell> spell : list) {
+                String id = idOf(spell);
+                if (id != null && !granted.contains(id)) {
+                    owned.add(id);
+                }
+            }
+        }
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            for (Map.Entry<String, String> replacement : replacements.entrySet()) {
+                if (!owned.contains(replacement.getKey()) && owned.contains(replacement.getValue())) {
+                    owned.add(replacement.getKey());
+                    grew = true;
+                }
+            }
+        }
+        Set<String> orphans = new HashSet<>();
+        for (String spell : granted) {
+            if (replacements.containsKey(spell) && !owned.contains(spell)) {
+                orphans.add(spell);
+            }
+        }
+        return orphans;
+    }
+
+    private static String idOf(Holder<Spell> spell) {
+        return spell.unwrapKey().map(key -> key.location().toString()).orElse(null);
+    }
+
+    private static void applyInherits(Player player, SpellContainerSource.Owner owner) {
+        Map<String, String> inherits = SpellLockState.inheritsFor(player);
+        if (inherits.isEmpty()) {
+            return;
+        }
+        Map<ResourceLocation, List<Spell.Modifier>> cache = owner.spellModifierCache();
+        for (Map.Entry<String, String> entry : inherits.entrySet()) {
+            ResourceLocation grantedId = ResourceLocation.tryParse(entry.getKey());
+            ResourceLocation replacedId = ResourceLocation.tryParse(entry.getValue());
+            Holder<Spell> granted = grantedId == null ? null : holderOf(player.level(), grantedId);
+            Holder<Spell> replaced = replacedId == null ? null : holderOf(player.level(), replacedId);
+            if (granted == null || replaced == null) {
+                continue;
+            }
+            List<Spell.Modifier> merged = new ArrayList<>(SpellModifiers.of(player, granted));
+            for (Spell.Modifier modifier : SpellModifiers.of(player, replaced)) {
+                if (!merged.contains(modifier)) {
+                    merged.add(modifier);
+                }
+            }
+            cache.put(grantedId, merged);
+        }
     }
 
     private static void applyTunes(Player player, SpellContainerSource.Owner owner) {

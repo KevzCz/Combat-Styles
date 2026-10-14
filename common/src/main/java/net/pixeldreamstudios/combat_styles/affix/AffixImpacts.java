@@ -154,7 +154,7 @@ public final class AffixImpacts {
                     continue;
                 }
                 mobEffect(effect.effect()).ifPresent(holder -> entity.addEffect(
-                        new MobEffectInstance(holder, effect.duration(), effect.amplifier())));
+                        new MobEffectInstance(holder, effect.duration(), effect.amplifier()), player));
             }
             onHit.knockback().ifPresent(knockback -> {
                 Vec3 direction = entity.position().subtract(player.position()).normalize();

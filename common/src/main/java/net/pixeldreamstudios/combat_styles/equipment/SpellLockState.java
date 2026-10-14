@@ -6,6 +6,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
+import net.pixeldreamstudios.combat_styles.compat.SpellParentLoader;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 import net.pixeldreamstudios.combat_styles.network.SyncSpellLocksPayload;
 
@@ -24,15 +25,16 @@ public final class SpellLockState {
     }
 
     public record State(List<String> grants, Map<String, Lock> spells, Map<String, Lock> schools,
-                        Map<String, SpellTuning> tunes) {
+                        Map<String, SpellTuning> tunes, Map<String, String> inherits) {
 
-        public static final State EMPTY = new State(List.of(), Map.of(), Map.of(), Map.of());
+        public static final State EMPTY = new State(List.of(), Map.of(), Map.of(), Map.of(), Map.of());
 
         public State {
             grants = List.copyOf(grants);
             spells = Map.copyOf(spells);
             schools = Map.copyOf(schools);
             tunes = Map.copyOf(tunes);
+            inherits = Map.copyOf(inherits);
         }
     }
 
@@ -76,6 +78,10 @@ public final class SpellLockState {
         return stateOf(player).tunes();
     }
 
+    public static Map<String, String> inheritsFor(Player player) {
+        return stateOf(player).inherits();
+    }
+
     public static float tunedChance(Player player, String spellId, float base) {
         SpellTuning tuning = player == null || spellId == null ? null : tunesFor(player).get(spellId);
         return tuning == null ? base : tuning.chanceFrom(base);
@@ -117,6 +123,7 @@ public final class SpellLockState {
         Map<String, Lock> spells = new LinkedHashMap<>();
         Map<String, Lock> schools = new LinkedHashMap<>();
         Map<String, SpellTuning> tunes = new LinkedHashMap<>();
+        Map<String, String> inherits = new LinkedHashMap<>();
         for (WornEquipment worn : WornEquipment.of(player)) {
             ItemStack stack = worn.stack();
             EquipmentDefinition definition = worn.definition();
@@ -143,9 +150,24 @@ public final class SpellLockState {
                 for (SpellTune tuned : locks.tune()) {
                     tunes.putIfAbsent(tuned.spell(), tuned.tuning());
                 }
+                Lock removal = new Lock(SpellLocks.Mode.REMOVE, itemId.toString());
+                for (Map.Entry<String, String> replaced : locks.replace().entrySet()) {
+                    if (!grants.contains(replaced.getValue())) {
+                        grants.add(replaced.getValue());
+                    }
+                    spells.putIfAbsent(replaced.getKey(), removal);
+                    inherits.putIfAbsent(replaced.getValue(), replaced.getKey());
+                }
             }
         }
-        return new State(grants, spells, schools, tunes);
+        for (Map.Entry<String, String> parent : SpellParentLoader.parents().entrySet()) {
+            inherits.putIfAbsent(parent.getKey(), parent.getValue());
+            SpellTuning tuned = tunes.get(parent.getValue());
+            if (tuned != null) {
+                tunes.putIfAbsent(parent.getKey(), tuned);
+            }
+        }
+        return new State(grants, spells, schools, tunes, inherits);
     }
 
     public static void accept(State state) {

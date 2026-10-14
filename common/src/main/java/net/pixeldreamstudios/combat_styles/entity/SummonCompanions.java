@@ -92,6 +92,14 @@ public final class SummonCompanions {
         if (slots.alive.size() < before) {
             slots.nextSpawn = Math.max(slots.nextSpawn, now + companion.respawnTicks());
         }
+        if (!profile.ownDamage()) {
+            float damage = SummonSpawner.companionDamage(player, profile, resolved);
+            for (UUID id : slots.alive) {
+                if (locate(level, id) instanceof SummonData data && data.combat_styles$summonDamage() != damage) {
+                    data.combat_styles$setSummonDamage(damage);
+                }
+            }
+        }
         while (slots.alive.size() > companion.count()) {
             UUID extra = slots.alive.removeLast();
             SUSTAINED.remove(extra);

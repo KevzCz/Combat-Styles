@@ -1,0 +1,12 @@
+{
+  "required": false,
+  "package": "net.pixeldreamstudios.combat_styles.fabric.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "mixins": [
+    "StarterKitGiveMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

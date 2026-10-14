@@ -238,6 +238,11 @@ public final class NetworkManager {
     }
 
     @ExpectPlatform
+    public static void sendSkillGrantsToClient(ServerPlayer player, SyncSkillGrantsPayload payload) {
+        throw new AssertionError();
+    }
+
+    @ExpectPlatform
     public static void sendConfigToClient(ServerPlayer player, SyncConfigPayload payload) {
         throw new AssertionError();
     }

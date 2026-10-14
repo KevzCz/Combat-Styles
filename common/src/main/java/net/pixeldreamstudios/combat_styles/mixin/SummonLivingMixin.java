@@ -12,8 +12,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import net.pixeldreamstudios.combat_styles.skill.SkillEvents;
 import net.pixeldreamstudios.combat_styles.entity.SummonLifecycle;
 import net.pixeldreamstudios.combat_styles.entity.SummonOwner;
+import net.pixeldreamstudios.combat_styles.skill.SkillDots;
 
 @Mixin(LivingEntity.class)
 public abstract class SummonLivingMixin {
@@ -36,6 +38,7 @@ public abstract class SummonLivingMixin {
     @Inject(method = "die", at = @At("HEAD"))
     private void combat_styles$summonDeath(DamageSource source, CallbackInfo callback) {
         SummonLifecycle.died((LivingEntity) (Object) this, source);
+        SkillEvents.died((LivingEntity) (Object) this, source);
     }
 
     @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
@@ -53,6 +56,7 @@ public abstract class SummonLivingMixin {
                                           CallbackInfoReturnable<Boolean> callback) {
         if (callback.getReturnValueZ()) {
             SummonLifecycle.hurt((LivingEntity) (Object) this, source);
+            SkillEvents.hurt((LivingEntity) (Object) this, source, amount);
         }
     }
 
@@ -63,6 +67,14 @@ public abstract class SummonLivingMixin {
         if (effect.getEffect().value().getCategory() == MobEffectCategory.HARMFUL
                 && SummonOwner.friendly(source, (LivingEntity) (Object) this)) {
             callback.setReturnValue(false);
+            return;
         }
+        SkillDots.applied((LivingEntity) (Object) this, effect.getEffect(), source);
+    }
+
+    @Inject(method = "forceAddEffect(Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)V",
+            at = @At("HEAD"))
+    private void combat_styles$trackForcedEffect(MobEffectInstance effect, Entity source, CallbackInfo callback) {
+        SkillDots.applied((LivingEntity) (Object) this, effect.getEffect(), source);
     }
 }

@@ -77,6 +77,7 @@ public final class CombatStylesConfig {
     private boolean cooldownHudVertical = true;
     private boolean cooldownHudFlipped = false;
     private boolean cooldownHudHideWhenReady = false;
+    private boolean cooldownHudSkillEquipment = true;
     private String cooldownHudDensity = ConfigOptions.HUD_DENSITY_DEFAULT;
     private int weightCommon = 12;
     private int weightUncommon = 6;
@@ -194,6 +195,7 @@ public final class CombatStylesConfig {
         cooldownHudVertical = other.cooldownHudVertical;
         cooldownHudFlipped = other.cooldownHudFlipped;
         cooldownHudHideWhenReady = other.cooldownHudHideWhenReady;
+        cooldownHudSkillEquipment = other.cooldownHudSkillEquipment;
         cooldownHudDensity = other.cooldownHudDensity;
         animationPreviewEnabled = other.animationPreviewEnabled;
         animationPreviewSpeed = other.animationPreviewSpeed;
@@ -301,6 +303,10 @@ public final class CombatStylesConfig {
 
     public boolean cooldownHudHideWhenReady() {
         return cooldownHudHideWhenReady;
+    }
+
+    public boolean cooldownHudSkillEquipment() {
+        return cooldownHudSkillEquipment;
     }
 
     public String cooldownHudDensity() {
@@ -519,6 +525,8 @@ public final class CombatStylesConfig {
                 () -> cooldownHudFlipped, value -> cooldownHudFlipped = value));
         options.add(ConfigOptions.bool("cooldownHudHideWhenReady", "Cooldown HUD Hide When Ready",
                 () -> cooldownHudHideWhenReady, value -> cooldownHudHideWhenReady = value));
+        options.add(ConfigOptions.bool("cooldownHudSkillEquipment", "Cooldown HUD Shows Skill Tree Effects",
+                () -> cooldownHudSkillEquipment, value -> cooldownHudSkillEquipment = value));
         options.add(ConfigOptions.text("cooldownHudDensity", "Cooldown HUD Density",
                         () -> cooldownHudDensity, value -> cooldownHudDensity = value)
                 .suggesting(ConfigOptions.KIND_HUD_DENSITY));

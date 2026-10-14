@@ -3,6 +3,7 @@ package net.pixeldreamstudios.combat_styles.style;
 import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.world.entity.player.Player;
 
+import net.pixeldreamstudios.combat_styles.affix.AffixGrants;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentContext;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRuntime;
@@ -68,12 +69,8 @@ public final class EquipmentComposer {
         }
 
         if (!equipment.effect().grantAffixes().isEmpty()) {
-            List<String> merged = new ArrayList<>(result.affixIds());
-            for (String affix : equipment.effect().grantAffixes()) {
-                if (!merged.contains(affix)) {
-                    merged.add(affix);
-                }
-            }
+            List<String> merged = AffixGrants.applied(result.affixIds(),
+                    equipment.effect().grantAffixes());
             result = result.withAffixes(StyleEntry.sorted(merged));
         }
 

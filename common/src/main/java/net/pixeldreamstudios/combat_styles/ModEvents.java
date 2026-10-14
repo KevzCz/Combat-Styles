@@ -14,6 +14,11 @@ import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
 import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.AffixLoader;
+import net.pixeldreamstudios.combat_styles.compat.SpellParentLoader;
+import net.pixeldreamstudios.combat_styles.compat.puffish.TreeRequirementLoader;
+import net.pixeldreamstudios.combat_styles.kit.KitHookLoader;
+import net.pixeldreamstudios.combat_styles.kit.KitHooks;
+import net.pixeldreamstudios.combat_styles.config.ConfigPaths;
 import net.pixeldreamstudios.combat_styles.affix.AffixMechanics;
 import net.pixeldreamstudios.combat_styles.affix.ProjectileUpkeep;
 import net.pixeldreamstudios.combat_styles.attribute.AttackAttributes;
@@ -30,7 +35,10 @@ import net.pixeldreamstudios.combat_styles.equipment.Gates;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLockState;
 import net.pixeldreamstudios.combat_styles.equipment.StateEdges;
 import net.pixeldreamstudios.combat_styles.equipment.PlayerTags;
+import net.pixeldreamstudios.combat_styles.command.ClassKitCommand;
+import net.pixeldreamstudios.combat_styles.command.SkillChoiceCommand;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+import net.pixeldreamstudios.combat_styles.skill.SkillHooks;
 import net.pixeldreamstudios.combat_styles.equipment.BurstSequence;
 import net.pixeldreamstudios.combat_styles.equipment.ClientSwing;
 import net.pixeldreamstudios.combat_styles.equipment.CombatState;
@@ -76,8 +84,14 @@ public final class ModEvents {
     }
 
     public static void register() {
-        CommandRegistrationEvent.EVENT.register((dispatcher, registry, selection) ->
-                CombatStylesCommand.register(dispatcher));
+        CommandRegistrationEvent.EVENT.register((dispatcher, registry, selection) -> {
+            CombatStylesCommand.register(dispatcher);
+            SkillChoiceCommand.register(dispatcher);
+            ClassKitCommand.register(dispatcher);
+        });
+
+        PlayerEvent.PLAYER_CLONE.register((oldPlayer, newPlayer, wonGame) ->
+                SkillHooks.cloned(oldPlayer, newPlayer));
 
         ReloadListenerRegistry.register(PackType.SERVER_DATA, new AffixLoader(),
                 CombatStyles.id(AffixLoader.DIRECTORY));
@@ -101,8 +115,14 @@ public final class ModEvents {
                 CombatStyles.id(ScriptedAbilityLoader.DIRECTORY));
         ReloadListenerRegistry.register(PackType.SERVER_DATA, new EquipmentTagLoader(),
                 CombatStyles.id("equipment_tags"));
+        ReloadListenerRegistry.register(PackType.SERVER_DATA, new SpellParentLoader(),
+                CombatStyles.id("spell_parents"));
         ReloadListenerRegistry.register(PackType.SERVER_DATA, new StyleIndexReloader(),
                 CombatStyles.id("style_index"));
+        ReloadListenerRegistry.register(PackType.SERVER_DATA, new TreeRequirementLoader(),
+                CombatStyles.id(ConfigPaths.TREE_REQUIREMENTS));
+        ReloadListenerRegistry.register(PackType.SERVER_DATA, new KitHookLoader(),
+                CombatStyles.id(ConfigPaths.STARTER_KIT_HOOKS));
 
         LifecycleEvent.SERVER_STOPPED.register(server -> ServerDataReset.clear());
 
@@ -118,6 +138,7 @@ public final class ModEvents {
             ClientSwing.forget(player.getUUID());
             ComboControl.forget(player.getUUID());
             PendingGrants.forget(player.getUUID());
+            KitHooks.forget(player.getUUID());
             SummonHooks.forget(player.getUUID());
             SummonLifecycle.clearOwned(player.getServer(), player.getUUID());
             SummonCompanions.forget(player.getUUID());
@@ -148,9 +169,11 @@ public final class ModEvents {
             CombatDebug.forget(player.getUUID());
             BurstSequence.forget(player.getUUID());
             AbilityGrants.forget(player.getUUID());
+            SkillHooks.quit(player);
         });
 
         TickEvent.SERVER_POST.register(server -> {
+            SkillHooks.tick(server);
             EquipmentProviders.advance();
             ConfigEditHandler.flush(server);
             long gameTime = server.overworld().getGameTime();

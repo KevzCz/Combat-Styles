@@ -38,7 +38,7 @@ public final class StackAttributes {
         if (stack == null || stack.isEmpty() || accepts == null || EquipmentRegistry.isEmpty()) {
             return;
         }
-        EquipmentDefinition definition = EquipmentProviders.definitionFor(stack);
+        EquipmentDefinition definition = EquipmentTooltip.shownFor(stack);
         if (definition == null) {
             return;
         }

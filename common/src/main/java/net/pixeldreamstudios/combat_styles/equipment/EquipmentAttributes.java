@@ -10,6 +10,7 @@ import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.attribute.AttackAttributes;
+import net.pixeldreamstudios.combat_styles.skill.SkillEquipmentStacks;
 import net.pixeldreamstudios.combat_styles.style.AttackAttribute;
 
 import java.util.LinkedHashMap;
@@ -155,12 +156,13 @@ public final class EquipmentAttributes {
         for (WornEquipment worn : WornEquipment.of(player)) {
             ItemStack stack = worn.stack();
             EquipmentDefinition definition = worn.definition();
-            boolean inAccessorySlot = containsStack(accessories, stack);
+            boolean fromSkill = SkillEquipmentStacks.isSkillStack(stack);
+            boolean inAccessorySlot = fromSkill || containsStack(accessories, stack);
             for (Map.Entry<String, AttributeBonus> entry
                     : definition.passiveAttributes().entrySet()) {
                 AttributeBonus declared = entry.getValue();
                 if (declared == null || declared.amount() == 0.0D
-                        || !declared.set() || !declared.usesAccessorySlot()) {
+                        || (!declared.set() && !fromSkill) || !declared.usesAccessorySlot()) {
                     continue;
                 }
                 add(merged, entry.getKey(), declared, definition.id());

@@ -1047,6 +1047,7 @@ public final class CombatEffectDealer {
         }
         Map<String, AffixTuning> tuning = null;
         List<String> granted = null;
+        List<String> removed = null;
         int usableIndex = slotIndex;
         int usableSize = size;
         if (usableSize > 0) {
@@ -1133,11 +1134,24 @@ public final class CombatEffectDealer {
                             .map(StyleAffix::serializedId).toList());
                 }
                 for (String affix : granting.grantAffixes()) {
-                    if (!granted.contains(affix)) {
+                    if (AffixGrants.isRemoval(affix)) {
+                        if (removed == null) {
+                            removed = new ArrayList<>();
+                        }
+                        removed.add(AffixGrants.affixOf(affix));
+                    } else if (!granted.contains(affix)) {
                         granted.add(affix);
                     }
                 }
             }
+        }
+
+        if (removed != null) {
+            if (granted == null) {
+                granted = new ArrayList<>(resolved.affixes().stream()
+                        .map(StyleAffix::serializedId).toList());
+            }
+            granted.removeAll(removed);
         }
 
         Map<String, AffixTuning> ownTuning = entry == null ? Map.of() : entry.affixTuning();
@@ -1351,7 +1365,9 @@ public final class CombatEffectDealer {
             }
             if (context.killed() && match.hears(trigger -> trigger.onKill().orElse(false))) {
                 for (String affix : match.effect().grantAffixes()) {
-                    PendingGrants.queue(player, affix, 1);
+                    if (!AffixGrants.isRemoval(affix)) {
+                        PendingGrants.queue(player, affix, 1);
+                    }
                 }
             }
             if (onHit && target != null) {

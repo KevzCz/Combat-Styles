@@ -1,2 +1,4 @@
-- Menus now fit on screen at every GUI scale
-- Extra drops on entity loot tables now only roll on real deaths.
+- Added some optional pufferfish compat hooks
+- Fixed an issue with GUI scale crashing + tooltip stucking to one corner
+- Added optional starter kits x pufferfish hooks /classkit reset & /classkit rechoose (true/false)
+- Fixed spell replacing not working correctly

@@ -7,6 +7,7 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
 
+import net.pixeldreamstudios.combat_styles.affix.AffixGrants;
 import net.pixeldreamstudios.combat_styles.CombatStyles;
 import net.pixeldreamstudios.combat_styles.style.InnateAffixes;
 import net.pixeldreamstudios.combat_styles.affix.AffixRegistry;
@@ -62,7 +63,7 @@ public class EquipmentLoader extends SimpleJsonResourceReloadListener {
                     continue;
                 }
                 for (String affixId : effect.grantAffixes()) {
-                    if (AffixRegistry.get(affixId) == null) {
+                    if (AffixRegistry.get(AffixGrants.affixOf(affixId)) == null) {
                         CombatStyles.LOGGER.warn("{} grants unknown affix {}", where, affixId);
                     }
                 }

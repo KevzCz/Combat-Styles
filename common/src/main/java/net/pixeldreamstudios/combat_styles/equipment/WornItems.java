@@ -6,6 +6,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 import net.pixeldreamstudios.combat_styles.platform.WeaponRegistryAccess;
+import net.pixeldreamstudios.combat_styles.skill.SkillEquipmentStacks;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -63,6 +64,11 @@ public final class WornItems {
             if (AccessoryCompat.isLoaded() && player instanceof Player holder) {
                 for (ItemStack accessory : AccessoryCompat.equipped(holder)) {
                     addIfActive(worn, accessory, false);
+                }
+            }
+            if (player instanceof Player holder) {
+                for (ItemStack granted : SkillEquipmentStacks.of(holder)) {
+                    addIfActive(worn, granted, false);
                 }
             }
         } finally {

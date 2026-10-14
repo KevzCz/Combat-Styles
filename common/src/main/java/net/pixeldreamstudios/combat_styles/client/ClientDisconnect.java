@@ -6,6 +6,8 @@ import net.pixeldreamstudios.combat_styles.equipment.BurstSequence;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLockState;
 import net.pixeldreamstudios.combat_styles.loot.BookRolls;
+import net.pixeldreamstudios.combat_styles.skill.SkillEquipmentStacks;
+import net.pixeldreamstudios.combat_styles.skill.SkillGrants;
 import net.pixeldreamstudios.combat_styles.loot.WeaponRolls;
 import net.pixeldreamstudios.combat_styles.damage.CritGroups;
 import net.pixeldreamstudios.combat_styles.loot.DropPools;
@@ -23,6 +25,8 @@ public final class ClientDisconnect {
     public static void clearAll() {
         ClientConfigSync.restoreLocal();
         SpellLockState.clearMirror();
+        SkillGrants.clearMirror();
+        SkillEquipmentStacks.clear();
         ClientStyleData.clear();
         DefaultStyles.clearSync();
         CustomStyles.clearSync();

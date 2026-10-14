@@ -3,11 +3,13 @@ package net.pixeldreamstudios.combat_styles.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
 import net.pixeldreamstudios.combat_styles.equipment.WornEquipment;
+import net.pixeldreamstudios.combat_styles.skill.SkillEquipmentStacks;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +32,7 @@ public final class CooldownHud {
     private static final float COOLING_FADE = 0.35F;
 
     private static final int ICON_INSET = 1;
+    private static final int ICON_SIZE = HudLayout.SLOT - ICON_INSET * 2;
     private static final int TEXT_DROP = 10;
     private static final int TICKS_PER_SECOND = 20;
     private static final float OVERLAY_LAYER = 200.0F;
@@ -46,7 +49,7 @@ public final class CooldownHud {
         if (player == null) {
             return;
         }
-        List<HudRow> rows = rowsFor(player, config.cooldownHudHideWhenReady());
+        List<HudRow> rows = rowsFor(player, config.cooldownHudHideWhenReady(), config.cooldownHudSkillEquipment());
         if (!rows.isEmpty()) {
             draw(graphics, rows, screenWidth, screenHeight, config, false);
         }
@@ -55,14 +58,14 @@ public final class CooldownHud {
     public static void preview(GuiGraphics graphics, int screenWidth, int screenHeight,
                                CombatStylesConfig config) {
         Player player = Minecraft.getInstance().player;
-        List<HudRow> rows = player == null ? List.of() : rowsFor(player, false);
+        List<HudRow> rows = player == null ? List.of() : rowsFor(player, false, config.cooldownHudSkillEquipment());
         draw(graphics, rows.isEmpty() ? HudRow.samples() : rows,
                 screenWidth, screenHeight, config, true);
     }
 
     public static HudLayout measure(CombatStylesConfig config) {
         Player player = Minecraft.getInstance().player;
-        List<HudRow> rows = player == null ? List.of() : rowsFor(player, false);
+        List<HudRow> rows = player == null ? List.of() : rowsFor(player, false, config.cooldownHudSkillEquipment());
         if (rows.isEmpty()) {
             rows = HudRow.samples();
         }
@@ -72,10 +75,13 @@ public final class CooldownHud {
                 widestTimer(Minecraft.getInstance().font, rows, density));
     }
 
-    private static List<HudRow> rowsFor(Player player, boolean hideWhenReady) {
+    private static List<HudRow> rowsFor(Player player, boolean hideWhenReady, boolean showSkillEquipment) {
         List<HudRow> rows = new ArrayList<>();
         for (WornEquipment worn : WornEquipment.of(player)) {
             HudRow row = HudRow.of(worn.stack(), worn.definition(), worn.copy());
+            if (SkillEquipmentStacks.isSkillStack(worn.stack()) && !showSkillEquipment) {
+                continue;
+            }
             if (!hideWhenReady || !row.idle()) {
                 rows.add(row);
             }
@@ -139,7 +145,13 @@ public final class CooldownHud {
                                 int x, int y, HudLayout layout) {
         int itemX = layout.itemX(x);
         drawHighlight(graphics, row, itemX, y);
-        graphics.renderItem(row.stack(), itemX + ICON_INSET, y + ICON_INSET);
+        ResourceLocation texture = SkillEquipmentStacks.textureOf(row.stack());
+        if (texture != null) {
+            graphics.blit(texture, itemX + ICON_INSET, y + ICON_INSET, 0.0F, 0.0F,
+                    ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+        } else {
+            graphics.renderItem(row.stack(), itemX + ICON_INSET, y + ICON_INSET);
+        }
         drawSweep(graphics, font, row, itemX, y);
 
         if (layout.density() == HudDensity.MINIMAL) {

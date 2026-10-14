@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.pixeldreamstudios.combat_styles.skill.SkillHooks;
 import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.AffixTrails;
 import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
@@ -77,6 +78,7 @@ public final class CombatStyles {
         AffixTrails.register();
         MissTracker.setHandler(CombatEffectDealer::applyMissEquipment);
         SpellEngineCompat.init();
+        SkillHooks.init();
     }
 
     public static ResourceLocation id(String path) {

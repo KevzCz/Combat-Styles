@@ -48,6 +48,10 @@ public abstract class PanelScreen extends ListScreen implements ScaledScreen {
 
     @Override
     public void fitTo(int realWidth, int realHeight) {
+        minecraft = Minecraft.getInstance();
+        font = minecraft.font;
+        width = realWidth;
+        height = realHeight;
         float fit = Math.min((float) realWidth / requiredWidth(), (float) realHeight / requiredHeight());
         if (fit >= FULL_SCALE) {
             uiScale = FULL_SCALE;
@@ -55,7 +59,7 @@ public abstract class PanelScreen extends ListScreen implements ScaledScreen {
             virtualHeight = realHeight;
             return;
         }
-        double guiScale = Minecraft.getInstance().getWindow().getGuiScale();
+        double guiScale = minecraft.getWindow().getGuiScale();
         int wholeSteps = Mth.floor(guiScale * fit);
         uiScale = wholeSteps >= 1 ? (float) (wholeSteps / guiScale) : fit;
         virtualWidth = Mth.ceil(realWidth / uiScale);

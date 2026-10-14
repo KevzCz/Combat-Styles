@@ -235,9 +235,8 @@ public final class SummonSpawner {
         double lift = configurable == null ? 0.0D : configurable.spawnLift();
         spawned.moveTo(player.getX() + Math.cos(angle) * COMPANION_RADIUS, player.getY() + lift,
                 player.getZ() + Math.sin(angle) * COMPANION_RADIUS, player.getYRot(), 0.0F);
-        float attack = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
         DamageSpec spec = profile.damageSpec().orElse(null);
-        float damage = spec != null ? spec.amountFor(player, attack) : attack * resolved.damageScale();
+        float damage = companionDamage(player, profile, resolved);
         String profileKey = SummonProfiles.keyOf(player, profile);
         if (configurable != null) {
             configurable.configure(player, null, damage, 0);
@@ -266,6 +265,12 @@ public final class SummonSpawner {
         Customs.spawned(CustomScopes.SUMMON_COMPANION, companion, player, player, spawned);
         Customs.spawned(CustomScopes.SUMMON_PROFILE, profile, player, player, spawned);
         return spawned;
+    }
+
+    public static float companionDamage(Player player, SummonProfile profile, SummonProfile.Resolved resolved) {
+        float attack = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
+        DamageSpec spec = profile.damageSpec().orElse(null);
+        return spec != null ? spec.amountFor(player, attack) : attack * resolved.damageScale();
     }
 
     private static void announce(ServerLevel level, Player owner, Entity spawned) {

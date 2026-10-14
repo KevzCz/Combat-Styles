@@ -3,17 +3,16 @@ package net.pixeldreamstudios.combat_styles.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 
+import net.pixeldreamstudios.combat_styles.client.tooltip.StyleTooltipRenderer;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentTooltip;
 import net.pixeldreamstudios.combat_styles.item.TooltipContextAccess;
 
-import org.joml.Vector2i;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -183,13 +182,8 @@ public class TooltipPreviewDock {
                     x + PADDING, top, ScreenTheme.MUTED, false);
             return;
         }
-        graphics.renderTooltip(font, lines.stream().map(Component::getVisualOrderText).toList(),
-                fixedAt(x + BOX_PADDING, top), 0, 0);
-    }
-
-    private static ClientTooltipPositioner fixedAt(int boxX, int boxY) {
-        return (screenWidth, screenHeight, cursorX, cursorY, boxWidth, boxHeight)
-                -> new Vector2i(boxX, boxY);
+        StyleTooltipRenderer.renderLinesAt(graphics, font, lines, stack.getTooltipImage(),
+                x + BOX_PADDING, top);
     }
 
     private static boolean within(double mouseX, double mouseY,

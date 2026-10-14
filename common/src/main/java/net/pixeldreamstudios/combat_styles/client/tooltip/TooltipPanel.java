@@ -26,15 +26,8 @@ public final class TooltipPanel {
         if (components.isEmpty()) {
             return;
         }
-        ScreenDraw.markTooltip();
-
-        int width = 0;
-        int height = 0;
-        for (ClientTooltipComponent component : components) {
-            width = Math.max(width, component.getWidth(font));
-            height += component.getHeight() + LINE_GAP;
-        }
-        height -= LINE_GAP;
+        int width = contentWidth(font, components);
+        int height = contentHeight(components);
 
         int x = mouseX + 12;
         int y = mouseY - 12;
@@ -48,8 +41,17 @@ public final class TooltipPanel {
             y = EDGE_MARGIN;
         }
 
-        int left = x;
-        int top = y;
+        renderAt(graphics, font, components, x, y);
+    }
+
+    public static void renderAt(GuiGraphics graphics, Font font,
+                                List<ClientTooltipComponent> components, int left, int top) {
+        if (components.isEmpty()) {
+            return;
+        }
+        ScreenDraw.markTooltip();
+        int width = contentWidth(font, components);
+        int height = contentHeight(components);
         int right = left + width + PADDING * 2;
         int bottom = top + height + PADDING * 2;
 
@@ -76,4 +78,19 @@ public final class TooltipPanel {
         graphics.pose().popPose();
     }
 
+    private static int contentWidth(Font font, List<ClientTooltipComponent> components) {
+        int width = 0;
+        for (ClientTooltipComponent component : components) {
+            width = Math.max(width, component.getWidth(font));
+        }
+        return width;
+    }
+
+    private static int contentHeight(List<ClientTooltipComponent> components) {
+        int height = 0;
+        for (ClientTooltipComponent component : components) {
+            height += component.getHeight() + LINE_GAP;
+        }
+        return height - LINE_GAP;
+    }
 }

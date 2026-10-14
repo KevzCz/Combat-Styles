@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 public record SyncSpellLocksPayload(List<String> grants, List<Entry> locks,
-                                    Map<String, SpellTuning> tunes)
+                                    Map<String, SpellTuning> tunes, Map<String, String> inherits)
         implements CustomPacketPayload {
 
     public record Entry(String id, boolean school, SpellLocks.Mode mode, String item) {
@@ -45,13 +45,15 @@ public record SyncSpellLocksPayload(List<String> grants, List<Entry> locks,
                     Entry.STREAM_CODEC.apply(ByteBufCodecs.list()), SyncSpellLocksPayload::locks,
                     ByteBufCodecs.map(HashMap::new, ByteBufCodecs.STRING_UTF8,
                             ByteBufCodecs.fromCodec(SpellTuning.CODEC)), SyncSpellLocksPayload::tunes,
+                    ByteBufCodecs.map(HashMap::new, ByteBufCodecs.STRING_UTF8, ByteBufCodecs.STRING_UTF8),
+                    SyncSpellLocksPayload::inherits,
                     SyncSpellLocksPayload::new);
 
     public static SyncSpellLocksPayload of(SpellLockState.State state) {
         List<Entry> locks = new ArrayList<>();
         state.spells().forEach((id, lock) -> locks.add(new Entry(id, false, lock.mode(), lock.item())));
         state.schools().forEach((id, lock) -> locks.add(new Entry(id, true, lock.mode(), lock.item())));
-        return new SyncSpellLocksPayload(state.grants(), locks, state.tunes());
+        return new SyncSpellLocksPayload(state.grants(), locks, state.tunes(), state.inherits());
     }
 
     public SpellLockState.State toState() {
@@ -61,7 +63,7 @@ public record SyncSpellLocksPayload(List<String> grants, List<Entry> locks,
             SpellLockState.Lock lock = new SpellLockState.Lock(entry.mode(), entry.item());
             (entry.school() ? schools : spells).put(entry.id(), lock);
         }
-        return new SpellLockState.State(grants, spells, schools, tunes);
+        return new SpellLockState.State(grants, spells, schools, tunes, inherits);
     }
 
     @Override

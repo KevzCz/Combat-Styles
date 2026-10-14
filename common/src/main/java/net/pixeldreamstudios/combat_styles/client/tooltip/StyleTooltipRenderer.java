@@ -49,6 +49,17 @@ public final class StyleTooltipRenderer {
     public static void renderLines(GuiGraphics graphics, Font font, List<Component> lines,
                                    Optional<TooltipComponent> image, int mouseX, int mouseY,
                                    int screenWidth, int screenHeight) {
+        TooltipPanel.render(graphics, font, components(lines, image), mouseX, mouseY,
+                screenWidth, screenHeight);
+    }
+
+    public static void renderLinesAt(GuiGraphics graphics, Font font, List<Component> lines,
+                                     Optional<TooltipComponent> image, int left, int top) {
+        TooltipPanel.renderAt(graphics, font, components(lines, image), left, top);
+    }
+
+    private static List<ClientTooltipComponent> components(List<Component> lines,
+                                                           Optional<TooltipComponent> image) {
         List<ClientTooltipComponent> components = new ArrayList<>(lines.size() + 1);
         for (Component line : lines) {
             AffixPlateData.Plate plate = AffixPlates.of(line);
@@ -65,7 +76,6 @@ public final class StyleTooltipRenderer {
                     arc.shape(), arc.angle(), arc.reach(), arc.baseReach()));
         }
 
-        TooltipPanel.render(graphics, font, components, mouseX, mouseY,
-                screenWidth, screenHeight);
+        return components;
     }
 }

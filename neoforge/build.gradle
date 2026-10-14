@@ -45,6 +45,7 @@ dependencies {
     modImplementation "curse.maven:playeranimator-658587:$rootProject.player_animator_neoforge"
     modCompileOnly "curse.maven:spell-engine-807653:$rootProject.spell_engine_neoforge"
     modCompileOnly "curse.maven:spell-power-771265:$rootProject.spell_power_neoforge"
+    modCompileOnly("curse.maven:puffish-skills-835091:$rootProject.puffish_skills_neoforge") { transitive = false }
     modCompileOnly "curse.maven:curios-309927:$rootProject.curios_neoforge"
     modCompileOnly "curse.maven:critical-strike-1379562:$rootProject.critical_strike_neoforge"
 }

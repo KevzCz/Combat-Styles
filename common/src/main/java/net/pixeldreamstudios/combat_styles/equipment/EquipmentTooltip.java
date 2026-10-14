@@ -1,5 +1,6 @@
 package net.pixeldreamstudios.combat_styles.equipment;
 
+import net.pixeldreamstudios.combat_styles.affix.AffixGrants;
 import net.pixeldreamstudios.combat_styles.custom.CustomScopes;
 import net.pixeldreamstudios.combat_styles.custom.Customs;
 
@@ -60,6 +61,8 @@ public final class EquipmentTooltip {
     private static final String KEY_SPELL_BLOCK = "tooltip.combat_styles.equip_spell_block";
     private static final String KEY_SPELL_TUNE = "tooltip.combat_styles.equip_spell_tune";
     private static final String KEY_SPELL_REMOVE = "tooltip.combat_styles.equip_spell_remove";
+    private static final String KEY_SPELL_REPLACE = "tooltip.combat_styles.equip_spell_replace";
+    private static final String KEY_GRANT_REMOVED = "tooltip.combat_styles.grant_removed";
     private static final String KEY_SCHOOL_BLOCK = "tooltip.combat_styles.equip_school_block";
     private static final String KEY_SCHOOL_REMOVE = "tooltip.combat_styles.equip_school_remove";
     private static final String KEY_REWRITES = "item.combat_styles.effect.rewrites";
@@ -868,6 +871,9 @@ public final class EquipmentTooltip {
             tooltip.add(TooltipGem.SPELL.bullet(Component.translatable(KEY_SPELL_GRANT, StyleText.spellName(spell))
                     .withStyle(BODY)));
         }
+        locks.replace().forEach((replaced, granted) -> tooltip.add(TooltipGem.SPELL.bullet(
+                Component.translatable(KEY_SPELL_REPLACE, StyleText.spellName(replaced), StyleText.spellName(granted))
+                        .withStyle(BODY))));
         for (SpellTune tuned : locks.tune()) {
             appendUnder(TooltipGem.SPELL.bullet(Component.translatable(KEY_SPELL_TUNE,
                     StyleText.spellName(tuned.spell())).withStyle(BODY)),
@@ -1583,8 +1589,14 @@ public final class EquipmentTooltip {
         int budget = TooltipContextAccess.expanded() ? Integer.MAX_VALUE : GRANT_LINE_BUDGET;
         int spent = 0;
         List<Component> withheld = new ArrayList<>();
-        for (String id : effect.grantAffixes()) {
+        for (String entry : effect.grantAffixes()) {
+            String id = AffixGrants.affixOf(entry);
             StyleAffix affix = AffixRegistry.get(id);
+            if (affix != null && AffixGrants.isRemoval(entry)) {
+                tooltip.add(TooltipGem.NOTE.bullet(Component.translatable(KEY_GRANT_REMOVED,
+                        AffixText.name(affix)).withStyle(BODY)));
+                continue;
+            }
             if (affix == null) {
                 tooltip.add(TooltipGem.NOTE.bullet(
                         Component.translatable(KEY_GRANT_UNKNOWN, id).withStyle(FRAME)));

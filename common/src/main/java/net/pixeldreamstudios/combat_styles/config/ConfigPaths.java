@@ -20,6 +20,8 @@ public final class ConfigPaths {
     public static final String EQUIPMENT_DROPS = "equipment_drops";
     public static final String SUMMON_ABILITIES = "summon_abilities";
     public static final String AFFIXES = "custom_affixes";
+    public static final String TREE_REQUIREMENTS = "tree_requirements";
+    public static final String STARTER_KIT_HOOKS = "starter_kit_hooks";
     public static final String STYLE_ID_LEDGER = "style_ids.json";
 
     private ConfigPaths() {

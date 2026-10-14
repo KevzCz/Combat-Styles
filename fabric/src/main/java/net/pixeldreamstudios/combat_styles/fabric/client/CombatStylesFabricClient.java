@@ -40,7 +40,9 @@ import net.pixeldreamstudios.combat_styles.network.SyncAttackOverridesPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncEquipmentPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncCooldownsPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncConfigPayload;
+import net.pixeldreamstudios.combat_styles.network.SyncSkillGrantsPayload;
 import net.pixeldreamstudios.combat_styles.network.SyncSpellLocksPayload;
+import net.pixeldreamstudios.combat_styles.skill.SkillGrants;
 import net.pixeldreamstudios.combat_styles.equipment.SpellLockState;
 import net.pixeldreamstudios.combat_styles.network.SyncLearnedPayload;
 import net.pixeldreamstudios.combat_styles.style.AttackOverrides;
@@ -102,6 +104,9 @@ public class CombatStylesFabricClient implements ClientModInitializer {
 
         ClientPlayNetworking.registerGlobalReceiver(SyncSpellLocksPayload.TYPE, (payload, context) ->
                 context.client().execute(() -> SpellLockState.accept(payload.toState())));
+
+        ClientPlayNetworking.registerGlobalReceiver(SyncSkillGrantsPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> SkillGrants.accept(payload.toView())));
 
         ClientPlayNetworking.registerGlobalReceiver(SyncConfigPayload.TYPE, (payload, context) ->
                 context.client().execute(() -> ClientConfigSync.accept(payload.json())));

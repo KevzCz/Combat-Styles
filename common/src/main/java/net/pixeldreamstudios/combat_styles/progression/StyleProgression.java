@@ -2,11 +2,16 @@ package net.pixeldreamstudios.combat_styles.progression;
 
 import net.minecraft.world.entity.player.Player;
 
+import net.pixeldreamstudios.combat_styles.skill.SkillGrants;
 import net.pixeldreamstudios.combat_styles.style.StyleEntry;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public final class StyleProgression {
+
+    private static final int GRANTED_COPIES = 1;
 
     private StyleProgression() {
     }
@@ -30,7 +35,7 @@ public final class StyleProgression {
             return false;
         }
         LearnedStyles learned = of(player);
-        return learned != null && learned.has(styleId);
+        return (learned != null && learned.has(styleId)) || SkillGrants.stylesOf(player).contains(styleId);
     }
 
     public static boolean learn(Player player, String styleId) {
@@ -50,12 +55,22 @@ public final class StyleProgression {
 
     public static Map<String, Integer> all(Player player) {
         LearnedStyles learned = of(player);
-        return learned == null ? Map.of() : learned.all();
+        Map<String, Integer> own = learned == null ? Map.of() : learned.all();
+        List<String> granted = SkillGrants.stylesOf(player);
+        if (granted.isEmpty()) {
+            return own;
+        }
+        Map<String, Integer> merged = new LinkedHashMap<>(own);
+        for (String styleId : granted) {
+            merged.putIfAbsent(styleId, GRANTED_COPIES);
+        }
+        return merged;
     }
 
     public static int copies(Player player, String styleId) {
         LearnedStyles learned = of(player);
-        return learned == null ? 0 : learned.count(styleId);
+        int own = learned == null ? 0 : learned.count(styleId);
+        return SkillGrants.stylesOf(player).contains(styleId) ? Math.max(own, GRANTED_COPIES) : own;
     }
 
     public static int count(Player player) {
