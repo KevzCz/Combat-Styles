@@ -169,7 +169,7 @@ public final class DataIntegrity {
             }
         }
         for (String ability : AbilityRegistry.registered()) {
-            if (AbilityConfig.declared(ability) == null
+            if (AbilityConfig.declared(ability) == null && !AbilityConfig.hasData(ability)
                     && !AbilityConfig.all().containsKey(ability)) {
                 problems.add("ability " + ability
                         + " has a behaviour but ships no defaults");

@@ -5,15 +5,16 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-
 import net.pixeldreamstudios.combat_styles.compat.SpellParentLoader;
 import net.pixeldreamstudios.combat_styles.network.NetworkManager;
 import net.pixeldreamstudios.combat_styles.network.SyncSpellLocksPayload;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -124,6 +125,7 @@ public final class SpellLockState {
         Map<String, Lock> schools = new LinkedHashMap<>();
         Map<String, SpellTuning> tunes = new LinkedHashMap<>();
         Map<String, String> inherits = new LinkedHashMap<>();
+        Set<String> standalone = new HashSet<>();
         for (WornEquipment worn : WornEquipment.of(player)) {
             ItemStack stack = worn.stack();
             EquipmentDefinition definition = worn.definition();
@@ -156,11 +158,18 @@ public final class SpellLockState {
                         grants.add(replaced.getValue());
                     }
                     spells.putIfAbsent(replaced.getKey(), removal);
-                    inherits.putIfAbsent(replaced.getValue(), replaced.getKey());
+                    if (locks.keepModifiers()) {
+                        inherits.putIfAbsent(replaced.getValue(), replaced.getKey());
+                    } else {
+                        standalone.add(replaced.getValue());
+                    }
                 }
             }
         }
         for (Map.Entry<String, String> parent : SpellParentLoader.parents().entrySet()) {
+            if (standalone.contains(parent.getKey())) {
+                continue;
+            }
             inherits.putIfAbsent(parent.getKey(), parent.getValue());
             SpellTuning tuned = tunes.get(parent.getValue());
             if (tuned != null) {

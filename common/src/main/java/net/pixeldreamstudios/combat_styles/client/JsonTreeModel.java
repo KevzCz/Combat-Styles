@@ -12,6 +12,9 @@ import java.util.Set;
 
 public final class JsonTreeModel {
 
+    private static final String PATH_SEPARATOR = "/";
+    private static final String ESCAPED_SEPARATOR = "\uE000";
+
     public enum Kind {
         OBJECT,
         ARRAY,
@@ -79,7 +82,8 @@ public final class JsonTreeModel {
     }
 
     private static String join(String path, String key) {
-        return path.isEmpty() ? key : path + "/" + key;
+        String segment = escape(key);
+        return path.isEmpty() ? segment : path + PATH_SEPARATOR + segment;
     }
 
     public static JsonElement resolve(JsonElement root, String path) {
@@ -87,12 +91,12 @@ public final class JsonTreeModel {
             return root;
         }
         JsonElement current = root;
-        for (String part : path.split("/")) {
+        for (String part : path.split(PATH_SEPARATOR)) {
             if (current == null) {
                 return null;
             }
             if (current.isJsonObject()) {
-                current = current.getAsJsonObject().get(part);
+                current = current.getAsJsonObject().get(unescape(part));
             } else if (current.isJsonArray()) {
                 int index = parseIndex(part);
                 JsonArray array = current.getAsJsonArray();
@@ -105,9 +109,9 @@ public final class JsonTreeModel {
     }
 
     public static void set(JsonElement root, String path, JsonElement value) {
-        int split = path.lastIndexOf('/');
+        int split = path.lastIndexOf(PATH_SEPARATOR);
         String parentPath = split < 0 ? "" : path.substring(0, split);
-        String leaf = split < 0 ? path : path.substring(split + 1);
+        String leaf = unescape(split < 0 ? path : path.substring(split + 1));
         JsonElement parent = resolve(root, parentPath);
         if (parent == null) {
             return;
@@ -126,9 +130,9 @@ public final class JsonTreeModel {
     }
 
     public static void remove(JsonElement root, String path) {
-        int split = path.lastIndexOf('/');
+        int split = path.lastIndexOf(PATH_SEPARATOR);
         String parentPath = split < 0 ? "" : path.substring(0, split);
-        String leaf = split < 0 ? path : path.substring(split + 1);
+        String leaf = unescape(split < 0 ? path : path.substring(split + 1));
         JsonElement parent = resolve(root, parentPath);
         if (parent == null) {
             return;
@@ -144,6 +148,14 @@ public final class JsonTreeModel {
                 array.remove(index);
             }
         }
+    }
+
+    public static String escape(String key) {
+        return key.replace(PATH_SEPARATOR, ESCAPED_SEPARATOR);
+    }
+
+    public static String unescape(String segment) {
+        return segment.replace(ESCAPED_SEPARATOR, PATH_SEPARATOR);
     }
 
     private static int parseIndex(String raw) {

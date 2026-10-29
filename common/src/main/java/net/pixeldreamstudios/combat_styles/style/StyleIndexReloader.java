@@ -22,7 +22,9 @@ public class StyleIndexReloader implements PreparableReloadListener {
                 .thenCompose(barrier::wait)
                 .thenRunAsync(() -> {
                     StyleConfigs.reloadAll();
-                    DataIntegrity.verify();
+                    if (StyleRegistry.size() > 0) {
+                        DataIntegrity.verify();
+                    }
                     StyleIdLedger.check();
                 }, applyExecutor);
     }

@@ -112,6 +112,8 @@ public final class EffectChoices {
             SummonGate.ENTITIES);
     private static final String PATH_SEPARATOR = "/";
     private static final String EQUIPMENT_SEGMENT = "equipment";
+    private static final String SPELLS_SEGMENT = "spells";
+    private static final String KEY_REPLACE = "replace";
     private static final String ENTITY_KEY = "entity";
     private static final List<String> ABILITY_KEYS = List.of("ability", "finale", "abilities");
 
@@ -226,6 +228,9 @@ public final class EffectChoices {
         }
         if (SchemaRegistry.hasChoices(key)) {
             return SchemaRegistry.choicesFor(key);
+        }
+        if (KEY_REPLACE.equals(ownerOf(scope)) && within(scope, SPELLS_SEGMENT)) {
+            return spellIds();
         }
         if (within(scope, EQUIPMENT_SEGMENT) && EffectSchema.SUMMON_SLOTS.contains(key)) {
             return itemIds();

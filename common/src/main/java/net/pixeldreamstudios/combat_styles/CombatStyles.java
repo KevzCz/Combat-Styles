@@ -5,18 +5,14 @@ import com.google.gson.GsonBuilder;
 import dev.architectury.platform.Platform;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import net.pixeldreamstudios.combat_styles.skill.SkillHooks;
-import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.affix.AffixTrails;
-import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
+import net.pixeldreamstudios.combat_styles.affix.CombatEffectDealer;
 import net.pixeldreamstudios.combat_styles.attribute.ModAttributes;
+import net.pixeldreamstudios.combat_styles.compat.SpellEngineCompat;
 import net.pixeldreamstudios.combat_styles.component.ModComponents;
 import net.pixeldreamstudios.combat_styles.config.AbilityConfig;
-import net.pixeldreamstudios.combat_styles.config.OptionSources;
 import net.pixeldreamstudios.combat_styles.config.CombatStylesConfig;
+import net.pixeldreamstudios.combat_styles.config.OptionSources;
 import net.pixeldreamstudios.combat_styles.config.SpellCompatState;
 import net.pixeldreamstudios.combat_styles.config.StatusEffectConfig;
 import net.pixeldreamstudios.combat_styles.config.SummonTuning;
@@ -29,9 +25,13 @@ import net.pixeldreamstudios.combat_styles.equipment.EquipmentDefinition;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentProviders;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.equipment.MissTracker;
-import net.pixeldreamstudios.combat_styles.item.ModItems;
+import net.pixeldreamstudios.combat_styles.equipment.SpellChoices;
 import net.pixeldreamstudios.combat_styles.item.EquipmentItem;
+import net.pixeldreamstudios.combat_styles.item.ModItems;
 import net.pixeldreamstudios.combat_styles.loot.RandomStyleFunction;
+import net.pixeldreamstudios.combat_styles.skill.SkillHooks;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class CombatStyles {
 
@@ -66,6 +66,7 @@ public final class CombatStyles {
         OptionSources.register(new AbilityChoices());
         OptionSources.register(new CustomChoices());
         OptionSources.register(new EnchantmentChoices());
+        OptionSources.register(new SpellChoices());
         RaiseDead.register();
         SummonTuning.load();
         ModComponents.register();

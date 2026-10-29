@@ -48,6 +48,11 @@ subprojects {
             name = 'Ladysnake'
             url = 'https://maven.ladysnake.org/releases'
         }
+        mavenLocal {
+            content {
+                includeGroup "net.pixeldreamstudios.skill_tree_editor"
+            }
+        }
         mavenCentral()
     }
 

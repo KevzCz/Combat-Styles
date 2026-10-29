@@ -24,6 +24,16 @@ public abstract class ScreenScaleMixin {
         original.call(minecraft, scaled.virtualWidth(), scaled.virtualHeight());
     }
 
+    @WrapMethod(method = "resize(Lnet/minecraft/client/Minecraft;II)V")
+    private void combat_styles$resizeInVirtualSpace(Minecraft minecraft, int width, int height, Operation<Void> original) {
+        if (!((Object) this instanceof ScaledScreen scaled)) {
+            original.call(minecraft, width, height);
+            return;
+        }
+        scaled.fitTo(width, height);
+        original.call(minecraft, scaled.virtualWidth(), scaled.virtualHeight());
+    }
+
     @WrapOperation(method = "renderWithTooltip", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/gui/screens/Screen;render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V"))
     private void combat_styles$renderScaled(Screen screen, GuiGraphics graphics, int mouseX, int mouseY,

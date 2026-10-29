@@ -27,6 +27,7 @@ public class CustomStyleLoader extends SimpleJsonResourceReloadListener {
         Map<String, CustomStyle> loaded = new LinkedHashMap<>();
         int rejected = 0;
         int unresolved = 0;
+        boolean indexed = StyleRegistry.size() > 0;
 
         for (Map.Entry<ResourceLocation, JsonElement> file : object.entrySet()) {
             CustomStyle style = CustomStyle.CODEC
@@ -44,7 +45,7 @@ public class CustomStyleLoader extends SimpleJsonResourceReloadListener {
                 rejected++;
                 continue;
             }
-            if (StyleRegistry.get(style.entry().styleId()) == null) {
+            if (indexed && StyleRegistry.get(style.entry().styleId()) == null) {
                 CombatStyles.LOGGER.warn("Custom style {} references unknown style {} (registry has {} pages)",
                         style.id(), style.entry().styleId(), StyleRegistry.all().size());
                 unresolved++;
@@ -58,8 +59,14 @@ public class CustomStyleLoader extends SimpleJsonResourceReloadListener {
         }
 
         CustomStyles.accept(loaded);
-        CombatStyles.LOGGER.info(
-                "Loaded {} custom styles in {} groups ({} rejected, {} unresolved)",
-                loaded.size(), CustomStyles.groups().size(), rejected, unresolved);
+        if (indexed) {
+            CombatStyles.LOGGER.info(
+                    "Loaded {} custom styles in {} groups ({} rejected, {} unresolved)",
+                    loaded.size(), CustomStyles.groups().size(), rejected, unresolved);
+        } else {
+            CombatStyles.LOGGER.info(
+                    "Loaded {} custom styles in {} groups ({} rejected); their styles are checked once BetterCombat's weapons load",
+                    loaded.size(), CustomStyles.groups().size(), rejected);
+        }
     }
 }

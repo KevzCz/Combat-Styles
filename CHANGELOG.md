@@ -1,4 +1,5 @@
-- Added some optional pufferfish compat hooks
-- Fixed an issue with GUI scale crashing + tooltip stucking to one corner
-- Added optional starter kits x pufferfish hooks /classkit reset & /classkit rechoose (true/false)
-- Fixed spell replacing not working correctly
+- Custom styles based on BetterCombat no longer report as unresolved at world start. They're checked once BetterCombat's weapons have loaded.
+- The data check no longer runs on the first datapack load. It still runs on server start and /reload. This removes the 92 false warnings at startup.
+- Summon abilities no longer warn "has a behaviour but ships no defaults".
+- Namespaced crit group references such as @combat_styles_content:sharp_throw no longer warn when the equipment also has a local crit list.
+- The early "BetterCombat weapon registry is empty" warning is now an info line.

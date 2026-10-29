@@ -5,6 +5,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.pixeldreamstudios.combat_styles.api.CombatStylesAPI;
 import net.pixeldreamstudios.combat_styles.compat.PuffishCompat;
+import net.pixeldreamstudios.combat_styles.compat.SkillTreeEditorCompat;
 import net.pixeldreamstudios.combat_styles.compat.puffish.TreePools;
 import net.pixeldreamstudios.combat_styles.kit.KitHooks;
 import net.pixeldreamstudios.combat_styles.kit.KitState;
@@ -22,6 +23,7 @@ public final class SkillHooks {
         CombatStylesAPI.registerBudgetModifier((holder, stack, category, budget) ->
                 holder instanceof Player player ? budget + SkillGrants.budgetOf(player) : budget);
         PuffishCompat.init();
+        SkillTreeEditorCompat.init();
     }
 
     public static void tick(MinecraftServer server) {

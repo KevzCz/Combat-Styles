@@ -70,7 +70,7 @@ public final class StyleRegistry {
         int disabled = 0;
         Map<ResourceLocation, WeaponAttributes> source = WeaponRegistryAccess.indexable();
         if (source == null || source.isEmpty()) {
-            CombatStyles.LOGGER.warn("BetterCombat weapon registry is empty; no combat styles indexed");
+            CombatStyles.LOGGER.info("BetterCombat weapons are not loaded yet; combat styles will be indexed once they are");
             PAGES.clear();
             RAW_PAGES.clear();
             BY_CATEGORY.clear();

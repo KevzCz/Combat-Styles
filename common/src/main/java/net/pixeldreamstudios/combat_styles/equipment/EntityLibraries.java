@@ -33,6 +33,8 @@ public final class EntityLibraries {
     public static final Codec<Map<String, ScaledNumber.Crit>> CRITS_CODEC =
             Codec.unboundedMap(Codec.STRING, ScaledNumber.Crit.CODEC);
 
+    private static final String NAMESPACE_MARK = ":";
+
     private record Library(String key, String refKey, Codec<?> codec) {
     }
 
@@ -127,7 +129,11 @@ public final class EntityLibraries {
                 || !LibraryRef.isRef(ref.getAsString())) {
             return Optional.empty();
         }
-        JsonElement entry = entries.get(LibraryRef.nameOf(ref.getAsString()));
+        String name = LibraryRef.nameOf(ref.getAsString());
+        JsonElement entry = entries.get(name);
+        if ((entry == null || !entry.isJsonObject()) && name.contains(NAMESPACE_MARK)) {
+            return Optional.empty();
+        }
         if (entry == null || !entry.isJsonObject()) {
             CombatStyles.LOGGER.warn("Reference {} has no entry in this equipment's {}",
                     ref.getAsString(), library.key());

@@ -531,6 +531,10 @@ public final class AbilityConfig {
         }
     }
 
+    public static boolean hasData(String ability) {
+        return DATA.containsKey(key(ability));
+    }
+
     public static Entry declared(String ability) {
         return DECLARED.get(key(ability));
     }

@@ -8,7 +8,6 @@ import net.pixeldreamstudios.combat_styles.equipment.EquipmentContext;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRegistry;
 import net.pixeldreamstudios.combat_styles.equipment.EquipmentRuntime;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;

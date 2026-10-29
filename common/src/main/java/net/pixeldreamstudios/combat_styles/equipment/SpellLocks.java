@@ -13,7 +13,8 @@ import java.util.Locale;
 import java.util.Map;
 
 public record SpellLocks(List<String> grant, List<String> disable, List<String> disableSchools,
-                         Mode disableMode, List<SpellTune> tune, Map<String, String> replace) {
+                         Mode disableMode, List<SpellTune> tune, Map<String, String> replace,
+                         boolean keepModifiers) {
 
     public enum Mode implements StringRepresentable {
         BLOCK,
@@ -28,11 +29,11 @@ public record SpellLocks(List<String> grant, List<String> disable, List<String> 
     }
 
     public static final SpellLocks NONE = new SpellLocks(List.of(), List.of(), List.of(), Mode.BLOCK,
-            List.of(), Map.of());
+            List.of(), Map.of(), true);
 
     public static final SpellLocks SAMPLE = new SpellLocks(List.of("wizards:frostbolt"),
             List.of("wizards:fireball"), List.of("fire"), Mode.BLOCK,
-            List.of(new SpellTune("wizards:frostbolt", SpellTuning.NONE)), Map.of());
+            List.of(new SpellTune("wizards:frostbolt", SpellTuning.NONE)), Map.of(), true);
 
     public static final Codec<SpellLocks> CODEC = Customs.wrap(SpellLocks.class, RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.listOf().optionalFieldOf("grant", List.of()).forGetter(SpellLocks::grant),
@@ -43,7 +44,8 @@ public record SpellLocks(List<String> grant, List<String> disable, List<String> 
             SpellTune.CODEC.listOf().optionalFieldOf("tune", List.of())
                     .forGetter(SpellLocks::tune),
             Codec.unboundedMap(Codec.STRING, Codec.STRING).optionalFieldOf("replace", Map.of())
-                    .forGetter(SpellLocks::replace)
+                    .forGetter(SpellLocks::replace),
+            Codec.BOOL.optionalFieldOf("keep_modifiers", true).forGetter(SpellLocks::keepModifiers)
     ).apply(instance, SpellLocks::new)));
 
     public SpellLocks {
@@ -74,7 +76,7 @@ public record SpellLocks(List<String> grant, List<String> disable, List<String> 
         return new SpellLocks(union(grant, other.grant()), union(disable, other.disable()),
                 union(disableSchools, other.disableSchools()),
                 disables() ? disableMode : other.disableMode(), mergedTune(other.tune()),
-                mergedReplace(other.replace()));
+                mergedReplace(other.replace()), replace.isEmpty() ? other.keepModifiers() : keepModifiers);
     }
 
     private Map<String, String> mergedReplace(Map<String, String> other) {
