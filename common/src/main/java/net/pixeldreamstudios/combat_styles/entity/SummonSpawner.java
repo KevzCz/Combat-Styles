@@ -169,6 +169,7 @@ public final class SummonSpawner {
             }
             summon.maxActive().ifPresent(max -> SummonCaps.makeRoom(player, source, max));
             if (declared.raisesVictim() && target != null) {
+                RaisedBody.copy(target, spawned, summon.keepGear());
                 spawned.moveTo(target.getX(), target.getY(), target.getZ(),
                         target.getYRot(), target.getXRot());
             } else {

@@ -1,1 +1,1 @@
-- Fixed an issue that made Spell Engine a required mod (its supposed to be optional)
+- Fixed Raise Dead ability. It now raise the exact copy of the killed entity.
